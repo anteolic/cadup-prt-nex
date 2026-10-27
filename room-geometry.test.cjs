@@ -121,3 +121,16 @@ const unjoinedLoop=RoomGeometry.layout([],almostClosed);assert.equal(unjoinedLoo
  assert.equal(d.start,215);assert.equal(d.end,395);assert.equal(d.end-d.start,180);
  assert.ok(RoomGeometry.union([...layout.outer,...layout.inner]).edges.some(e=>e.axis===d.axis&&e.line===d.line&&e.span[0]===d.start&&e.span[1]===d.end));
 }
+
+// Face dimensions exclude openings; neighboring and perpendicular walls keep their measures.
+{
+ const edges=[{axis:'h',line:385,span:[100,900],side:-1},{axis:'h',line:415,span:[100,900],side:1},{axis:'h',line:450,span:[100,900],side:1},{axis:'v',line:850,span:[100,900],side:1}];
+ const openings=[{axis:'h',start:255,end:345,low:385,high:415},{axis:'h',start:540,end:660,low:385,high:415}];
+ const result=RoomGeometry.cutWallDimensions(edges,openings);
+ assert.deepEqual(result.filter(e=>e.line===385).map(e=>e.span),[[100,255],[345,540],[660,900]]);
+ assert.deepEqual(result.filter(e=>e.line===415).map(e=>e.span),[[100,255],[345,540],[660,900]]);
+ assert.deepEqual(result.filter(e=>e.line===450||e.axis==='v'),edges.slice(2));
+ const overlap=RoomGeometry.cutWallDimensions([edges[0]],[...openings,{axis:'h',start:300,end:560,low:385,high:415}]);
+ assert.deepEqual(overlap.map(e=>e.span),[[100,255],[660,900]]);
+ assert.deepEqual(RoomGeometry.cutWallDimensions([edges[0]],[{axis:'h',start:0,end:1000,low:385,high:415}]),[]);
+}

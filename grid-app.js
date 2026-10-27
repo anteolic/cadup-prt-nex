@@ -313,12 +313,21 @@
   if(!wallsVisible){g.strokeStyle='#1675d1';g.lineWidth=2;g.beginPath();
    for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();
   }
-  // Kote iz stvarnih rubova zidova: unutarnje i vanjske duljine, bez oznaka prostorija.
-  for(const e of current.wallOutline.edges){
+  // Measure the remaining wall faces on each side of attached openings.
+  const openingCuts=[];
+  for(const item of objects){
+   if(!['door','double-door','window'].includes(item.kind))continue;
+   const attached=CadObjects.attach(item,segments);
+   if(Math.abs(attached.x-item.x)>=.01||Math.abs(attached.y-item.y)>=.01||attached.rotation%180!==item.rotation%180)continue;
+   const wall=hitWallForObject(item);if(!wall)continue;
+   const horizontal=wall.y1===wall.y2,start=(horizontal?item.x:item.y)-item.width/2,end=start+item.width;
+   for(const box of RoomGeometry.wallSelection(current.rooms,segments,wall,current.layout))openingCuts.push({axis:horizontal?'h':'v',start:Math.max(start,horizontal?box.x:box.y),end:Math.min(end,horizontal?box.x+box.width:box.y+box.height),low:horizontal?box.y:box.x,high:horizontal?box.y+box.height:box.x+box.width});
+  }
+  for(const e of RoomGeometry.cutWallDimensions(current.wallOutline.edges,openingCuts.filter(cut=>cut.end>cut.start))){
    const wall=e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]};
    const center=visibleWallCenter(wall);if(!center)continue;
    const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);
-   if(visibleLength<36)continue;
+   if(visibleLength<(e.cut?14:36))continue;
    tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v',1,{axis:e.axis,line:e.line,start:e.span[0],end:e.span[1],side:e.side});
   }
   g.globalAlpha=1;

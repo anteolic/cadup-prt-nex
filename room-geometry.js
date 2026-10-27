@@ -153,6 +153,21 @@ globalThis.RoomGeometry = (() => {
   return {outer,inner,net,area:union(free).area,segments,physicalParts,physicalJoints,wallGroups,disconnectedOverlap,unjoinedCaps,centered:true};
  }
  // Visible face length excludes corners and the thickness of intersecting walls.
+ function cutWallDimensions(edges,openings){
+  return edges.flatMap(edge=>{
+   let spans=[edge.span],cut=false;
+   for(const opening of openings){
+    if(edge.axis!==opening.axis||edge.line<opening.low-.001||edge.line>opening.high+.001)continue;
+    const next=[];
+    for(const [a,b] of spans){
+     if(opening.end<=a||opening.start>=b){next.push([a,b]);continue;}
+     cut=true;if(opening.start>a)next.push([a,opening.start]);if(opening.end<b)next.push([opening.end,b]);
+    }
+    spans=next;
+   }
+   return spans.map(span=>({...edge,span,...(cut?{cut:true}:{})}));
+  });
+ }
  function visibleWallDimension(rects,physicalWalls,wall,layout){
   const h=wall.y1===wall.y2,axis=h?'h':'v',line=h?wall.y1:wall.x1;
   const start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2,t=wall.thickness??defaultThickness(rects,wall);
@@ -234,5 +249,5 @@ globalThis.RoomGeometry = (() => {
   let free=rects;for(const wall of inner)free=subtract(free,wall);
   return {outer,inner,net,area:union(free).area,segments};
  }
- return {connected,shell,union,subtract,defaultThickness,visibleWallDimension,wallSelection,layout,roomKey,groups,split};
+ return {connected,shell,union,subtract,defaultThickness,cutWallDimensions,visibleWallDimension,wallSelection,layout,roomKey,groups,split};
 })();

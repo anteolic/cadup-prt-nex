@@ -3,8 +3,8 @@ const nodes=new Map(),labels=[],memory=new Map();
 let downloadedBlob=null,downloadName=null;
 const updateRequests=[];let updateFailure=null;
 const publishedHtml=fs.readFileSync(__dirname+'/CADup.html','utf8');
-const gridLines=[],paintCalls=[];let gridStart=null;
-const canvas=new Proxy({fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
+const gridLines=[],paintCalls=[],gripCircles=[];let gridStart=null;
+const canvas=new Proxy({arc(x,y,r){if(r>=11&&this.strokeStyle==='#2563eb')gripCircles.push({x,y,r});},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
  if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
@@ -408,3 +408,11 @@ assert.equal(api.model().faces.length,2);assert.ok(api.dimensions.some(r=>r.dime
 assert.ok(labels.includes('195 cm'));
 el('dimensionThickness').value='20';el('dimensionForm').submit({preventDefault(){}});
 assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===200&&s.x2===600&&s.thickness===20));
+
+// Uhvaćena ručka skriva se tijekom povlačenja i vraća pri puštanju.
+el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();click(200,100);
+gripCircles.length=0;api.draw();assert.equal(gripCircles.length,2);
+gripCircles.length=0;board.pointerdown(event(300,100));assert.equal(gripCircles.length,1,'Uhvaćena ručka je odmah skrivena');
+gripCircles.length=0;board.pointermove(event(350,100));assert.equal(gripCircles.length,1);assert.ok(api.segments.some(s=>s.x2===700));
+gripCircles.length=0;board.pointerup(event(350,100));assert.equal(gripCircles.length,2,'Nakon puštanja su opet vidljive obje ručke');
+gripCircles.length=0;board.pointerdown(event(350,100));board.pointercancel(event(350,100));assert.ok(gripCircles.length>=2,'Prekid također vraća ručke');

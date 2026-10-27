@@ -260,7 +260,10 @@
    g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
    g.fillStyle='#93c5fd';g.fill();g.strokeStyle='#2563eb';g.lineWidth=2;
    const gripScale=handleScale();
-   if(mode==='edit')for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,11*gripScale,0,Math.PI*2);g.fill();g.stroke();}
+   if(mode==='edit')for(const [index,p] of [a,b].entries()){
+    if(gesture?.type==='wall-resize'&&gesture.endpoint===index+1)continue;
+    g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,11*gripScale,0,Math.PI*2);g.fill();g.stroke();
+   }
 
   }
   if(first){

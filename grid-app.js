@@ -209,7 +209,10 @@
  function drawObjectHandles(){
   for(const handle of objectHandles()){
    if(gesture?.type==='object-resize'&&gesture.axis===handle.axis)continue;
-   const radius=11*handleScale();g.save();g.translate(handle.x,handle.y);g.rotate(handle.item.rotation*Math.PI/180);g.fillStyle='rgba(255,255,255,0.85)';g.strokeStyle='#2563eb';g.lineWidth=1.5;g.beginPath();g.arc(0,0,radius,0,Math.PI*2);g.fill();g.stroke();g.fillStyle='#2563eb';g.font='bold '+(14*handleScale())+'px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText(handle.axis==='width'?'↔':'↕',0,0);g.restore();
+   g.save();g.translate(handle.x,handle.y);g.rotate(handle.item.rotation*Math.PI/180+(handle.axis==='depth'?Math.PI/2:0));g.scale(handleScale(),handleScale());
+   g.fillStyle='rgba(255,255,255,0.95)';g.strokeStyle='#2563eb';g.lineWidth=1.4;g.beginPath();g.arc(0,0,12,0,Math.PI*2);g.fill();g.stroke();
+   // Symmetrical vector arrows stay optically centered on every device.
+   g.lineWidth=1.8;g.lineCap='round';g.lineJoin='round';g.beginPath();g.moveTo(-6,0);g.lineTo(6,0);g.moveTo(-2.5,-3.5);g.lineTo(-6,0);g.lineTo(-2.5,3.5);g.moveTo(2.5,-3.5);g.lineTo(6,0);g.lineTo(2.5,3.5);g.stroke();g.restore();
   }
  }
  function hitHandle(x,y){

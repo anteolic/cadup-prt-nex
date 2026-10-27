@@ -65,9 +65,9 @@ click(100,100);click(300,100);click(300,250);click(100,250);
 assert.equal(api.model().faces.length,0);
 assert.ok(api.first);assert.equal(api.first.x,200);assert.equal(api.first.y,500);
 click(100,100);assert.equal(api.model().faces.length,1);
-assert.equal(api.first,null,'Zatvoren obris automatski završava crtanje');assert.equal(api.mode,'edit');
+assert.ok(api.first,'Zatvoren obris ne završava crtanje');assert.equal(api.mode,'draw');
 const closed=JSON.stringify(api.segments);
-assert.equal(api.first,null,'Nije potreban dodatan dodir za završetak prostorije');
+click(100,100);assert.equal(api.first,null,'Ponovni dodir zadnje točke završava crtanje');assert.equal(api.mode,'edit');
 assert.equal(JSON.stringify(api.segments),closed,'Završetak ne dodaje ni briše segmente');
 // Pogrešan početak može se prekinuti ponovnim dodirom iste točke.
 startDrawing();click(400,400);assert.ok(api.first);click(400,400);assert.equal(api.first,null);
@@ -284,13 +284,13 @@ assert.ok(api.hitHandle(handleView.ox+handleWall.x1*handleView.scale+25,handleVi
 const midX=handleView.ox+(handleWall.x1+handleWall.x2)/2*handleView.scale,midY=handleView.oy+(handleWall.y1+handleWall.y2)/2*handleView.scale;
 assert.ok(api.hitMoveHandle(midX+18,midY+20));
 
-// Nova zatvorena pregrada završava crtanje; postojeća prostorija ne prekida novi otvoreni niz.
+// Zatvaranje prostorije ili pregrade ne prekida crtanje; ponovni dodir zadnje točke prekida.
 el('clearAll').click();el('clearAll').click();startDrawing();api.fit();
 click(100,100);click(300,100);click(300,250);click(100,250);const closingCamera={scale:api.view.scale,ox:api.view.ox,oy:api.view.oy};click(100,100);
-assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(api.model().faces.length,1);
+assert.equal(api.mode,'draw');assert.ok(api.first);assert.equal(api.model().faces.length,1);click(100,100);assert.equal(api.mode,'edit');
 assert.deepEqual({scale:api.view.scale,ox:api.view.ox,oy:api.view.oy},closingCamera);
 startDrawing();click(200,100);click(200,250);
-assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(api.model().faces.length,2);
+assert.equal(api.mode,'draw');assert.ok(api.first);assert.equal(api.model().faces.length,2);click(200,250);assert.equal(api.mode,'edit');assert.equal(api.first,null);
 api.undo();assert.equal(api.model().faces.length,1);api.redo();assert.equal(api.model().faces.length,2);
 startDrawing();click(400,400);click(500,400);assert.equal(api.mode,'draw');assert.ok(api.first,'Postojeće prostorije ne završavaju nepovezani otvoreni potez');
 finishDrawing();

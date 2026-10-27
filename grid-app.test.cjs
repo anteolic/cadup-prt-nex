@@ -331,8 +331,8 @@ deselect();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainToo
 // Biblioteka elemenata: umetanje, izravne mjere, grupe, kopiranje i zajednički undo/redo.
 el('clearAll').click();el('clearAll').click();api.fit();
 api.addObject('sofa');assert.equal(api.objects.length,1);assert.equal(el('objectActions').hidden,false);assert.equal(el('wallActions').hidden,true);
-assert.equal(el('objectWidth').value,'220');el('objectWidth').value='240';el('objectDepth').value='100';el('objectRotation').value='90';el('objectForm').submit({preventDefault(){}});
-assert.equal(api.objects[0].width,240);assert.equal(api.objects[0].rotation,90);
+assert.equal(el('objectWidth').value,'220');el('objectWidth').value='240';el('objectDepth').value='100';el('objectForm').submit({preventDefault(){}});
+assert.equal(api.objects[0].width,240);el('objectRotate').click();assert.equal(api.objects[0].rotation,90);el('objectRotate').click();assert.equal(api.objects[0].rotation,180);api.undo();assert.equal(api.objects[0].rotation,90);
 api.addObject('chair');assert.equal(api.objects.length,2);
 let furniture=api.objects,objectView=api.view,chairPoint={x:objectView.ox+furniture[1].x*objectView.scale,y:objectView.oy+furniture[1].y*objectView.scale};
 drag(chairPoint.x,chairPoint.y,chairPoint.x+100,chairPoint.y);
@@ -346,3 +346,18 @@ el('objectDelete').click();assert.equal(api.objects.length,2);api.undo();assert.
 api.addObject('stairs');assert.equal(api.objects.length,5);assert.equal(api.objects.at(-1).kind,'stairs');
 const beforeInvalidObject=JSON.stringify(api.objects);el('objectWidth').value='0';el('objectForm').submit({preventDefault(){}});assert.equal(JSON.stringify(api.objects),beforeInvalidObject);assert.ok(el('objectError').textContent);
 const beforeObjectClear=JSON.stringify(api.objects);el('clearAll').click();el('clearAll').click();assert.equal(api.objects.length,0);api.undo();assert.equal(JSON.stringify(api.objects),beforeObjectClear,'Briši sve i undo čuvaju cijelu scenu');
+
+(async()=>{
+ await new Promise(resolve=>setImmediate(resolve));
+// Undo u neprekinutom crtanju poništava segment već prvim klikom i odmah omogućuje Redo.
+el('clearAll').click();el('clearAll').click();startDrawing();api.fit();
+click(100,100);click(300,100);assert.equal(api.segments.length,1);assert.ok(api.first);
+el('undo').click();assert.equal(api.segments.length,0);assert.equal(api.first,null);assert.equal(el('redo').disabled,false);
+el('redo').click();assert.equal(api.segments.length,1);assert.equal(api.first,null);
+const savedHistory=JSON.parse(memory.get('infoa_grid_loops_v1'));assert.equal(savedHistory.historyVersion,1);assert.ok(savedHistory.past.length);
+// Ponovno pokretanje aplikacije učitava istu povijest.
+vm.runInContext(source,context);assert.equal(context.api.segments.length,1);assert.equal(el('undo').disabled,false);
+el('undo').click();assert.equal(context.api.segments.length,0);assert.equal(el('redo').disabled,false);
+vm.runInContext(source,context);assert.equal(el('redo').disabled,false);el('redo').click();assert.equal(context.api.segments.length,1);
+
+})().catch(error=>{console.error(error);process.exitCode=1;});

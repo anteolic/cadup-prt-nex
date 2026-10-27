@@ -21,3 +21,8 @@ assert.deepEqual(C.validate(JSON.parse(JSON.stringify(copies.items))),copies.ite
 console.log('PASS: katalog, dimenzije, rotacija, kopiranje, grupe, pomicanje, otvori i JSON.');
 for(const item of C.catalog)for(const [x,y] of [[0,0],[2000,0],[0,2000],[2000,2000]])assert.equal(C.validate([C.create(item.kind,x,y)]).length,1,'Umetanje uz rub daje valjan element');
 assert.equal(C.attach({...door,rotation:180},[{x1:100,y1:500,x2:1000,y2:500}]).rotation,180,'Smjer otvaranja vrata ostaje odabran');
+
+const rotated=C.rotate([sofa],[sofa.id]);assert.equal(rotated[0].rotation,90);assert.equal(C.rotate(rotated,[sofa.id])[0].rotation,180);
+const groupRotation=C.rotate(grouped,grouped.map(item=>item.id));assert.ok(groupRotation.every(item=>item.rotation===90));
+assert.equal(C.selectionBounds(groupRotation).width,C.selectionBounds(grouped).depth);assert.equal(C.selectionBounds(groupRotation).depth,C.selectionBounds(grouped).width);
+let fullTurn=[sofa];for(let i=0;i<4;i++)fullTurn=C.rotate(fullTurn,[sofa.id]);assert.deepEqual(fullTurn,[sofa],'Četiri klika vraćaju početni položaj');

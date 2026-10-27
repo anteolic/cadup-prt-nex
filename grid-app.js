@@ -15,11 +15,23 @@
   if(JSON.stringify(before)!==JSON.stringify(snapshot())){past.push(before);if(past.length>HISTORY)past.shift();future=[];save();}
   selectedWall=null;wallSession=null;objectIds=new Set(ids);objectEditorKey=null;status();draw();
  }
- function save(){try{localStorage.setItem(KEY,JSON.stringify({segments,objects,wallsVisible}));}catch(_){}}
+ function save(){
+  const scene={segments,objects,wallsVisible};
+  try{localStorage.setItem(KEY,JSON.stringify({...scene,historyVersion:1,past:past.slice(-HISTORY),future:future.slice(-HISTORY)}));}
+  catch(_){try{localStorage.setItem(KEY,JSON.stringify(scene));}catch(_){}}
+ }
+ function readHistory(history){
+  if(!Array.isArray(history))return [];
+  try{return history.slice(-HISTORY).map(state=>{
+   if(!state||!Array.isArray(state.segments)||state.segments.length>2000||!state.segments.every(s=>s&&['x1','y1','x2','y2'].every(k=>Number.isFinite(s[k])&&s[k]>=0&&s[k]<=2000)&&
+    (s.x1===s.x2||s.y1===s.y2)&&(s.thickness===undefined||(Number.isFinite(s.thickness)&&s.thickness>=1&&s.thickness<=100))))throw new Error('Neispravna povijest');
+   return {segments:GridGeometry.normalize(state.segments),objects:CadObjects.validate(state.objects??[])};
+  });}catch(_){return [];}
+ }
  function restore(){
   try{
    const saved=localStorage.getItem(KEY);
-   if(saved){const data=JSON.parse(saved);segments=GridGeometry.normalize(Array.isArray(data.segments)?data.segments:[]);objects=CadObjects.validate(data.objects??[]);wallsVisible=data.wallsVisible!==false;}
+   if(saved){const data=JSON.parse(saved);segments=GridGeometry.normalize(Array.isArray(data.segments)?data.segments:[]);objects=CadObjects.validate(data.objects??[]);wallsVisible=data.wallsVisible!==false;if(data.historyVersion===1){past=readHistory(data.past);future=readHistory(data.future);}}
    else{
     // Zadržavaju se obrisi spremljenih prostorija; stari ručno crtani zidovi se ne učitavaju.
     const old=JSON.parse(localStorage.getItem('infoa_tlocrt_minimal_v1')||'null');
@@ -93,10 +105,10 @@
  }
  function undo(){
   if(gesture?.type==='object-move'||gesture?.type==='wall-move'||gesture?.type==='wall-resize'){cancelInteraction();return;}
-  if(first){first=null;preview=null;status();draw();return;}
-  if(!past.length)return;future.push(snapshot());restoreSnapshot(past.pop());selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
+  first=null;preview=null;
+  if(!past.length){status();draw();return;}future.push(snapshot());restoreSnapshot(past.pop());selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
- function redo(){if(!future.length)return;past.push(snapshot());restoreSnapshot(future.pop());selected=null;selectedWall=null;wallSession=null;save();status();draw();}
+ function redo(){if(!future.length)return;first=null;preview=null;gesture=null;pointers.clear();past.push(snapshot());restoreSnapshot(future.pop());selected=null;selectedWall=null;wallSession=null;save();status();draw();}
  function hitWall(x,y){
   const raw=point(x,y);let best=null,solid=null,solidDistance=Infinity,distance=wallsVisible?Math.max(15,30*scale+3):15;
   const current=model();
@@ -500,11 +512,11 @@
   $('objectMulti').setAttribute('aria-pressed',String(objectMulti));$('objectMulti').classList.toggle('active',objectMulti);
   $('objectGroup').disabled=count<2;$('objectUngroup').disabled=!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;$('objectApply').disabled=!count;
   $('objectTitle').textContent=count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':'Dodirni elemente za višestruki odabir';
-  $('objectRotation').disabled=count!==1;
+  $('objectRotate').disabled=!count;
   const key=JSON.stringify(items);if(key===objectEditorKey)return;objectEditorKey=key;$('objectError').textContent='';
   if(!count){$('objectWidth').value='';$('objectDepth').value='';return;}
   const box=count===1?items[0]:CadObjects.selectionBounds(items);
-  $('objectWidth').value=String(Math.round(box.width*10)/10).replace('.',',');$('objectDepth').value=String(Math.round(box.depth*10)/10).replace('.',',');$('objectRotation').value=String(count===1?items[0].rotation:0);
+  $('objectWidth').value=String(Math.round(box.width*10)/10).replace('.',',');$('objectDepth').value=String(Math.round(box.depth*10)/10).replace('.',',');
  }
  $('objectLibrary').innerHTML=buildObjectLibrary();
  function buildObjectLibrary(){
@@ -519,13 +531,14 @@
  }
  $('objectMenu').addEventListener('click',e=>{const button=e.target?.closest?.('[data-object]');if(button)addObject(button.dataset.object);});
  $('objectMulti').addEventListener('click',()=>{objectMulti=!objectMulti;status();draw();});
+ $('objectRotate').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{objects=CadObjects.rotate(objects,[...objectIds]);commitObjects(before,[...objectIds]);}catch(error){$('objectError').textContent=error.message;}});
  $('objectCopy').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{const result=CadObjects.duplicate(objects,[...objectIds]);objects=result.items;commitObjects(before,result.ids);}catch(error){$('objectError').textContent=error.message;}});
  $('objectGroup').addEventListener('click',()=>{if(objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});
  $('objectUngroup').addEventListener('click',()=>{const before=snapshot();objects=CadObjects.ungroup(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
  $('objectDelete').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();objects=objects.filter(item=>!objectIds.has(item.id));objectMulti=false;commitObjects(before);});
  $('objectForm').addEventListener('submit',e=>{
   e.preventDefault();if(!objectIds.size)return;const parse=id=>Number($(id).value.trim().replace(',','.'));
-  try{const before=snapshot();objects=CadObjects.resize(objects,[...objectIds],parse('objectWidth'),parse('objectDepth'),Number($('objectRotation').value));commitObjects(before,[...objectIds]);}
+  try{const before=snapshot();objects=CadObjects.resize(objects,[...objectIds],parse('objectWidth'),parse('objectDepth'),objects.find(item=>objectIds.has(item.id))?.rotation??0);commitObjects(before,[...objectIds]);}
   catch(error){$('objectError').textContent=error.message;}
  });
  restore();status();new ResizeObserver(resize).observe(board);resize();

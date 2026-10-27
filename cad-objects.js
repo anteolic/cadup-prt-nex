@@ -54,6 +54,12 @@ globalThis.CadObjects=(()=>{
   if(resized.some(item=>item.width<5||item.depth<5))throw new Error('Pojedini element postaje manji od 5 cm.');
   const fitted=constrain(resized),map=new Map(fitted.map(item=>[item.id,item]));return items.map(item=>map.get(item.id)||{...item});
  }
+ function rotate(items,ids){
+  const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);
+  const center=group.length===1?group[0]:selectionBounds(group);
+  const turned=constrain(group.map(item=>({...item,x:center.x-(item.y-center.y),y:center.y+(item.x-center.x),rotation:rotation(item.rotation+90)})));
+  const map=new Map(turned.map(item=>[item.id,item]));return items.map(item=>map.get(item.id)||{...item});
+ }
  function duplicate(items,ids){
   const selected=new Set(ids),groups=new Map(),copies=items.filter(item=>selected.has(item.id)).map(item=>{
    if(item.group&&!groups.has(item.group))groups.set(item.group,id());return {...item,id:id(),x:item.x+40,y:item.y+40,group:item.group?groups.get(item.group):null};
@@ -107,5 +113,5 @@ globalThis.CadObjects=(()=>{
   if(selected){g.setLineDash([5/Math.max(fx,fy),3/Math.max(fx,fy)]);g.strokeRect(-50,['door','double-door'].includes(item.kind)?-100:-50,100,100);}
   g.restore();
  }
- return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,duplicate,group,ungroup,attach,draw};
+ return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,duplicate,group,ungroup,attach,draw};
 })();

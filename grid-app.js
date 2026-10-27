@@ -419,8 +419,8 @@
    const raw=point(p.x,p.y),item=CadObjects.hit(editingGroup?objects.filter(item=>item.group===editingGroup):objects,raw.x,raw.y);
    if(item){
     const ids=editingGroup?[item.id]:CadObjects.expandedSelection(objects,[item.id]);
-    if(objectMulti||e.shiftKey){const remove=ids.every(id=>objectIds.has(id));for(const id of ids)if(remove)objectIds.delete(id);else objectIds.add(id);gesture={type:'object-select',id:e.pointerId};}
-    else{if(!objectIds.has(item.id))objectIds=new Set(ids);gesture={type:'object-move',id:e.pointerId,start:p,before:snapshot(),ids:[...objectIds]};}
+    if(!objectIds.has(item.id)||objectMulti||e.shiftKey){gesture={type:'pick-pan',id:e.pointerId,start:p,ox,oy,moved:false,pick:{kind:'object',ids,toggle:objectMulti||e.shiftKey}};return;}
+    gesture={type:'object-move',id:e.pointerId,start:p,before:snapshot(),ids:[...objectIds]};
     selectedWall=null;wallSession=null;objectEditorKey=null;status();draw();return;
    }
    if(objectIds.size||objectMulti){objectIds.clear();objectMulti=false;objectEditorKey=null;status();draw();}
@@ -430,7 +430,9 @@
   if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
   if(mode==='edit'&&dimensionHits.some(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom)){gesture={type:'pan',id:e.pointerId,start:p,ox,oy,moved:false};return;}
   if(mode==='edit'){
-   const wall=hitWall(p.x,p.y);selectedWall=wall;
+   const wall=hitWall(p.x,p.y);
+   if(wall&&(!selectedWall||!['x1','y1','x2','y2'].every(k=>wall[k]===selectedWall[k]))){gesture={type:'pick-pan',id:e.pointerId,start:p,ox,oy,moved:false,pick:{kind:'wall',wall}};return;}
+   selectedWall=wall;
    if(wall){
     const session=wallSession&&['x1','y1','x2','y2'].every(k=>wallSession.current[k]===wall[k])?wallSession:null;
     gesture={type:'wall-move',id:e.pointerId,start:p,wall,before:copy(segments),currentWall:wall,beforeSession:wallSession,
@@ -461,7 +463,7 @@
   else if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
   else if(gesture.type==='wall-move'){updateWall(p,gesture);}
   else if(gesture.type==='wall-resize'){updateWallLength(p,gesture);}
-  else if(gesture.type==='single'||gesture.type==='pan'){
+  else if(gesture.type==='single'||gesture.type==='pan'||gesture.type==='pick-pan'){
    const dx=p.x-gesture.start.x,dy=p.y-gesture.start.y;if(Math.hypot(dx,dy)>9)gesture.moved=true;
    if(gesture.moved){ox=gesture.ox+dx;oy=gesture.oy+dy;schedule();}
   }
@@ -472,8 +474,18 @@
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
   if(wasMulti||last?.type==='remaining'){status();draw();return;}
   if(last?.type==='erase-span'){if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)deleteEraseTarget(last.target);else{eraseHover=null;eraseObjectIds=[];draw();}return;}
+  if(last?.type==='pick-pan'){
+   if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9){
+    const pick=last.pick;
+    if(pick.kind==='object'){
+     if(pick.toggle){const remove=pick.ids.every(id=>objectIds.has(id));for(const id of pick.ids)if(remove)objectIds.delete(id);else objectIds.add(id);}
+     else objectIds=new Set(pick.ids);
+     selectedWall=null;wallSession=null;objectEditorKey=null;
+    }else{objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=pick.wall;wallSession=null;}
+   }
+   status();draw();return;
+  }
   if(last?.type==='pan'){status();draw();return;}
-  if(last?.type==='object-select')return;
   if(last?.type==='object-move'){
    if(cancelled){restoreSnapshot(last.before);objectIds=new Set(last.ids);status();draw();}
    else commitObjects(last.before,last.ids);

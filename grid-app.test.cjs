@@ -52,7 +52,7 @@ el('clearAll').click();el('clearAll').click();startDrawing();
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);line(200,100,200,250);
 enterEdit();
 function drag(x1,y1,x2,y2){board.pointerdown(event(x1,y1));board.pointermove(event(x2,y2));board.pointerup(event(x2,y2));}
-drag(150,100,150,125);assert.equal(api.model().faces.length,2);
+click(150,100);drag(150,100,150,125);assert.equal(api.model().faces.length,2);
 assert.ok(api.segments.some(s=>s.y1===250&&s.y2===250&&s.x1===200));
 drag(150,125,150,75);assert.equal(api.model().faces.length,2);
 assert.ok(api.segments.some(s=>s.y1===150&&s.y2===150&&s.x1===200),'Spušteni segment podiže se iznad početne ravnine');
@@ -500,3 +500,14 @@ el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api
 assert.deepEqual(JSON.parse(memory.get('cadup_view_settings_v1')),{grid:false,measures:false});assert.deepEqual({...api.view},viewSettingsCamera);assert.equal(JSON.stringify(api.segments),viewSettingsScene);
 el('showGrid').checked=true;el('showGrid').change();gridLines.length=0;api.draw();assert.ok(gridLines.length);
 el('showMeasures').checked=true;el('showMeasures').change();
+
+// An unselected object or wall pans on drag, then requires a separate tap before editing.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('drawer-cabinet');deselect();
+let selectionPanView={...api.view},selectionPanObject=api.objects[0],selectionPanScene=JSON.stringify(api.objects),selectionPanSaved=memory.get('infoa_grid_loops_v1');
+let selectionPanPoint={x:selectionPanView.ox+selectionPanObject.x*selectionPanView.scale,y:selectionPanView.oy+selectionPanObject.y*selectionPanView.scale};
+drag(selectionPanPoint.x,selectionPanPoint.y,selectionPanPoint.x+40,selectionPanPoint.y+20);
+assert.equal(JSON.stringify(api.objects),selectionPanScene);assert.equal(memory.get('infoa_grid_loops_v1'),selectionPanSaved);assert.equal(api.objectIds.length,0);assert.equal(api.view.ox,selectionPanView.ox+40);assert.equal(api.view.oy,selectionPanView.oy+20);assert.equal(api.view.scale,selectionPanView.scale);
+selectionPanView={...api.view};selectionPanPoint={x:selectionPanView.ox+selectionPanObject.x*selectionPanView.scale,y:selectionPanView.oy+selectionPanObject.y*selectionPanView.scale};click(selectionPanPoint.x,selectionPanPoint.y);assert.equal(api.objectIds.length,1);
+drag(selectionPanPoint.x,selectionPanPoint.y,selectionPanPoint.x+50,selectionPanPoint.y);assert.notEqual(JSON.stringify(api.objects),selectionPanScene);assert.deepEqual({...api.view},selectionPanView);
+el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();const wallPanScene=JSON.stringify(api.segments),wallPanView={...api.view};drag(200,100,220,120);assert.equal(JSON.stringify(api.segments),wallPanScene);assert.equal(api.selection,null);assert.equal(api.view.ox,wallPanView.ox+20);assert.equal(api.view.oy,wallPanView.oy+20);
+click(220,120);assert.ok(api.selection);const selectedPanView={...api.view};drag(220,120,220,160);assert.notEqual(JSON.stringify(api.segments),wallPanScene);assert.deepEqual({...api.view},selectedPanView);

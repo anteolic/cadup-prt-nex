@@ -73,7 +73,7 @@
   if(!first)return;
   if(first.x===end.x&&first.y===end.y){status('Odaberi drugu točku linije');return;}
   const before=copy(segments),stroke={x1:first.x,y1:first.y,x2:end.x,y2:end.y};
-  segments=mode==='erase'?GridGeometry.eraseLine(segments,stroke):GridGeometry.toggleLine(segments,stroke);
+  segments=mode==='erase'?GridGeometry.eraseLine(segments,stroke):GridGeometry.normalize([...segments,stroke]);
   first=mode==='draw'?{...end}:null;preview=first;commit(before);
  }
  function undo(){

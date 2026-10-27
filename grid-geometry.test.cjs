@@ -132,9 +132,3 @@ assert.equal(GridGeometry.atomic(adjacentWidths)[1].thickness,30);
 assert.equal(GridGeometry.detectWithDoors(adjacentWidths).doors.length,0,'Promjena debljine na spoju nije otvor');
 assert.throws(()=>GridGeometry.setWallThickness(divided,partitionDimension,0));
 
-const cutByDrawing=GridGeometry.toggleLine([{...line(100,100,500,100),thickness:25}],line(200,100,300,100));
-assert.deepEqual(cutByDrawing,[{...line(100,100,200,100),thickness:25},{...line(300,100,500,100),thickness:25}]);
-assert.deepEqual(GridGeometry.toggleLine([line(100,100,500,100)],line(500,100,100,100)),[],'Precrtavanje u obrnutom smjeru briše cijeli zid');
-assert.deepEqual(GridGeometry.toggleLine([line(200,100,400,100)],line(100,100,500,100)),[line(100,100,200,100),line(400,100,500,100)],'Jedan potez briše preklop i dodaje oba prazna kraja');
-assert.deepEqual(GridGeometry.toggleLine([line(100,100,200,100),line(300,100,400,100)],line(150,100,350,100)),[line(100,100,150,100),line(200,100,300,100),line(350,100,400,100)]);
-assert.deepEqual(GridGeometry.toggleLine([line(200,100,200,400)],line(100,250,300,250)),[line(200,100,200,400),line(100,250,300,250)],'Okomito križanje ne briše zid');

@@ -217,11 +217,7 @@ assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1<400),'Briše se cij
 assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===400),'Susjedni segment ostaje');
 api.undo();assert.equal(JSON.stringify(api.segments),eraseOriginal);api.redo();assert.notEqual(JSON.stringify(api.segments),eraseOriginal);
 
-// Crtanje preko zida zamjenjuje staro brisanje dijela, uz neprekinuti nastavak.
+// Precrtavanje postojećeg zida ne briše njegov dio.
 el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();
 line(100,100,300,100);const beforeOverdraw=JSON.stringify(api.segments);
-click(150,100);click(200,100);
-assert.equal(api.segments.length,2);assert.ok(api.first);
-assert.ok(!api.segments.some(s=>s.y1===200&&s.x1<400&&s.x2>300),'Preklop je otvoren');
-el('cancel').click();api.undo();assert.equal(JSON.stringify(api.segments),beforeOverdraw);api.redo();assert.equal(api.segments.length,2);
-line(150,100,200,100);assert.equal(api.segments.length,1,'Prazan otvor može se ponovno nacrtati');
+line(150,100,200,100);assert.equal(JSON.stringify(api.segments),beforeOverdraw);

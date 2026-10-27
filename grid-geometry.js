@@ -118,18 +118,6 @@ globalThis.GridGeometry=(()=>{
   }
   return normalize(result);
  }
- // Precrtavanje mijenja samo kolinearni preklop: postojeće briše, prazno crta.
- function toggleLine(input,stroke){
-  const normalized=normalize([stroke]);if(!normalized.length)return normalize(input);
-  const line=normalized[0],h=line.y1===line.y2,start=h?line.x1:line.y1,end=h?line.x2:line.y2;
-  const covered=normalize(input).filter(s=>(s.y1===s.y2)===h&&(h?s.y1:s.x1)===(h?line.y1:line.x1))
-   .map(s=>[Math.max(start,h?s.x1:s.y1),Math.min(end,h?s.x2:s.y2)]).filter(s=>s[1]>s[0]).sort((a,b)=>a[0]-b[0]);
-  const added=[];let cursor=start;
-  const append=(a,b)=>added.push(h?{...line,x1:a,x2:b}:{...line,y1:a,y2:b});
-  for(const [a,b] of covered){if(a>cursor)append(cursor,a);cursor=Math.max(cursor,b);}
-  if(cursor<end)append(cursor,end);
-  return normalize([...eraseLine(input,line),...added]);
- }
  function wallForDimension(input,dimension){
   const h=dimension.axis==='h',lines=atomic(input),start=dimension.start,end=dimension.end;
   let root=-1,best=Infinity;
@@ -242,5 +230,5 @@ globalThis.GridGeometry=(()=>{
   }
   return {segments:normalize(result),dx,dy};
  }
- return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,toggleLine,wallForDimension,setWallThickness,resizeDimension,resizeWall,moveWall,moveRoom};
+ return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,wallForDimension,setWallThickness,resizeDimension,resizeWall,moveWall,moveRoom};
 })();

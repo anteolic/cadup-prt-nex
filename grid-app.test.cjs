@@ -15,6 +15,7 @@ vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
 function click(x,y){board.pointerdown(event(x,y));board.pointerup(event(x,y));}
+function deselect(){click(api.view.w-8,api.view.h-8);}
 function line(x1,y1,x2,y2){el('cancel').click();el('drawMode').click();click(x1,y1);click(x2,y2);el('cancel').click();}
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);
 assert.equal(api.model().faces.length,0);line(100,250,100,100);
@@ -184,7 +185,7 @@ assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces
 assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===160&&e.span[1]-e.span[0]===600));
 // Odabir zida ne dodaje naglašenu kotu uz postojeća donja polja.
 assert.ok(api.dimensions.every(r=>r.dimension.side===-1||r.dimension.side===1),'Prikazane su samo postojeće rubne kote');
-el('wallDeselect').click();assert.equal(el('wallActions').hidden,true);
+deselect();assert.equal(el('wallActions').hidden,true);
 
 // Mreža ostaje vidljiva i nakon odabira početka linije.
 el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();
@@ -219,10 +220,10 @@ click(200,100);assert.ok(api.selection);assert.equal(el('wallActions').hidden,fa
 paintCalls.length=0;api.draw();assert.ok(paintCalls.some(p=>p.color==='#93c5fd'&&p.alpha===1),'Odabrani zid ima plavu ispunu');
 assert.ok(paintCalls.some(p=>p.color==='#bfc3c8'&&p.alpha===.3),'Ostatak zidova je prigušen');
 assert.equal(el('dimensionValue').value,'400');assert.equal(el('dimensionThickness').value,'10');
-click(200,100);assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionValue').value,'400');el('wallDeselect').click();
-click(200,100);assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionThickness').value,'10');el('wallDeselect').click();
+click(200,100);assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionValue').value,'400');deselect();
+click(200,100);assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionThickness').value,'10');deselect();
 const beforeSelectionDelete=JSON.stringify(api.segments);
-el('wallDeselect').click();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
+deselect();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
 el('wallDelete').click();assert.equal(JSON.stringify(api.segments),beforeSelectionDelete,'Brisanje bez odabira ništa ne radi');
 click(200,100);el('wallDelete').click();assert.equal(api.segments.length,0);api.undo();assert.equal(JSON.stringify(api.segments),beforeSelectionDelete);
 el('drawMode').click();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
@@ -258,7 +259,7 @@ el('editMode').click();assert.deepEqual(camera(),stableCamera);
 const wallMid=api.segments[0],screenView=api.view;
 click(screenView.ox+(wallMid.x1+wallMid.x2)/2*screenView.scale,screenView.oy+(wallMid.y1+wallMid.y2)/2*screenView.scale);
 assert.deepEqual(camera(),stableCamera);
-if(api.selection){el('dimensionValue').value='490';el('dimensionForm').submit({preventDefault(){}});assert.deepEqual(camera(),stableCamera);el('wallDeselect').click();assert.deepEqual(camera(),stableCamera);}
+if(api.selection){el('dimensionValue').value='490';el('dimensionForm').submit({preventDefault(){}});assert.deepEqual(camera(),stableCamera);deselect();assert.deepEqual(camera(),stableCamera);}
 api.zoomAt(.9);assert.notDeepEqual(camera(),stableCamera,'Korisnik i dalje može promijeniti zoom');
 
 // Uređivanje privremeno zamjenjuje glavne alate na dnu.
@@ -266,7 +267,7 @@ el('editMode').click();const toolbarCamera={scale:api.view.scale,ox:api.view.ox,
 api.fit();const oneWall=api.segments[0],toolView=api.view;
 click(toolView.ox+(oneWall.x1+oneWall.x2)/2*toolView.scale,toolView.oy+(oneWall.y1+oneWall.y2)/2*toolView.scale);
 assert.ok(api.selection);assert.equal(el('wallActions').hidden,false);assert.equal(el('mainTools').hidden,true);
-el('wallDeselect').click();assert.equal(el('wallActions').hidden,true);assert.equal(el('mainTools').hidden,false);
+deselect();assert.equal(el('wallActions').hidden,true);assert.equal(el('mainTools').hidden,false);
 
 // Veće ručke i njihove dodirne površine prate približavanje.
 el('editMode').click();api.fit();const gripWall=api.segments[0];

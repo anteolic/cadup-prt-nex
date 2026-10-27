@@ -352,7 +352,6 @@
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
  $('cancel').addEventListener('click',()=>changeMode('edit'));
  function deselectWall(){selectedWall=null;wallSession=null;status();draw();}
- $('wallDeselect').addEventListener('click',deselectWall);
  function selectedDimension(){if(!selectedWall)return null;const h=selectedWall.y1===selectedWall.y2;return {axis:h?'h':'v',line:h?selectedWall.y1:selectedWall.x1,start:h?selectedWall.x1:selectedWall.y1,end:h?selectedWall.x2:selectedWall.y2};}
  $('wallDelete').addEventListener('click',()=>{if(mode!=='edit'||!selectedWall)return;const before=copy(segments);segments=GridGeometry.eraseLine(segments,selectedWall);selectedWall=null;commit(before);});
  $('clearAll').addEventListener('click',()=>{

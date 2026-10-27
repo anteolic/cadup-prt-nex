@@ -18,7 +18,9 @@ function line(x1,y1,x2,y2){el('cancel').click();click(x1,y1);click(x2,y2);el('ca
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);
 assert.equal(api.model().faces.length,0);line(100,250,100,100);
 assert.equal(api.model().faces.length,1);assert.equal(api.model().faces[0].area,120000);
-assert.ok(labels.includes('Prostorija 1'));assert.ok(labels.some(t=>t.includes('m²')));
+assert.ok(!labels.some(t=>t.startsWith('Prostorija ')));assert.ok(!labels.some(t=>t.includes('m²')));
+assert.ok(labels.some(t=>t.includes('m')),'Duljine zidova ostaju vidljive');
+assert.equal(el('roomArea').textContent,'');
 line(200,100,200,250);assert.equal(api.model().faces.length,2);assert.equal(api.model().layout.inner[0].width,10);
 el('toggleWalls').click();assert.equal(api.visible,false);assert.equal(api.model().faces.length,2);
 el('eraseMode').click();line(200,150,200,200);assert.equal(api.model().faces.length,2,'Otvor za vrata zadržava dvije prostorije');

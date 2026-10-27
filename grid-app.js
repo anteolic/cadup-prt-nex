@@ -52,12 +52,10 @@
   return horizontal?{x:q.x,y:first.y}:{x:first.x,y:q.y};
  }
  const lengthText=cm=>cm>=100?(cm/100).toLocaleString('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m':cm.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm';
- const areaText=cm=> (cm/10000).toLocaleString('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m²';
  function resetClear(){clearArmed=false;$('clearAll').textContent='Briši';$('clearAll').classList.remove('armed');}
  function status(message){
-  const current=model();
   $('status').textContent=message||(mode==='edit'?(selectedWall?'Povuci ručke za duljinu · sredinu za pomak':'Povuci unutrašnjost prostorije ili odaberi zid'):first?(mode==='erase'?'2. Dodirni kraj brisanja · povuci za duljinu':'Dodirni sljedeću točku · dvostruki dodir završava'):(mode==='erase'?'1. Dodirni početak brisanja':'1. Dodirni početak linije'));
-  $('roomArea').textContent=current.faces.length?current.faces.length+' prostorija · ukupno '+areaText(current.layout.area):'Zatvori obris da nastane prostorija';
+  $('roomArea').textContent='';
   for(const [id,value] of [['drawMode','draw'],['eraseMode','erase'],['editMode','edit']]){
    $(id).classList.toggle('active',mode===value);$(id).setAttribute('aria-pressed',String(mode===value));
   }
@@ -177,10 +175,6 @@
   g.lineWidth=1;
   for(let i=Math.ceil(left/unit);i<=Math.floor(right/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,oy);g.lineTo(x,oy+height*scale);g.stroke();}
   for(let i=Math.ceil(top/unit);i<=Math.floor(bottom/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(ox,y);g.lineTo(ox+WIDTH*scale,y);g.stroke();}
-  current.faces.forEach(face=>{
-   g.beginPath();for(const r of face.rects)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
-   g.fillStyle=face.id===selected?'rgba(22,117,209,.16)':'rgba(22,117,209,.045)';g.fill();
-  });
   if(wallsVisible){
    const boxes=[...current.layout.outer,...current.layout.inner];
    g.fillStyle='#1e2329';for(const r of boxes)g.fillRect(ox+r.x*scale-1,oy+r.y*scale-1,r.width*scale+2,r.height*scale+2);
@@ -188,27 +182,13 @@
   }
   g.strokeStyle=wallsVisible?'rgba(22,117,209,.6)':'#1675d1';g.lineWidth=2;g.beginPath();
   for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();
-  const dimensionKeys=new Set();
-  for(const face of current.faces){
-   const net=current.layout.net.find(r=>r.id===face.id);
-   const visible=face.rects.map(r=>({x:Math.max(r.x,left),y:Math.max(r.y,top),right:Math.min(r.x+r.width,right),bottom:Math.min(r.y+r.height,bottom)})).filter(r=>r.right>r.x&&r.bottom>r.y);
-   const label=visible.sort((a,b)=>(b.right-b.x)*(b.bottom-b.y)-(a.right-a.x)*(a.bottom-a.y))[0];
-   if(label&&face.area>=10000&&net.width>=20&&net.height>=20){
-    const center=screen({x:(label.x+label.right)/2,y:(label.y+label.bottom)/2});
-    const gap=clamp(15+Math.log2(Math.max(1,scale/(w/WIDTH))),15,18);
-    tag(center.x,center.y-gap,'Prostorija '+face.id,'#24557e',false,3);
-    if(RoomGeometry.union(face.rects).edges.length===4)tag(center.x,center.y,lengthText(net.width)+' × '+lengthText(net.height),'#24557e',false,3);
-    tag(center.x,center.y+gap,areaText(net.area),'#24557e',false,3);
-   }
-   for(const e of RoomGeometry.union(face.rects).edges){
-    const wall=e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]};
-    const key=JSON.stringify(wall),length=e.span[1]-e.span[0];
-    if(dimensionKeys.has(key)||length<20)continue;dimensionKeys.add(key);
-    const p=visibleWallCenter(wall);if(!p)continue;
-    const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);
-    if(visibleLength<80)continue;
-    tag(p.x+(e.axis==='v'?e.side*18:0),p.y+(e.axis==='h'?e.side*18:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v');
-   }
+  // Kote iz stvarnih rubova zidova: unutarnje i vanjske duljine, bez oznaka prostorija.
+  for(const e of RoomGeometry.union([...current.layout.outer,...current.layout.inner]).edges){
+   const wall=e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]};
+   const center=visibleWallCenter(wall);if(!center)continue;
+   const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);
+   if(visibleLength<36)continue;
+   tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v');
   }
   if(selectedWall){
    const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});

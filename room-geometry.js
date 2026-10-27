@@ -118,6 +118,32 @@ globalThis.RoomGeometry = (() => {
   if(!custom)return shell(rects,30);
   let outside=pieces;for(const r of rects)outside=subtract(outside,r);return outside;
  }
+ function wallSelection(rects,physicalWalls,wall,layout){
+  const h=wall.y1===wall.y2,line=h?wall.y1:wall.x1,start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2;
+  const mid=(start+end)/2,x=h?mid:line,y=h?line:mid;
+  const covered=(a,b)=>rects.some(r=>a>=r.x&&a<=r.x+r.width&&b>=r.y&&b<=r.y+r.height);
+  const negative=covered(x-(h?0:.001),y-(h?.001:0)),positive=covered(x+(h?0:.001),y+(h?.001:0));
+  const exterior=negative!==positive,t=wall.thickness??(exterior?30:10);
+  const across=exterior?(negative?line:line-t):line-t/2;
+  const extension=(position,before)=>{
+   const continuation=physicalWalls.some(s=>(s.y1===s.y2)===h&&(h?s.y1:s.x1)===line&&
+    (before?(h?s.x1:s.y1)<position&&(h?s.x2:s.y2)>=position:(h?s.x2:s.y2)>position&&(h?s.x1:s.y1)<=position));
+   if(continuation)return 0;
+   if(exterior)return t;
+   let reach=0;
+   for(const s of physicalWalls)if((s.y1===s.y2)!==h&&(h?s.x1:s.y1)===position&&
+    (h?s.y1:s.x1)<=line&&(h?s.y2:s.x2)>=line)reach=Math.max(reach,(s.thickness??defaultThickness(rects,s))/2);
+   return reach;
+  };
+  const a=start-extension(start,true),b=end+extension(end,false);
+  const bounds=h?{x:a,y:across,width:b-a,height:t}:{x:across,y:a,width:t,height:b-a};
+  const result=[];
+  for(const r of [...layout.outer,...layout.inner]){
+   const x=Math.max(r.x,bounds.x),y=Math.max(r.y,bounds.y),right=Math.min(r.x+r.width,bounds.x+bounds.width),bottom=Math.min(r.y+r.height,bounds.y+bounds.height);
+   if(right>x&&bottom>y)result.push({x,y,width:right-x,height:bottom-y});
+  }
+  return result;
+ }
  function layout(rects,physicalWalls=null){
   const xs=[...new Set(rects.flatMap(r=>[r.x,r.x+r.width]))].sort((a,b)=>a-b);
   const ys=[...new Set(rects.flatMap(r=>[r.y,r.y+r.height]))].sort((a,b)=>a-b);
@@ -170,5 +196,5 @@ globalThis.RoomGeometry = (() => {
   let free=rects;for(const wall of inner)free=subtract(free,wall);
   return {outer,inner,net,area:union(free).area,segments};
  }
- return {connected,shell,union,subtract,defaultThickness,layout,roomKey,groups,split};
+ return {connected,shell,union,subtract,defaultThickness,wallSelection,layout,roomKey,groups,split};
 })();

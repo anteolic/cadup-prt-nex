@@ -212,7 +212,11 @@
   if(selectedWall){
    const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});
    const horizontal=selectedWall.y1===selectedWall.y2;
-   g.strokeStyle=mode==='erase'?'#dc2626':'#1675d1';g.lineWidth=5;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+   if(mode==='erase'){
+    const boxes=RoomGeometry.wallSelection(current.rooms,segments,selectedWall,current.layout);
+    g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
+    g.fillStyle='#ef4444';g.fill();
+   }else{g.strokeStyle='#1675d1';g.lineWidth=5;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
    if(mode==='edit')for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,9,0,Math.PI*2);g.fill();g.stroke();}
    const center=visibleWallCenter(selectedWall);if(center)tag(center.x,center.y,(mode==='erase'?'Obriši ':horizontal?'↕ ':'↔ ')+lengthText(horizontal?selectedWall.x2-selectedWall.x1:selectedWall.y2-selectedWall.y1),mode==='erase'?'#dc2626':'#1675d1',false,5,{axis:horizontal?'h':'v',line:horizontal?selectedWall.y1:selectedWall.x1,start:horizontal?selectedWall.x1:selectedWall.y1,end:horizontal?selectedWall.x2:selectedWall.y2});
   }

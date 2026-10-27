@@ -81,3 +81,16 @@ assert.equal(Math.max(...variableOuter.outer.map(r=>r.y+r.height)),330,'Suprotni
 for(const r of variableOuter.outer)assert.ok(r.x+r.width<=a.x||r.x>=a.x+a.width||r.y+r.height<=a.y||r.y>=a.y+a.height,'Vanjska debljina ne ulazi u slobodni prostor');
 const thickCorner=RoomGeometry.layout([],[{x1:100,y1:200,x2:200,y2:200,thickness:20},{x1:200,y1:200,x2:200,y2:300,thickness:40}]);
 assert.ok(thickCorner.inner.some(r=>r.x===180&&r.y===190&&r.width===40&&r.height===20),'Kut spaja različite debljine bez rupe');
+
+// Odabir gumicom ispunjava stvarnu debljinu i vanjski pomak zida.
+const selectionPlan=RoomGeometry.layout([a],outlineWalls);
+const topSelection=RoomGeometry.wallSelection([a],outlineWalls,outlineWalls[0],selectionPlan);
+assert.equal(Math.min(...topSelection.map(r=>r.y)),50);
+assert.equal(Math.max(...topSelection.map(r=>r.y+r.height)),100);
+assert.equal(Math.min(...topSelection.map(r=>r.x)),50,'Odabir uključuje i vanjski kut');
+const standalone=[{x1:100,y1:200,x2:400,y2:200,thickness:24}];
+const standaloneLayout=RoomGeometry.layout([],standalone);
+assert.deepEqual(RoomGeometry.wallSelection([],standalone,standalone[0],standaloneLayout),[{x:100,y:188,width:300,height:24}]);
+const adjacent=[{x1:100,y1:200,x2:200,y2:200,thickness:20},{x1:200,y1:200,x2:400,y2:200,thickness:30}];
+const selectedFirst=RoomGeometry.wallSelection([],adjacent,adjacent[0],RoomGeometry.layout([],adjacent));
+assert.ok(selectedFirst.every(r=>r.x+r.width<=200),'Odabir ne boji susjedni kolinearni segment');

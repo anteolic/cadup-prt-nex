@@ -263,7 +263,7 @@
   let x=rawX,y=rawY;
   const base=priority===3?7:priority===1?8:12;
   const size=clamp(base+Math.log2(Math.max(1,scale/(w/WIDTH))),base,base+2),boxHeight=size+(priority===3?4:6);
-  g.save();g.globalAlpha=(mode==='edit'&&(selectedWall||objectIds.size)&&priority<5)?0.9:1;g.font='600 '+size+'px system-ui';
+  g.save();g.globalAlpha=editingGroup?0.25:(mode==='edit'&&(selectedWall||objectIds.size)&&priority<5)?0.9:1;g.font='600 '+size+'px system-ui';
   const width=g.measureText(text).width+(priority===3?6:10),halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
   x=clamp(x,Math.max(0,ox)+halfX+3,Math.min(w,ox+WIDTH*scale)-halfX-3);
   y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
@@ -288,7 +288,7 @@
   if(!w||!h)return;
   const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.globalAlpha=1;g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
   g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
-  g.globalAlpha=(mode==='edit'&&(selectedWall||objectIds.size))?0.7:1;
+  g.globalAlpha=editingGroup?0.2:(mode==='edit'&&(selectedWall||objectIds.size))?0.7:1;
   // Blaga pastelna ispuna samo zatvorenih prostora; mreža i zidovi crtaju se iznad.
   g.fillStyle='#edf6ef';
   for(const face of current.faces){
@@ -365,7 +365,7 @@
    if(length&&center)tag(center.x,center.y-20,lengthText(length),color,false,5);
   }
   for(const item of objects){
-   const active=objectIds.has(item.id);g.globalAlpha=((selectedWall||objectIds.size||editingGroup)&&!active&&(!editingGroup||item.group!==editingGroup))?0.7:1;
+   const active=objectIds.has(item.id);g.globalAlpha=editingGroup?(item.group===editingGroup?1:0.2):((selectedWall||objectIds.size)&&!active)?0.7:1;
    const attached=CadObjects.attach(item,segments),same=Math.abs(attached.x-item.x)<.01&&Math.abs(attached.y-item.y)<.01&&attached.rotation%180===item.rotation%180;
    const wall=same&&['door','double-door','window'].includes(item.kind)?hitWallForObject(item):null;
    if(wall){

@@ -43,6 +43,7 @@ footer{padding:5px 8px max(5px,env(safe-area-inset-bottom))}.mode-row{display:fl
 .mode-row[hidden]{display:none}.wall-actions{margin-bottom:0}
 .footer-row{display:flex;align-items:flex-end;gap:6px}.footer-row .mode-row{flex:0 0 auto}.footer-row .wall-actions{flex:1;min-width:0}.footer-row .dimension-fields{gap:3px;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) 28px}.footer-row .dimension-fields label{font-size:9px}.footer-row .dimension-fields button{padding-inline:4px}.footer-row .wall-actions{padding:4px}
 header{flex-wrap:wrap}header #mainTools{display:flex;flex:0 0 auto;gap:4px;margin:0}header #mainTools #toggleWalls,header #mainTools #drawMode{flex:0 0 32px;width:32px;min-width:32px;height:28px;margin:0;padding:3px;border-radius:7px}header #mainTools svg{width:22px;height:22px}header .wall-actions{flex:0 0 100%;min-width:0;margin:0;padding:4px}.top-menu summary{padding:5px 8px}header .status{flex:0 0 100%;margin:0}
+.menu-panel #reloadApp{grid-column:1 / -1}
 </style>
 </head>
 <body>
@@ -54,6 +55,7 @@ header{flex-wrap:wrap}header #mainTools{display:flex;flex:0 0 auto;gap:4px;margi
  <button id="fullscreen" class="top-action" title="Cijeli zaslon" aria-label="Cijeli zaslon">⛶</button>
  <details id="topMenu" class="top-menu"><summary aria-label="Izbornik" title="Izbornik">☰</summary>
   <div class="menu-panel">
+   <button id="reloadApp" class="file-action" type="button">↻ Učitaj novu verziju</button>
    <button id="minus" class="file-action" aria-label="Smanji zoom">− Zoom</button>
    <button id="plus" class="file-action" aria-label="Povećaj zoom">+ Zoom</button>
    <button id="fit" class="file-action">Cijelo</button>
@@ -76,8 +78,8 @@ header{flex-wrap:wrap}header #mainTools{display:flex;flex:0 0 auto;gap:4px;margi
  <span id="status" class="status" role="status" hidden></span>
 </header>
 <canvas id="board" aria-label="Mreža za crtanje obrisa prostorija"></canvas>
-<script src="room-geometry.js?v=20261027-39"></script>
-<script src="grid-geometry.js?v=20261027-39"></script>
-<script src="grid-app.js?v=20261027-39"></script>
+<script src="room-geometry.js?v=20261027-40"></script>
+<script src="grid-geometry.js?v=20261027-40"></script>
+<script src="grid-app.js?v=20261027-40"></script>
 </body>
 </html>

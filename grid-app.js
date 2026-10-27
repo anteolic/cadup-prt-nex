@@ -349,6 +349,11 @@
  document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))closeMenu();});
  function changeMode(next){closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
+ $('reloadApp').addEventListener('click',()=>{
+  closeMenu();save();
+  const target=new URL(window.location.href);target.searchParams.set('v',String(Date.now()));
+  window.location.replace(target.href);
+ });
  $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
  function deselectWall(){selectedWall=null;wallSession=null;status();draw();}

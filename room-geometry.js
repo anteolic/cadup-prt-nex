@@ -132,6 +132,13 @@ globalThis.RoomGeometry = (() => {
    }
   }
   const inner=segments.map(s=>s.axis==='v'?{x:s.line-5,y:s.start,width:10,height:s.end-s.start}:{x:s.start,y:s.line-5,width:s.end-s.start,height:10});
+  // Kvadratni spoj popunjava vanjski kut dvaju stvarnih okomitih poteza.
+  const joints=new Set();
+  for(const a of segments)for(const b of segments){
+   if(a.axis!=='h'||b.axis!=='v'||b.line<a.start||b.line>a.end||a.line<b.start||a.line>b.end)continue;
+   const key=b.line+':'+a.line;if(joints.has(key))continue;joints.add(key);
+   inner.push({x:b.line-5,y:a.line-5,width:10,height:10});
+  }
   const outer=shell(rects,30);
   const net=groups(rects).map(group=>{
    let pieces=group.rects;for(const wall of inner)pieces=subtract(pieces,wall);

@@ -93,7 +93,8 @@ console.log('PASS: otvor kraći od punog zida, tri prostorije, fizički otvori, 
 const openWalls=outline.slice(0,3);
 result=GridGeometry.detectWithDoors(openWalls);
 assert.equal(result.faces.length,0);
-assert.equal(RoomGeometry.layout(result.rooms,openWalls).inner.length,3,'Nepotpuni obris prikazuje svaki nacrtani zid');
+const openLayout=RoomGeometry.layout(result.rooms,openWalls);
+for(const s of openWalls){const x=(s.x1+s.x2)/2,y=(s.y1+s.y2)/2;assert.ok(openLayout.inner.some(r=>x>=r.x&&x<=r.x+r.width&&y>=r.y&&y<=r.y+r.height),'Nepotpuni obris prikazuje svaki nacrtani zid');}
 assert.equal(RoomGeometry.layout([], [line(100,100,105,100)]).inner[0].height,10,'Samostalan kratki potez ima debljinu zida');
 let resized=GridGeometry.resizeWall(divided,middle,2,280);
 assert.equal(resized.wall.y2,280);

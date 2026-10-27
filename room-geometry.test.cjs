@@ -61,3 +61,15 @@ assert.equal(RoomGeometry.layout(joined).area,80000,'Vraćena površina nakon uk
 assert.equal(RoomGeometry.union(joined).edges.length,4);
 assert.ok(RoomGeometry.split(joined,1,'h',200),'Ponovni rez spojene prostorije');
 console.log('PASS: pravokutnik, L prostor, povezivanje, preklapanje, zidovi isključivo izvana.');
+
+// L spojevi svih usmjerenja moraju popuniti cijeli kvadrat na kutu.
+for(const dx of [-100,100])for(const dy of [-100,100]){
+ const walls=[{x1:Math.min(200,200+dx),y1:200,x2:Math.max(200,200+dx),y2:200},
+  {x1:200,y1:Math.min(200,200+dy),x2:200,y2:Math.max(200,200+dy)}];
+ const layout=RoomGeometry.layout([],walls);
+ for(const x of [196,204])for(const y of [196,204])assert.ok(layout.inner.some(r=>x>r.x&&x<r.x+r.width&&y>r.y&&y<r.y+r.height),'Spoj nema praznu četvrtinu');
+ assert.equal(RoomGeometry.union(layout.inner).area,2000,'Kut čini jednu spojenu masu zida');
+}
+const doorWalls=[{x1:100,y1:100,x2:200,y2:100},{x1:200,y1:120,x2:200,y2:200}];
+const doorLayout=RoomGeometry.layout([],doorWalls);
+assert.ok(!doorLayout.inner.some(r=>200>r.x&&200<r.x+r.width&&110>r.y&&110<r.y+r.height),'Blizina kuta ne zatvara otvor za vrata');

@@ -28,7 +28,7 @@
  }
  function model(){
   const key=JSON.stringify(segments);
-  if(cachedKey!==key){const detected=GridGeometry.detectWithDoors(segments);cached={...detected,layout:RoomGeometry.layout(detected.rooms,segments)};cachedKey=key;}
+  if(cachedKey!==key){const detected=GridGeometry.detectWithDoors(segments),layout=RoomGeometry.layout(detected.rooms,segments);cached={...detected,layout,wallOutline:RoomGeometry.union([...layout.outer,...layout.inner])};cachedKey=key;}
   return cached;
  }
  const point=(x,y)=>({x:(x-ox)/scale,y:(y-oy)/scale});
@@ -184,13 +184,19 @@
   g.save();g.beginPath();g.rect(ox,oy,WIDTH*scale,height*scale);g.clip();
   if(wallsVisible){
    const boxes=[...current.layout.outer,...current.layout.inner];
-   g.fillStyle='#1e2329';for(const r of boxes)g.fillRect(ox+r.x*scale-1,oy+r.y*scale-1,r.width*scale+2,r.height*scale+2);
-   g.fillStyle='#bfc3c8';for(const r of boxes)g.fillRect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
+   // Jedinstvena ispuna i samo vanjski rub unije: nema šavova na spojevima.
+   g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
+   g.fillStyle='#bfc3c8';g.fill();g.beginPath();g.strokeStyle='#1e2329';g.lineWidth=1.5;
+   for(const e of current.wallOutline.edges){
+    if(e.axis==='h'){g.moveTo(ox+e.span[0]*scale,oy+e.line*scale);g.lineTo(ox+e.span[1]*scale,oy+e.line*scale);}
+    else{g.moveTo(ox+e.line*scale,oy+e.span[0]*scale);g.lineTo(ox+e.line*scale,oy+e.span[1]*scale);}
+   }g.stroke();
   }
-  g.strokeStyle=wallsVisible?'rgba(22,117,209,.6)':'#1675d1';g.lineWidth=2;g.beginPath();
-  for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();
+  if(!wallsVisible){g.strokeStyle='#1675d1';g.lineWidth=2;g.beginPath();
+   for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();
+  }
   // Kote iz stvarnih rubova zidova: unutarnje i vanjske duljine, bez oznaka prostorija.
-  for(const e of RoomGeometry.union([...current.layout.outer,...current.layout.inner]).edges){
+  for(const e of current.wallOutline.edges){
    const wall=e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]};
    const center=visibleWallCenter(wall);if(!center)continue;
    const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);

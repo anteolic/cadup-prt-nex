@@ -64,6 +64,7 @@ header #mainTools #eraseMode{flex:0 0 32px;width:32px;min-width:32px;height:28px
  <div class="brand"><strong>CADup</strong></div>
  <button id="undo" class="top-action" title="Poništi" aria-label="Poništi">↶</button>
  <button id="redo" class="top-action" title="Vrati" aria-label="Vrati">↷</button>
+ <button id="viewportRotate" class="top-action" type="button" title="Zakreni prikaz za 90°" aria-label="Zakreni prikaz za 90°"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" aria-hidden="true"><path d="M19 9a8 8 0 1 0 1 7M19 3v6h-6M8 10h6v6H8z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
  <button id="fullscreen" class="top-action" title="Cijeli zaslon" aria-label="Cijeli zaslon">⛶</button>
  <details id="topMenu" class="top-menu" name="header-menu"><summary aria-label="Izbornik" title="Izbornik">☰</summary>
   <div class="menu-panel">
@@ -75,7 +76,7 @@ header #mainTools #eraseMode{flex:0 0 32px;width:32px;min-width:32px;height:28px
    <button id="importJson" class="file-action">Uvezi JSON</button>
    <details class="view-settings"><summary>Postavke prikaza</summary><label><span>Grid</span><input id="showGrid" type="checkbox" checked></label><label><span>Prikaži mjere</span><input id="showMeasures" type="checkbox" checked></label></details>
    <button id="reloadApp" class="file-action" type="button">↻ Učitaj novu verziju</button>
-   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v87</small></div>
+   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v88</small></div>
   </div>
  </details>
  <input id="jsonFile" type="file" accept=".json,application/json" hidden>
@@ -108,9 +109,9 @@ header #mainTools #eraseMode{flex:0 0 32px;width:32px;min-width:32px;height:28px
   <p id="objectError" role="alert"></p>
  </div>
 </footer>
-<script src="room-geometry.js?v=20261027-87"></script>
-<script src="grid-geometry.js?v=20261027-87"></script>
-<script src="cad-objects.js?v=20261027-87"></script>
-<script src="grid-app.js?v=20261027-87"></script>
+<script src="room-geometry.js?v=20261027-88"></script>
+<script src="grid-geometry.js?v=20261027-88"></script>
+<script src="cad-objects.js?v=20261027-88"></script>
+<script src="grid-app.js?v=20261027-88"></script>
 </body>
 </html>

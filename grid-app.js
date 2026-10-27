@@ -4,7 +4,7 @@
  const CUSTOM_KEY='cadup_custom_library_v1',KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  const VIEW_KEY='cadup_view_settings_v1';
- let showGrid=true,showMeasures=true;
+ let showGrid=true,showMeasures=true,viewportTurns=0;
  let customLibrary=[],customNaming=false;
  let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null,editingObjectId=null,lastGroupTap=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
@@ -79,6 +79,19 @@
  }
  const point=(x,y)=>({x:(x-ox)/scale,y:(y-oy)/scale});
  const screen=p=>({x:ox+p.x*scale,y:oy+p.y*scale});
+ // Camera rotation is separate from plan geometry and object rotations.
+ function displayPoint(p,inverse=false){
+  const c=[1,0,-1,0][viewportTurns],s=[0,1,0,-1][viewportTurns]*(inverse?-1:1),x=p.x-w/2,y=p.y-h/2;
+  return {x:w/2+x*c-y*s,y:h/2+x*s+y*c};
+ }
+ function viewBounds(){
+  const vw=viewportTurns%2?h:w,vh=viewportTurns%2?w:h;
+  return {left:(w-vw)/2,right:(w+vw)/2,top:(h-vh)/2,bottom:(h+vh)/2,width:vw,height:vh};
+ }
+ function viewportBounds(bounds){
+  const a=displayPoint({x:bounds.left,y:bounds.top},true),b=displayPoint({x:bounds.right,y:bounds.bottom},true);
+  return {left:Math.min(a.x,b.x),right:Math.max(a.x,b.x),top:Math.min(a.y,b.y),bottom:Math.max(a.y,b.y)};
+ }
  function gridUnit(){return scale<=w/WIDTH*(1+1e-9)?100:step();}
  function step(){for(const s of [5,10,20,50,100,200,500,1000,2000])if(s*scale>=19)return s;return 2000;}
  function guideAxes(){
@@ -93,13 +106,13 @@
   return q;
  }
  function drawGuides(){
-  if(mode!=='draw')return;const axes=guideAxes(),target=first?(preview||first):cursor?snap(cursor.x,cursor.y):null;
+  if(mode!=='draw')return;const bounds=viewBounds(),axes=guideAxes(),target=first?(preview||first):cursor?snap(cursor.x,cursor.y):null;
   g.save();g.setLineDash([4,5]);
   for(const axis of ['x','y']){let previous=-Infinity;for(const value of axes[axis]){
-   const pixel=(axis==='x'?ox:oy)+value*scale,limit=axis==='x'?w:h,active=target&&Math.abs(target[axis]-value)<.001;
-   if(pixel<0||pixel>limit||(!active&&pixel-previous<5))continue;previous=pixel;
+   const pixel=(axis==='x'?ox:oy)+value*scale,limit=axis==='x'?bounds.right:bounds.bottom,minimum=axis==='x'?bounds.left:bounds.top,active=target&&Math.abs(target[axis]-value)<.001;
+   if(pixel<minimum||pixel>limit||(!active&&pixel-previous<5))continue;previous=pixel;
    g.globalAlpha=active?0.85:0.4;g.strokeStyle=active?'#2563eb':'#93b4d5';g.lineWidth=active?1.25:.75;g.beginPath();
-   if(axis==='x'){g.moveTo(pixel,0);g.lineTo(pixel,h);}else{g.moveTo(0,pixel);g.lineTo(w,pixel);}g.stroke();
+   if(axis==='x'){g.moveTo(pixel,bounds.top);g.lineTo(pixel,bounds.bottom);}else{g.moveTo(bounds.left,pixel);g.lineTo(bounds.right,pixel);}g.stroke();
   }}g.restore();
  }
  function drawWallAxes(){
@@ -256,9 +269,9 @@
   gesture=null;pointers.clear();first=null;preview=null;status();draw();
  }
  function limitPan(){
-  const availableX=w-WIDTH*scale,availableY=h-height*scale;
-  ox=availableX>0?availableX/2:clamp(ox,availableX,0);
-  oy=availableY>0?availableY/2:clamp(oy,availableY,0);
+  const bounds=viewBounds(),availableX=bounds.width-WIDTH*scale,availableY=bounds.height-height*scale;
+  ox=availableX>0?bounds.left+availableX/2:clamp(ox,bounds.right-WIDTH*scale,bounds.left);
+  oy=availableY>0?bounds.top+availableY/2:clamp(oy,bounds.bottom-height*scale,bounds.top);
  }
  function zoomAt(factor,x=w/2,y=h/2){
   const anchor=point(x,y);scale=clamp(scale*factor,w/WIDTH,w/WIDTH*25);ox=x-anchor.x*scale;oy=y-anchor.y*scale;limitPan();status();draw();
@@ -277,34 +290,35 @@
  function tag(x,y,text,color='#24557e',vertical=false,priority=1,dimension=null){if(!showMeasures)return;pendingTags.push({x,y,text,color,vertical,priority,dimension});}
  function paintTags(){
   const occupied=[];dimensionHits=[];
-  for(const {x:rawX,y:rawY,text,color,vertical,priority,dimension} of pendingTags.sort((a,b)=>b.priority-a.priority)){
-  let x=rawX,y=rawY;
+  for(const {x:rawX,y:rawY,text,color,vertical:sourceVertical,priority,dimension} of pendingTags.sort((a,b)=>b.priority-a.priority)){
+  let {x,y}=displayPoint({x:rawX,y:rawY});const vertical=sourceVertical!==!!(viewportTurns%2);
   const base=priority===3?7:priority===1?8:12;
   const size=clamp(base+Math.log2(Math.max(1,scale/(w/WIDTH))),base,base+2),boxHeight=size+(priority===3?4:6);
-  g.save();g.globalAlpha=editingGroup?0.25:(mode==='edit'&&(selectedWall||objectIds.size)&&priority<5)?0.9:1;g.font='600 '+size+'px system-ui';
+  g.save();g.setTransform(dpr,0,0,dpr,0,0);g.globalAlpha=editingGroup?0.25:(mode==='edit'&&(selectedWall||objectIds.size)&&priority<5)?0.9:1;g.font='600 '+size+'px system-ui';
   const width=g.measureText(text).width+(priority===3?6:10),halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
-  x=clamp(x,Math.max(0,ox)+halfX+3,Math.min(w,ox+WIDTH*scale)-halfX-3);
-  y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
+  x=clamp(x,halfX+3,w-halfX-3);
+  y=clamp(y,halfY+3,h-halfY-3);
   const bounds={left:x-halfX-3,right:x+halfX+3,top:y-halfY-2,bottom:y+halfY+2};
   if(occupied.some(r=>r.left<bounds.right&&r.right>bounds.left&&r.top<bounds.bottom&&r.bottom>bounds.top)){g.restore();continue;}
-  occupied.push(bounds);if(dimension)dimensionHits.push({...bounds,dimension});g.translate(x,y);if(vertical)g.rotate(-Math.PI/2);
+  occupied.push(bounds);if(dimension)dimensionHits.push({...viewportBounds(bounds),dimension});g.translate(x,y);if(vertical)g.rotate(-Math.PI/2);
   g.beginPath();g.roundRect(-width/2,-boxHeight/2,width,boxHeight,Math.min(5,boxHeight/2));
   g.fillStyle='#f1f3f5';g.fill();g.strokeStyle='#cbd0d6';g.lineWidth=.8;g.stroke();
   g.fillStyle=color;g.textAlign='center';g.textBaseline='middle';g.fillText(text,0,0);g.restore();
   }
  }
  function visibleWallCenter(s,padding=24){
-  const a=screen({x:s.x1,y:s.y1}),b=screen({x:s.x2,y:s.y2}),horizontal=s.y1===s.y2;
+  const a=screen({x:s.x1,y:s.y1}),b=screen({x:s.x2,y:s.y2}),horizontal=s.y1===s.y2,bounds=viewBounds();
   if(horizontal){
-   if(a.y < -padding||a.y>h+padding||Math.max(a.x,b.x)<0||Math.min(a.x,b.x)>w)return null;
-   return {x:(Math.max(0,Math.min(a.x,b.x))+Math.min(w,Math.max(a.x,b.x)))/2,y:a.y};
+   if(a.y<bounds.top-padding||a.y>bounds.bottom+padding||Math.max(a.x,b.x)<bounds.left||Math.min(a.x,b.x)>bounds.right)return null;
+   return {x:(Math.max(bounds.left,Math.min(a.x,b.x))+Math.min(bounds.right,Math.max(a.x,b.x)))/2,y:a.y};
   }
-  if(a.x < -padding||a.x>w+padding||Math.max(a.y,b.y)<0||Math.min(a.y,b.y)>h)return null;
-  return {x:a.x,y:(Math.max(0,Math.min(a.y,b.y))+Math.min(h,Math.max(a.y,b.y)))/2};
+  if(a.x<bounds.left-padding||a.x>bounds.right+padding||Math.max(a.y,b.y)<bounds.top||Math.min(a.y,b.y)>bounds.bottom)return null;
+  return {x:a.x,y:(Math.max(bounds.top,Math.min(a.y,b.y))+Math.min(bounds.bottom,Math.max(a.y,b.y)))/2};
  }
  function draw(){
   if(!w||!h)return;
   const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.globalAlpha=1;g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
+  g.translate(w/2,h/2);g.rotate(viewportTurns*Math.PI/2);g.translate(-w/2,-h/2);const bounds=viewBounds();
   g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
   g.globalAlpha=editingGroup?0.2:(mode==='edit'&&(selectedWall||objectIds.size))?0.7:1;
   // Blaga pastelna ispuna samo zatvorenih prostora; mreža i zidovi crtaju se iznad.
@@ -315,8 +329,8 @@
   const unit=gridUnit();
   g.lineWidth=1;
   // Mreža prekriva cijeli prikaz, uključujući rubove izvan smanjene radne plohe.
-  if(showGrid)for(let i=Math.ceil(-ox/scale/unit);i<=Math.floor((w-ox)/scale/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
-  if(showGrid)for(let i=Math.ceil(-oy/scale/unit);i<=Math.floor((h-oy)/scale/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
+  if(showGrid)for(let i=Math.ceil((bounds.left-ox)/scale/unit);i<=Math.floor((bounds.right-ox)/scale/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,bounds.top);g.lineTo(x,bounds.bottom);g.stroke();}
+  if(showGrid)for(let i=Math.ceil((bounds.top-oy)/scale/unit);i<=Math.floor((bounds.bottom-oy)/scale/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(bounds.left,y);g.lineTo(bounds.right,y);g.stroke();}
   g.save();g.beginPath();g.rect(ox,oy,WIDTH*scale,height*scale);g.clip();
   drawGuides();
   if(wallsVisible){
@@ -346,7 +360,7 @@
   for(const e of RoomGeometry.cutWallDimensions(current.wallOutline.edges,openingCuts.filter(cut=>cut.end>cut.start))){
    const wall=e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]};
    const center=visibleWallCenter(wall);if(!center)continue;
-   const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);
+   const visibleLength=e.axis==='h'?Math.min(bounds.right,ox+wall.x2*scale)-Math.max(bounds.left,ox+wall.x1*scale):Math.min(bounds.bottom,oy+wall.y2*scale)-Math.max(bounds.top,oy+wall.y1*scale);
    if(visibleLength<(e.cut?14:36))continue;
    tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v',1,{axis:e.axis,line:e.line,start:e.span[0],end:e.span[1],side:e.side});
   }
@@ -411,7 +425,7 @@
   if(objectIds.size>1){const box=CadObjects.selectionBounds(objects.filter(item=>objectIds.has(item.id)));if(box){g.strokeStyle='#2563eb';g.lineWidth=1.5;g.setLineDash([5,4]);g.strokeRect(ox+box.left*scale,oy+box.top*scale,box.width*scale,box.depth*scale);g.setLineDash([]);}}
   drawJoinedNodes();drawObjectHandles();paintTags();g.restore();g.globalAlpha=1;
  }
- const xy=e=>{const r=board.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
+ const xy=e=>{const r=board.getBoundingClientRect();return displayPoint({x:e.clientX-r.left,y:e.clientY-r.top},true);};
  function pinch(){
   const [a,b]=[...pointers.values()];if(!b)return;
   if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
@@ -584,6 +598,7 @@
   try{localStorage.setItem(VIEW_KEY,JSON.stringify({grid:showGrid,measures:showMeasures}));}catch(_){}
   draw();
  });
+ $('viewportRotate').addEventListener('click',()=>{finishMeasureInput();closeMenu();if(gesture)cancelInteraction();viewportTurns=(viewportTurns+1)%4;lastGroupTap=null;status();draw();});
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('eraseMode').addEventListener('click',()=>changeMode(mode==='erase'?'edit':'erase'));
  $('reloadApp').addEventListener('click',async()=>{

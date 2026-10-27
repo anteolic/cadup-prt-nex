@@ -51,23 +51,6 @@
   const raw=point(x,y),q=snap(x,y),horizontal=axis?axis==='h':Math.abs(raw.x-first.x)>=Math.abs(raw.y-first.y);
   return horizontal?{x:q.x,y:first.y}:{x:first.x,y:q.y};
  }
- function drawingTargets(){
-  if(mode!=='draw'||!first)return [];
-  const unit=step(),targets=new Map();
-  const add=(x,y,axis)=>{
-   const p=screen({x,y}),q=second(p.x,p.y,axis),s=screen(q);
-   if(q.x===first.x&&q.y===first.y||s.x<6||s.x>w-6||s.y<6||s.y>h-6)return;
-   targets.set(q.x+':'+q.y,{...q,axis,length:Math.abs(q.x-first.x)+Math.abs(q.y-first.y)});
-  };
-  const left=clamp(-ox/scale,0,WIDTH),right=clamp((w-ox)/scale,0,WIDTH),top=clamp(-oy/scale,0,height),bottom=clamp((h-oy)/scale,0,height);
-  for(let i=Math.ceil(left/unit);i<=Math.floor(right/unit);i++)add(i*unit,first.y,'h');
-  for(let i=Math.ceil(top/unit);i<=Math.floor(bottom/unit);i++)add(first.x,i*unit,'v');
-  for(const s of segments)for(const n of [1,2]){
-   if(s['y'+n]===first.y)add(s['x'+n],first.y,'h');
-   if(s['x'+n]===first.x)add(first.x,s['y'+n],'v');
-  }
-  return [...targets.values()].sort((a,b)=>a.axis.localeCompare(b.axis)||a.x-b.x||a.y-b.y);
- }
  const lengthText=cm=>cm.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm';
  function resetClear(){clearArmed=false;$('clearAll').textContent='Briši sve';$('clearAll').classList.remove('armed');}
  function status(message){
@@ -167,14 +150,14 @@
   const occupied=[];dimensionHits=[];
   for(const {x:rawX,y:rawY,text,color,vertical,priority,dimension} of pendingTags.sort((a,b)=>b.priority-a.priority)){
   let x=rawX,y=rawY;
-  const base=priority===3?7:priority<=2?8:12;
+  const base=priority===3?7:priority===1?8:12;
   const size=clamp(base+Math.log2(Math.max(1,scale/(w/WIDTH))),base,base+2),boxHeight=size+(priority===3?4:6);
   g.save();g.font='600 '+size+'px system-ui';
   const width=g.measureText(text).width+(priority===3?6:10),halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
   x=clamp(x,Math.max(0,ox)+halfX+3,Math.min(w,ox+WIDTH*scale)-halfX-3);
   y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
   const bounds={left:x-halfX-3,right:x+halfX+3,top:y-halfY-2,bottom:y+halfY+2};
-  if(priority!==2&&occupied.some(r=>r.left<bounds.right&&r.right>bounds.left&&r.top<bounds.bottom&&r.bottom>bounds.top)){g.restore();continue;}
+  if(occupied.some(r=>r.left<bounds.right&&r.right>bounds.left&&r.top<bounds.bottom&&r.bottom>bounds.top)){g.restore();continue;}
   occupied.push(bounds);if(dimension)dimensionHits.push({...bounds,dimension});g.translate(x,y);if(vertical)g.rotate(-Math.PI/2);
   g.beginPath();g.roundRect(-width/2,-boxHeight/2,width,boxHeight,Math.min(5,boxHeight/2));
   g.fillStyle='#f1f3f5';g.fill();g.strokeStyle='#cbd0d6';g.lineWidth=.8;g.stroke();
@@ -199,14 +182,11 @@
   for(const face of current.faces){
    g.beginPath();for(const r of face.rects)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);g.fill();
   }
-  const targeting=mode==='draw'&&first;
   const unit=scale<=w/WIDTH*(1+1e-9)?100:step();
   g.lineWidth=1;
   // Mreža prekriva cijeli prikaz, uključujući rubove izvan smanjene radne plohe.
-  if(!targeting){
   for(let i=Math.ceil(-ox/scale/unit);i<=Math.floor((w-ox)/scale/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
   for(let i=Math.ceil(-oy/scale/unit);i<=Math.floor((h-oy)/scale/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
-  }
   g.save();g.beginPath();g.rect(ox,oy,WIDTH*scale,height*scale);g.clip();
   if(wallsVisible){
    const boxes=[...current.layout.outer,...current.layout.inner];
@@ -222,7 +202,7 @@
    for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();
   }
   // Kote iz stvarnih rubova zidova: unutarnje i vanjske duljine, bez oznaka prostorija.
-  if(!targeting)for(const e of current.wallOutline.edges){
+  for(const e of current.wallOutline.edges){
    const wall=e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]};
    const center=visibleWallCenter(wall);if(!center)continue;
    const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);
@@ -242,17 +222,7 @@
    for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,5,0,Math.PI*2);g.fill();g.stroke();}
    const length=Math.abs((preview||first).x-first.x)+Math.abs((preview||first).y-first.y);
    const center=visibleWallCenter({x1:first.x,y1:first.y,x2:(preview||first).x,y2:(preview||first).y});
-   if(mode!=='draw'&&length&&center)tag(center.x,center.y-20,(mode==='erase'?'Obriši ':'')+lengthText(length),color,false,5);
-  }
-  if(targeting){
-   const origin=screen(first);let horizontal=0,vertical=0;
-   for(const target of drawingTargets()){
-    const p=screen(target);g.beginPath();g.arc(p.x,p.y,3,0,Math.PI*2);g.fillStyle='#fff';g.fill();g.strokeStyle='#3884b5';g.lineWidth=1.2;g.stroke();
-    const row=(target.axis==='h'?horizontal++:vertical++)%2,offset=16+row*16;
-    const x=target.axis==='h'?p.x:p.x+(origin.x>w-60?-offset:offset);
-    const y=target.axis==='h'?p.y+(origin.y<44?offset:-offset):p.y;
-    tag(x,y,lengthText(target.length),'#24557e',target.axis==='v',2);
-   }
+   if(length&&center)tag(center.x,center.y-20,(mode==='erase'?'Obriši ':'')+lengthText(length),color,false,5);
   }
   paintTags();g.restore();
  }

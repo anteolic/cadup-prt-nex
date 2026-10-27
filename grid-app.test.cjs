@@ -10,7 +10,7 @@ function el(id){
 const context=vm.createContext({console,Blob,URL:{createObjectURL(blob){downloadedBlob=blob;return 'blob:test';},revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={drawingTargets,model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -196,27 +196,10 @@ el('dimensionValue').value='600';el('dimensionThickness').value='40';el('dimensi
 assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.length,1);
 assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===160&&e.span[1]-e.span[0]===600));
 
-// Odabrani početak skriva mrežu i pokazuje samo ortogonalne ciljeve s točnim duljinama.
+// Mreža ostaje vidljiva i nakon odabira početka linije.
 el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();
-gridLines.length=0;labels.length=0;click(100,100);
-assert.equal(gridLines.length,0,'Tijekom izbora kraja nema pune mreže');
-const coarseTargets=api.drawingTargets();assert.ok(coarseTargets.length>4);
-for(const target of coarseTargets){
- assert.ok(target.x===api.first.x||target.y===api.first.y);
- assert.equal(target.length,Math.abs(target.x-api.first.x)+Math.abs(target.y-api.first.y));
- assert.ok(labels.includes(target.length.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm'),'Svaka moguća točka ima oznaku duljine');
-}
-const coarseMinimum=Math.min(...coarseTargets.map(t=>t.length));
-api.zoomAt(4,100,100);const fineTargets=api.drawingTargets();
-assert.ok(Math.min(...fineTargets.map(t=>t.length))<coarseMinimum,'Približavanje nudi manje duljine');
-const chosen=fineTargets.find(t=>t.axis==='h'&&t.x>api.first.x&&t.length===40);assert.ok(chosen);
-view=api.view;click(view.ox+chosen.x*view.scale,view.oy+chosen.y*view.scale);
-assert.equal(api.segments.length,1);
-const created=api.segments[0];assert.equal(Math.abs(created.x2-created.x1)+Math.abs(created.y2-created.y1),chosen.length);
-assert.equal(api.first.x,chosen.x,'Neprekinuto crtanje nastavlja od odabrane točke');
-gridLines.length=0;view=api.view;click(view.ox+api.first.x*view.scale,view.oy+api.first.y*view.scale);
-assert.equal(api.first,null);assert.ok(gridLines.length>0,'Nakon završetka se vraća mreža');
-api.fit();
+gridLines.length=0;click(100,100);assert.ok(gridLines.length>0);
+el('cancel').click();
 
 // Odabir za brisanje: prazan prostor poništava, drugi zid prebacuje odabir.
 el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();

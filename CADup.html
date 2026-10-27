@@ -42,15 +42,17 @@ footer{padding:5px 8px max(5px,env(safe-area-inset-bottom))}.mode-row{display:fl
 .wall-actions{display:block;padding:6px}.dimension-fields{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) 30px;gap:5px;align-items:end}.dimension-fields label{font-size:10px;font-weight:650;color:#1e40af;min-width:0}.dimension-fields input{display:block;width:100%;min-width:0;margin-top:3px;padding:7px 5px;border:1px solid #93c5fd;border-radius:7px;background:#fff;color:#162335;font:inherit;font-size:16px}.dimension-fields button{padding-inline:6px}#dimensionError{margin:5px 0 0;font-size:11px;color:#b91c1c}#dimensionError:empty{display:none}
 .mode-row[hidden]{display:none}.wall-actions{margin-bottom:0}
 .footer-row{display:flex;align-items:flex-end;gap:6px}.footer-row .mode-row{flex:0 0 auto}.footer-row .wall-actions{flex:1;min-width:0}.footer-row .dimension-fields{gap:3px;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) 28px}.footer-row .dimension-fields label{font-size:9px}.footer-row .dimension-fields button{padding-inline:4px}.footer-row .wall-actions{padding:4px}
+header{flex-wrap:wrap}header #mainTools{display:flex;flex:0 0 auto;gap:4px;margin:0}header #mainTools #toggleWalls,header #mainTools #drawMode{flex:0 0 32px;width:32px;min-width:32px;height:28px;margin:0;padding:3px;border-radius:7px}header #mainTools svg{width:22px;height:22px}header .wall-actions{flex:0 0 100%;min-width:0;margin:0;padding:4px}.top-menu summary{padding:5px 8px}header .status{flex:0 0 100%;margin:0}
 </style>
 </head>
 <body>
 <header>
  <div class="brand"><strong>CADup</strong></div>
+ <div id="mainTools" class="mode-row"><button id="toggleWalls" aria-label="Sakrij zidove" aria-pressed="true" title="Zidovi uključeni"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4 24V4h20v20h-7v-4h3V8H8v12h4v4H4Z" fill="currentColor"/><path d="M14 8v5h6M8 16h6v4" stroke="currentColor" stroke-width="3"/><path class="wall-off" d="M3 3l22 22" stroke-width="2.5" stroke-linecap="round"/></svg></button><button id="drawMode" class="tool" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button></div>
  <button id="undo" class="top-action" title="Poništi" aria-label="Poništi">↶</button>
  <button id="redo" class="top-action" title="Vrati" aria-label="Vrati">↷</button>
  <button id="fullscreen" class="top-action" title="Cijeli zaslon" aria-label="Cijeli zaslon">⛶</button>
- <details id="topMenu" class="top-menu"><summary aria-label="Ponude i naredbe">☰ Izbornik</summary>
+ <details id="topMenu" class="top-menu"><summary aria-label="Izbornik" title="Izbornik">☰</summary>
   <div class="menu-panel">
    <button id="minus" class="file-action" aria-label="Smanji zoom">− Zoom</button>
    <button id="plus" class="file-action" aria-label="Povećaj zoom">+ Zoom</button>
@@ -61,28 +63,21 @@ footer{padding:5px 8px max(5px,env(safe-area-inset-bottom))}.mode-row{display:fl
   </div>
  </details>
  <input id="jsonFile" type="file" accept=".json,application/json" hidden>
-</header>
-<canvas id="board" aria-label="Mreža za crtanje obrisa prostorija"></canvas>
-<footer>
- <div class="footer-row">
- <div id="mainTools" class="mode-row"><button id="toggleWalls" aria-label="Sakrij zidove" aria-pressed="true" title="Zidovi uključeni"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4 24V4h20v20h-7v-4h3V8H8v12h4v4H4Z" fill="currentColor"/><path d="M14 8v5h6M8 16h6v4" stroke="currentColor" stroke-width="3"/><path class="wall-off" d="M3 3l22 22" stroke-width="2.5" stroke-linecap="round"/></svg></button><button id="drawMode" class="tool" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button></div>
  <div id="wallActions" class="wall-actions" hidden aria-label="Uređivanje odabranog zida">
   <form id="dimensionForm" class="dimension-fields">
    <button id="wallDelete" type="button" title="Obriši odabrani zid">Obriši</button>
    <label for="dimensionValue">Duljina (cm)<input id="dimensionValue" type="text" inputmode="decimal" autocomplete="off" required aria-describedby="dimensionError"></label>
    <label for="dimensionThickness">Debljina (cm)<input id="dimensionThickness" type="text" inputmode="decimal" autocomplete="off" required aria-describedby="dimensionError"></label>
-
-
    <button type="submit" title="Primijeni mjere" aria-label="Primijeni mjere">✓</button>
   </form>
   <p id="dimensionError" role="alert"></p>
  </div>
- </div>
  <div id="roomArea" hidden></div>
  <span id="status" class="status" role="status" hidden></span>
-</footer>
-<script src="room-geometry.js?v=20261027-38"></script>
-<script src="grid-geometry.js?v=20261027-38"></script>
-<script src="grid-app.js?v=20261027-38"></script>
+</header>
+<canvas id="board" aria-label="Mreža za crtanje obrisa prostorija"></canvas>
+<script src="room-geometry.js?v=20261027-39"></script>
+<script src="grid-geometry.js?v=20261027-39"></script>
+<script src="grid-app.js?v=20261027-39"></script>
 </body>
 </html>

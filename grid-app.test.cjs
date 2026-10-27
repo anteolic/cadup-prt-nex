@@ -1,13 +1,15 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const nodes=new Map(),labels=[],memory=new Map();
 let downloadedBlob=null,downloadName=null;
+const updateRequests=[];let updateFailure=null;
+const publishedHtml=fs.readFileSync(__dirname+'/CADup.html','utf8');
 const gridLines=[],paintCalls=[];let gridStart=null;
 const canvas=new Proxy({fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
  if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
 }
-const context=vm.createContext({console,Blob,URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
+const context=vm.createContext({console,Blob,fetch:async(url,options)=>{updateRequests.push({url,options});if(updateFailure==='network')throw new Error('Offline');return {ok:updateFailure!=='http'&&!(updateFailure==='script'&&url.includes('grid-app.js')),status:updateFailure==='http'||(updateFailure==='script'&&url.includes('grid-app.js'))?503:200,text:async()=>url.includes('CADup.html')?(updateFailure==='incomplete'?'<html></html>':publishedHtml):'/* verified script response */'};},URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
 source=source.replace('restore();status();',`globalThis.api={handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
@@ -299,17 +301,29 @@ el('drawMode').click();assert.equal(api.mode,'draw');assert.equal(el('drawMode')
 el('drawMode').click();assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(el('drawMode').attributes['aria-pressed'],'false');
 assert.deepEqual({scale:api.view.scale,ox:api.view.ox,oy:api.view.oy},pencilCamera);assert.equal(el('mainTools').hidden,false);
 
-// Učitavanje nove verzije čuva crtež i osvježava adresu bez ručnog zatvaranja.
-const beforeReload=JSON.stringify(api.segments);el('topMenu').open=true;el('reloadApp').click();
-assert.equal(el('topMenu').open,false);
-const reloadUrl=new URL(context.window.location.href);
-assert.equal(reloadUrl.pathname,'/cadup-prt-nex/CADup.html');assert.equal(reloadUrl.hash,'#drawing');assert.equal(reloadUrl.searchParams.get('mode'),'test');
-assert.ok(Number(reloadUrl.searchParams.get('v'))>39);assert.equal(JSON.stringify(api.segments),beforeReload);
-assert.equal(JSON.stringify(JSON.parse(memory.get('infoa_grid_loops_v1')).segments),beforeReload);
-
 // Dolje se prikazuje samo editor odabranog zida; glavni alati ostaju dostupni gore.
 enterEdit();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainTools').hidden,false);
 api.fit();const footerWall=api.segments[0],footerView=api.view;
 click(footerView.ox+(footerWall.x1+footerWall.x2)/2*footerView.scale,footerView.oy+(footerWall.y1+footerWall.y2)/2*footerView.scale);
 assert.ok(api.selection);assert.equal(el('editorFooter').hidden,false);assert.equal(el('mainTools').hidden,false);
 deselect();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainTools').hidden,false);
+
+// Nadogradnja dohvaća stranicu i sve tri skripte mimo cachea prije navigacije.
+(async()=>{
+ await new Promise(resolve=>setImmediate(resolve));
+ const beforeReload=JSON.stringify(api.segments);el('topMenu').open=true;updateRequests.length=0;
+ await el('reloadApp').click();assert.equal(el('topMenu').open,false);
+ const reloadUrl=new URL(context.window.location.href);
+ assert.equal(reloadUrl.pathname,'/cadup-prt-nex/CADup.html');assert.ok(Number(reloadUrl.searchParams.get('v'))>42);
+ assert.equal(updateRequests.length,4);assert.ok(updateRequests.every(request=>request.options.cache==='reload'));
+ for(const file of ['room-geometry.js','grid-geometry.js','grid-app.js'])assert.ok(updateRequests.some(request=>request.url.includes(file+'?v=')));
+ assert.equal(JSON.stringify(api.segments),beforeReload);assert.equal(JSON.stringify(JSON.parse(memory.get('infoa_grid_loops_v1')).segments),beforeReload);
+ assert.equal(el('reloadApp').disabled,false);
+ const previousUrl=context.window.location.href;
+ for(const failure of ['network','http','incomplete','script']){
+  updateFailure=failure;await el('reloadApp').click();assert.equal(context.window.location.href,previousUrl);
+  assert.ok(el('status').textContent.includes('nije učitana'));assert.equal(el('reloadApp').disabled,false);
+  assert.equal(JSON.stringify(api.segments),beforeReload,'Neuspjela nadogradnja ne gubi crtež');
+ }
+ updateFailure=null;
+})().catch(error=>{console.error(error);process.exitCode=1;});

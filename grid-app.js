@@ -350,10 +350,27 @@
  document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))closeMenu();});
  function changeMode(next){closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
- $('reloadApp').addEventListener('click',()=>{
-  closeMenu();save();
-  const target=new URL(window.location.href);target.searchParams.set('v',String(Date.now()));
-  window.location.replace(target.href);
+ $('reloadApp').addEventListener('click',async()=>{
+  const button=$('reloadApp');if(button.disabled)return;
+  button.disabled=true;button.textContent='Učitavam…';closeMenu();save();status('Učitavam novu verziju…');
+  try{
+   // Dohvati kanonsku stranicu i osvježi HTTP cache prije navigacije.
+   const target=new URL('CADup.html',window.location.href);target.searchParams.set('v',String(Date.now()));
+   const response=await fetch(target.href,{cache:'reload'});
+   if(!response.ok)throw new Error('HTTP '+response.status);
+   const html=await response.text();
+   const scripts=[...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map(match=>new URL(match[1],target.href));
+   const required=['room-geometry.js','grid-geometry.js','grid-app.js'];
+   if(!required.every(name=>scripts.some(url=>url.origin===target.origin&&url.pathname.endsWith('/'+name))))throw new Error('Nepotpuna stranica');
+   for(const url of scripts){
+    if(url.origin!==target.origin)continue;
+    const script=await fetch(url.href,{cache:'reload'});
+    if(!script.ok)throw new Error('Skripta: HTTP '+script.status);
+    const source=await script.text();if(!source.trim())throw new Error('Prazna skripta');
+   }
+   save();window.location.replace(target.href);
+  }catch(_){status('Nova verzija nije učitana. Provjeri vezu i pokušaj ponovno. Tlocrt je sačuvan.');}
+  finally{button.disabled=false;button.textContent='↻ Učitaj novu verziju';}
  });
  $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);

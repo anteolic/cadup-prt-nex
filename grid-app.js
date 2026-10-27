@@ -56,7 +56,7 @@
  function resetClear(){clearArmed=false;$('clearAll').textContent='Obriši sve';$('clearAll').classList.remove('armed');}
  function status(message){
   const current=model();
-  $('status').textContent=message||(mode==='edit'?(selectedWall?'Povuci zid unutra ili van':'Povuci unutrašnjost prostorije ili odaberi zid'):first?(mode==='erase'?'2. Dodirni kraj brisanja · povuci za duljinu':'2. Dodirni kraj · povuci za duljinu'):(mode==='erase'?'1. Dodirni početak brisanja':'1. Dodirni početak linije'));
+  $('status').textContent=message||(mode==='edit'?(selectedWall?'Povuci zid unutra ili van':'Povuci unutrašnjost prostorije ili odaberi zid'):first?(mode==='erase'?'2. Dodirni kraj brisanja · povuci za duljinu':'Dodirni sljedeću točku · dvostruki dodir završava'):(mode==='erase'?'1. Dodirni početak brisanja':'1. Dodirni početak linije'));
   $('roomArea').textContent=current.faces.length?current.faces.length+' prostorija · ukupno '+areaText(current.layout.area):'Zatvori obris da nastane prostorija';
   for(const [id,value] of [['drawMode','draw'],['eraseMode','erase'],['editMode','edit']]){
    $(id).classList.toggle('active',mode===value);$(id).setAttribute('aria-pressed',String(mode===value));
@@ -73,7 +73,7 @@
   if(first.x===end.x&&first.y===end.y){status('Odaberi drugu točku linije');return;}
   const before=copy(segments),stroke={x1:first.x,y1:first.y,x2:end.x,y2:end.y};
   segments=mode==='erase'?GridGeometry.eraseLine(segments,stroke):GridGeometry.normalize([...segments,stroke]);
-  first=null;preview=null;commit(before);
+  first=mode==='draw'?{...end}:null;preview=first;commit(before);
  }
  function undo(){
   if(gesture?.type==='wall-move'||gesture?.type==='room-move'){cancelInteraction();return;}
@@ -278,7 +278,15 @@
    else{const wall=last.currentWall;commit(last.before);selectedWall=wall;
     wallSession={baseSegments:last.baseSegments,baseWall:last.baseWall,offset:last.currentOffset,current:wall};status();draw();}
   }
-  else if(last?.type==='preview'&&first){if(!cancelled)add(adjust(p,last));else{preview=first;status();draw();}}
+  else if(last?.type==='preview'&&first){
+   if(cancelled){preview=first;status();draw();}
+   else{
+    const q=snap(p.x,p.y);
+    // Ponovljeni dodir zadnje točke završava niz i na dodirnom zaslonu.
+    if(mode==='draw'&&!last.dragMode&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9&&q.x===first.x&&q.y===first.y)cancelInteraction();
+    else add(adjust(p,last));
+   }
+  }
   else if(last?.type==='single'&&!last.moved&&!cancelled){
    if(mode==='draw'||mode==='erase'){first=snap(p.x,p.y);preview=first;status();draw();}
    else{const raw=point(p.x,p.y);selected=model().rooms.find(r=>raw.x>=r.x&&raw.x<=r.x+r.width&&raw.y>=r.y&&raw.y<=r.y+r.height)?.roomKey??null;status();draw();}

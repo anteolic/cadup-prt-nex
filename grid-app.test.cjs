@@ -13,7 +13,7 @@ vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
 function click(x,y){board.pointerdown(event(x,y));board.pointerup(event(x,y));}
-function line(x1,y1,x2,y2){click(x1,y1);click(x2,y2);}
+function line(x1,y1,x2,y2){el('cancel').click();click(x1,y1);click(x2,y2);el('cancel').click();}
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);
 assert.equal(api.model().faces.length,0);line(100,250,100,100);
 assert.equal(api.model().faces.length,1);assert.equal(api.model().faces[0].area,120000);
@@ -46,4 +46,22 @@ api.undo();api.undo();
 const beforeRoomMove=JSON.stringify(api.segments);drag(150,175,125,200);
 assert.notEqual(JSON.stringify(api.segments),beforeRoomMove,'Povlačenje unutrašnjosti pomiče prostoriju');
 assert.equal(api.model().faces.length,2);api.undo();assert.equal(JSON.stringify(api.segments),beforeRoomMove);
-console.log('PASS: crtanje na dvije točke, podešavanje duljine, automatske prostorije, žive dimenzije, gumica, zidovi, snap, undo/redo i spremanje.');
+// Neprekinuti niz: svaki novi dodir dodaje segment i zadržava kraj za nastavak.
+el('clearAll').click();el('clearAll').click();el('drawMode').click();
+click(100,100);click(300,100);click(300,250);click(100,250);
+assert.equal(api.model().faces.length,0);
+assert.ok(api.first);assert.equal(api.first.x,200);assert.equal(api.first.y,500);
+click(100,100);assert.equal(api.model().faces.length,1);
+assert.ok(api.first,'Zatvoren obris dopušta nastavak crtanja');
+const closed=JSON.stringify(api.segments);
+click(100,100);assert.equal(api.first,null,'Drugi dodir iste točke završava niz');
+assert.equal(JSON.stringify(api.segments),closed,'Završetak ne dodaje ni briše segmente');
+// Pogrešan početak može se prekinuti ponovnim dodirom iste točke.
+click(400,400);assert.ok(api.first);click(400,400);assert.equal(api.first,null);
+assert.equal(JSON.stringify(api.segments),closed);
+// Nakon završetka može se crtati odvojeni niz, a undo/redo čuva segmente.
+click(400,400);click(500,400);click(500,500);click(500,500);
+assert.equal(api.first,null);const extended=JSON.stringify(api.segments);
+assert.notEqual(extended,closed);api.undo();assert.notEqual(JSON.stringify(api.segments),extended);
+api.redo();assert.equal(JSON.stringify(api.segments),extended);
+console.log('PASS: continuous line, ponovljeni dodir za završetak i otkazivanje početka; crtanje na dvije točke, podešavanje duljine, automatske prostorije, žive dimenzije, gumica, zidovi, snap, undo/redo i spremanje.');

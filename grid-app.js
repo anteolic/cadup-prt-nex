@@ -76,8 +76,10 @@
  function add(end){
   if(!first)return;
   if(first.x===end.x&&first.y===end.y){status('Odaberi drugu točku linije');return;}
-  const before=copy(segments),stroke={x1:first.x,y1:first.y,x2:end.x,y2:end.y};
+  const before=copy(segments),roomCount=GridGeometry.detect(segments).faces.length,stroke={x1:first.x,y1:first.y,x2:end.x,y2:end.y};
   segments=GridGeometry.normalize([...segments,stroke]);
+  const closed=GridGeometry.detect(segments).faces.length>roomCount;
+  if(closed)mode='edit';
   first=mode==='draw'?{...end}:null;preview=first;commit(before);
  }
  function undo(){

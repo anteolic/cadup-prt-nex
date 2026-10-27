@@ -511,3 +511,12 @@ selectionPanView={...api.view};selectionPanPoint={x:selectionPanView.ox+selectio
 drag(selectionPanPoint.x,selectionPanPoint.y,selectionPanPoint.x+50,selectionPanPoint.y);assert.notEqual(JSON.stringify(api.objects),selectionPanScene);assert.deepEqual({...api.view},selectionPanView);
 el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();const wallPanScene=JSON.stringify(api.segments),wallPanView={...api.view};drag(200,100,220,120);assert.equal(JSON.stringify(api.segments),wallPanScene);assert.equal(api.selection,null);assert.equal(api.view.ox,wallPanView.ox+20);assert.equal(api.view.oy,wallPanView.oy+20);
 click(220,120);assert.ok(api.selection);const selectedPanView={...api.view};drag(220,120,220,160);assert.notEqual(JSON.stringify(api.segments),wallPanScene);assert.deepEqual({...api.view},selectedPanView);
+
+// Double tap opens the group; only a double tap outside its bounds closes it.
+el('clearAll').click();el('clearAll').click();api.fit();api.addCustomObject(api.customLibrary[0].id);
+const doubleGroupMember=api.objects[0],doubleGroupView={...api.view},doubleGroupScene=memory.get('infoa_grid_loops_v1');
+const doubleGroupPoint={x:doubleGroupView.ox+doubleGroupMember.x*doubleGroupView.scale,y:doubleGroupView.oy+doubleGroupMember.y*doubleGroupView.scale};
+function timedTap(x,y,time){board.pointerdown({...event(x,y),timeStamp:time-30});board.pointerup({...event(x,y),timeStamp:time});}
+timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1000);assert.equal(el('objectEditGroup').textContent,'Uredi grupu');timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1200);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');assert.equal(api.objectIds.length,0);
+timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1700);timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1900);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
+timedTap(990,790,2500);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');timedTap(990,790,2700);assert.equal(el('objectEditGroup').textContent,'Uredi grupu');assert.equal(api.objectIds.length,2);assert.equal(memory.get('infoa_grid_loops_v1'),doubleGroupScene);assert.deepEqual({...api.view},doubleGroupView);

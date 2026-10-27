@@ -6,7 +6,7 @@
  const VIEW_KEY='cadup_view_settings_v1';
  let showGrid=true,showMeasures=true;
  let customLibrary=[],customNaming=false;
- let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null;
+ let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null,lastGroupTap=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false,cursor=null,eraseHover=null,eraseObjectIds=[];
  let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null,editorSelectionKey=null;
@@ -468,11 +468,26 @@
    if(gesture.moved){ox=gesture.ox+dx;oy=gesture.oy+dy;schedule();}
   }
  });
+ function handleGroupDoubleTap(e,p,last,cancelled){
+  if(mode!=='edit'||cancelled||objectMulti||e.shiftKey||!Number.isFinite(e.timeStamp)||!last||last.moved||!['pick-pan','pan','object-move'].includes(last.type)||Math.hypot(p.x-last.start.x,p.y-last.start.y)>9){lastGroupTap=null;return false;}
+  const raw=point(p.x,p.y);let key=null,group=null;
+  if(editingGroup){
+   const box=CadObjects.selectionBounds(objects.filter(item=>item.group===editingGroup));
+   if(box&&(raw.x<box.left||raw.x>box.right||raw.y<box.top||raw.y>box.bottom))key='close:'+editingGroup;
+  }else{
+   group=CadObjects.hit(objects,raw.x,raw.y)?.group;if(group)key='open:'+group;
+  }
+  if(!key){lastGroupTap=null;return false;}
+  const previous=lastGroupTap;lastGroupTap={key,time:e.timeStamp,x:p.x,y:p.y};
+  if(!previous||previous.key!==key||e.timeStamp-previous.time<0||e.timeStamp-previous.time>380||Math.hypot(p.x-previous.x,p.y-previous.y)>22)return false;
+  lastGroupTap=null;if(editingGroup)closeGroupEditor();else openGroupEditor(group);return true;
+ }
  function release(e,cancelled){
   if(!pointers.has(e.pointerId))return;
   const p=xy(e),last=gesture,wasMulti=last?.type==='pinch'||pointers.size>1;pointers.delete(e.pointerId);
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
-  if(wasMulti||last?.type==='remaining'){status();draw();return;}
+  if(wasMulti||last?.type==='remaining'){lastGroupTap=null;status();draw();return;}
+  if(handleGroupDoubleTap(e,p,last,cancelled))return;
   if(last?.type==='erase-span'){if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)deleteEraseTarget(last.target);else{eraseHover=null;eraseObjectIds=[];draw();}return;}
   if(last?.type==='pick-pan'){
    if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9){
@@ -520,10 +535,11 @@
  board.addEventListener('wheel',e=>{closeMenu();e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
  function closeMenu(){$('topMenu').open=false;$('objectMenu').open=false;}
  document.addEventListener('pointerdown',e=>{
+  if(e.target!==board)lastGroupTap=null;
   if(liveEdit&&e.target!==liveEdit.input){const input=liveEdit.input;finishMeasureInput();input.blur?.();}
   if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
  },true);
- function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;editingGroup=null;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
+ function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;editingGroup=null;lastGroupTap=null;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
  function restoreViewSettings(){
   try{const saved=JSON.parse(localStorage.getItem(VIEW_KEY)||'{}');showGrid=saved.grid!==false;showMeasures=saved.measures!==false;}catch(_){}
   $('showGrid').checked=showGrid;$('showMeasures').checked=showMeasures;
@@ -717,15 +733,19 @@
    $('customName').value='';customNaming=false;$('customSaveForm').hidden=true;$('customMessage').textContent='Spremljeno u Custom: '+template.name;
   }catch(error){$('customMessage').textContent=error.message;}
  });
+ function openGroupEditor(group){
+  if(!group||!objects.some(item=>item.group===group))return;
+  lastGroupTap=null;editingGroup=group;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;selectedWall=null;wallSession=null;status();draw();
+ }
  function closeGroupEditor(){
-  const group=editingGroup;editingGroup=null;objectIds=new Set(objects.filter(item=>item.group===group).map(item=>item.id));objectMulti=false;objectEditorKey=null;status();draw();
+  lastGroupTap=null;const group=editingGroup;editingGroup=null;objectIds=new Set(objects.filter(item=>item.group===group).map(item=>item.id));objectMulti=false;objectEditorKey=null;status();draw();
  }
  $('objectEditGroup').addEventListener('click',()=>{
   finishMeasureInput();
   if(editingGroup){closeGroupEditor();return;}
   const items=objects.filter(item=>objectIds.has(item.id)),group=items[0]?.group;
   if(!group||!items.every(item=>item.group===group))return;
-  editingGroup=group;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;status();draw();
+  openGroupEditor(group);
  });
  $('objectMulti').addEventListener('click',()=>{objectMulti=!objectMulti;status();draw();});
  $('objectMirror').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();objects=CadObjects.mirror(objects,[...objectIds]);commitObjects(before,[...objectIds]);});

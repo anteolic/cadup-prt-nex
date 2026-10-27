@@ -110,6 +110,39 @@ globalThis.GridGeometry=(()=>{
   }
   return normalize(result);
  }
+ // Promjena kote pomiče vezani kraj i susjedne zidove, čuvajući zatvoren obris.
+ function resizeDimension(input,dimension,length,min=5,width=2000,height=2000){
+  const h=dimension.axis==='h',lines=atomic(input),start=dimension.start,end=dimension.end;
+  if(!Number.isFinite(length)||length<min)throw new Error('Duljina mora biti najmanje 5 cm.');
+  let root=-1,best=Infinity;
+  for(let i=0;i<lines.length;i++){
+   const s=lines[i];if((s.y1===s.y2)!==h)continue;
+   const overlap=Math.min(end,h?s.x2:s.y2)-Math.max(start,h?s.x1:s.y1);
+   const distance=Math.abs(dimension.line-(h?s.y1:s.x1));
+   if(overlap<=0||distance>30.001)continue;
+   const score=distance*10000-overlap;if(score<best){best=score;root=i;}
+  }
+  if(root<0)throw new Error('Nije pronađen zid za ovu mjeru.');
+  const wall=lines[root],line=h?wall.y1:wall.x1,axis=h?'x':'y';
+  const candidates=lines.filter(s=>(s.y1===s.y2)===h&&(h?s.y1:s.x1)===line).flatMap(s=>[s[axis+'1'],s[axis+'2']]);
+  const cut=candidates.reduce((a,b)=>Math.abs(b-end)<Math.abs(a-end)?b:a);
+  if(Math.abs(cut-end)>30.001)throw new Error('Za ovaj dio zida upotrijebi krajnju ručku.');
+  const neighbors=new Map(),key=(x,y)=>x+':'+y;
+  lines.forEach((s,i)=>{for(const n of [1,2]){const k=key(s['x'+n],s['y'+n]);if(!neighbors.has(k))neighbors.set(k,[]);neighbors.get(k).push(i);}});
+  const connected=new Set([root]),queue=[root];
+  for(let j=0;j<queue.length;j++)for(const n of [1,2])for(const i of neighbors.get(key(lines[queue[j]]['x'+n],lines[queue[j]]['y'+n]))){
+   if(!connected.has(i)){connected.add(i);queue.push(i);}
+  }
+  const delta=length-(end-start);
+  const resized=lines.map((s,i)=>{
+   if(!connected.has(i))return s;const next={...s};
+   for(const n of [1,2])if(next[axis+n]>=cut)next[axis+n]=Math.round((next[axis+n]+delta)*1000)/1000;
+   if(next.x1<0||next.y1<0||next.x2>width||next.y2>height||next.x2<next.x1||next.y2<next.y1||
+    Math.abs(next.x2-next.x1)+Math.abs(next.y2-next.y1)<min)throw new Error('Duljina prelazi rub tlocrta ili previše skraćuje susjedni zid.');
+   return next;
+  });
+  return normalize(resized);
+ }
  function resizeWall(input,wall,endpoint,position,min=5,width=2000,height=2000){
   const lines=atomic(input),index=lines.findIndex(s=>['x1','y1','x2','y2'].every(k=>s[k]===wall[k]));
   if(index<0||![1,2].includes(endpoint)||!Number.isFinite(position))return {segments:normalize(input),wall};
@@ -180,5 +213,5 @@ globalThis.GridGeometry=(()=>{
   }
   return {segments:normalize(result),dx,dy};
  }
- return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,resizeWall,moveWall,moveRoom};
+ return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,resizeDimension,resizeWall,moveWall,moveRoom};
 })();

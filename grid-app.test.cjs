@@ -4,13 +4,13 @@ let downloadedBlob=null,downloadName=null;
 const gridLines=[];let gridStart=null;
 const canvas=new Proxy({measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
- if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
+ if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
 }
-const context=vm.createContext({console,Blob,URL:{createObjectURL(blob){downloadedBlob=blob;return 'blob:test';},revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
+const context=vm.createContext({console,Blob,URL:{createObjectURL(blob){downloadedBlob=blob;return 'blob:test';},revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -142,3 +142,22 @@ el('topMenu').open=true;el('editMode').click();assert.equal(el('topMenu').open,f
 el('topMenu').open=true;context.document.pointerdown({target:{closest:()=>null}});assert.equal(el('topMenu').open,false);
 el('topMenu').open=true;context.document.pointerdown({target:{closest:()=>el('topMenu')}});assert.equal(el('topMenu').open,true);
 el('topMenu').open=false;
+
+// Dodir stvarno prikazane vanjske kote otvara unos i mijenja spojene zidove.
+el('clearAll').click();el('clearAll').click();el('drawMode').click();
+line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);
+el('editMode').click();
+const topDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
+assert.ok(topDimension);click((topDimension.left+topDimension.right)/2,(topDimension.top+topDimension.bottom)/2);
+assert.equal(el('dimensionDialog').open,true);assert.equal(el('dimensionValue').value,'4,6');
+const beforeNumber=JSON.stringify(api.segments);
+el('dimensionValue').value='0';el('dimensionForm').submit({preventDefault(){}});
+assert.equal(JSON.stringify(api.segments),beforeNumber);assert.ok(el('dimensionError').textContent);
+el('dimensionValue').value='5,00';el('dimensionForm').submit({preventDefault(){}});
+assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.length,1);
+assert.ok(api.segments.some(s=>s.x1===640&&s.x2===640),'Vezani vanjski zid pomiče se s novom mjerom');
+api.undo();assert.equal(JSON.stringify(api.segments),beforeNumber);api.redo();
+const beforeCancel=JSON.stringify(api.segments);
+el('editMode').click();const another=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
+click((another.left+another.right)/2,(another.top+another.bottom)/2);el('dimensionCancel').click();
+assert.equal(JSON.stringify(api.segments),beforeCancel);assert.equal(el('dimensionDialog').open,false);

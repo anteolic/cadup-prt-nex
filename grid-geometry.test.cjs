@@ -105,3 +105,13 @@ resized=GridGeometry.resizeWall(divided,middle,1,9999);
 assert.equal(resized.wall.y1,395,'Ručke ne mogu prijeći suprotni kraj');
 resized=GridGeometry.resizeWall(outline,top,2,350);
 assert.equal(resized.wall.x2,350,'Vodoravna ručka mijenja x koordinatu');
+
+const numeric=GridGeometry.resizeDimension(outline,{axis:'h',line:70,start:70,end:530},500);
+assert.equal(GridGeometry.detect(numeric).faces.length,1,'Promjena vanjske kote čuva zatvoren tlocrt');
+assert.equal(GridGeometry.detect(numeric).faces[0].area,440*300);
+assert.equal(RoomGeometry.union(RoomGeometry.layout(GridGeometry.detect(numeric).rooms,numeric).outer).edges.find(e=>e.axis==='h'&&e.line===70&&e.side===-1).span[1],570);
+const separate=box(900,900,100,100),combined=[...outline,...separate];
+const adjusted=GridGeometry.resizeDimension(combined,{axis:'h',line:70,start:70,end:530},500);
+for(const s of GridGeometry.normalize(separate))assert.ok(adjusted.some(a=>['x1','y1','x2','y2'].every(k=>a[k]===s[k])),'Odvojeni obris se ne mijenja');
+assert.throws(()=>GridGeometry.resizeDimension(outline,{axis:'h',line:70,start:70,end:530},NaN));
+assert.throws(()=>GridGeometry.resizeDimension(outline,{axis:'h',line:70,start:70,end:530},3000));

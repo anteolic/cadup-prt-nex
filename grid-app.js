@@ -5,7 +5,7 @@
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  let segments=[],past=[],future=[],first=null,preview=null,mode='draw',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false;
- let cachedKey=null,cached=null,pendingTags=[];
+ let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null;
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
  function save(){try{localStorage.setItem(KEY,JSON.stringify({segments,wallsVisible}));}catch(_){}}
@@ -145,10 +145,10 @@
   ox=oldFit?w/2-center.x*scale:0;oy=oldFit?h/2-center.y*scale:0;limitPan();draw();
  }
  function schedule(){if(frame)return;frame=true;requestAnimationFrame(()=>{frame=false;status();draw();});}
- function tag(x,y,text,color='#24557e',vertical=false,priority=1){pendingTags.push({x,y,text,color,vertical,priority});}
+ function tag(x,y,text,color='#24557e',vertical=false,priority=1,dimension=null){pendingTags.push({x,y,text,color,vertical,priority,dimension});}
  function paintTags(){
-  const occupied=[];
-  for(const {x:rawX,y:rawY,text,color,vertical,priority} of pendingTags.sort((a,b)=>b.priority-a.priority)){
+  const occupied=[];dimensionHits=[];
+  for(const {x:rawX,y:rawY,text,color,vertical,priority,dimension} of pendingTags.sort((a,b)=>b.priority-a.priority)){
   let x=rawX,y=rawY;
   const base=priority===3?7:priority===1?8:12;
   const size=clamp(base+Math.log2(Math.max(1,scale/(w/WIDTH))),base,base+2),boxHeight=size+(priority===3?4:6);
@@ -158,7 +158,7 @@
   y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
   const bounds={left:x-halfX-3,right:x+halfX+3,top:y-halfY-2,bottom:y+halfY+2};
   if(occupied.some(r=>r.left<bounds.right&&r.right>bounds.left&&r.top<bounds.bottom&&r.bottom>bounds.top)){g.restore();continue;}
-  occupied.push(bounds);g.translate(x,y);if(vertical)g.rotate(-Math.PI/2);
+  occupied.push(bounds);if(dimension)dimensionHits.push({...bounds,dimension});g.translate(x,y);if(vertical)g.rotate(-Math.PI/2);
   g.fillStyle='rgba(255,255,255,.96)';g.fillRect(-width/2,-boxHeight/2,width,boxHeight);
   g.fillStyle=color;g.textAlign='center';g.textBaseline='middle';g.fillText(text,0,0);g.restore();
   }
@@ -206,14 +206,14 @@
    const center=visibleWallCenter(wall);if(!center)continue;
    const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);
    if(visibleLength<36)continue;
-   tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v');
+   tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v',1,{axis:e.axis,line:e.line,start:e.span[0],end:e.span[1]});
   }
   if(selectedWall){
    const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});
    const horizontal=selectedWall.y1===selectedWall.y2;
    g.strokeStyle='#1675d1';g.lineWidth=5;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
    for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,9,0,Math.PI*2);g.fill();g.stroke();}
-   const center=visibleWallCenter(selectedWall);if(center)tag(center.x,center.y,(horizontal?'↕ ':'↔ ')+lengthText(horizontal?selectedWall.x2-selectedWall.x1:selectedWall.y2-selectedWall.y1),'#1675d1',false,5);
+   const center=visibleWallCenter(selectedWall);if(center)tag(center.x,center.y,(horizontal?'↕ ':'↔ ')+lengthText(horizontal?selectedWall.x2-selectedWall.x1:selectedWall.y2-selectedWall.y1),'#1675d1',false,5,{axis:horizontal?'h':'v',line:horizontal?selectedWall.y1:selectedWall.x1,start:horizontal?selectedWall.x1:selectedWall.y1,end:horizontal?selectedWall.x2:selectedWall.y2});
   }
   if(first){
    const color=mode==='erase'?'#dc2626':'#1675d1';
@@ -249,6 +249,8 @@
   if(mode==='edit'){
    const endpoint=hitHandle(p.x,p.y);
    if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
+   const label=dimensionHits.find(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom);
+   if(label){gesture={type:'dimension',id:e.pointerId,start:p,dimension:label.dimension,wall:hitWall(p.x,p.y)};return;}
    const wall=hitWall(p.x,p.y);selectedWall=wall;
    if(wall){
     const session=wallSession&&['x1','y1','x2','y2'].every(k=>wallSession.current[k]===wall[k])?wallSession:null;
@@ -274,6 +276,12 @@
    scale=clamp(gesture.scale*Math.hypot(a.x-b.x,a.y-b.y)/gesture.distance,w/WIDTH,w/WIDTH*25);ox=mid.x-gesture.anchor.x*scale;oy=mid.y-gesture.anchor.y*scale;limitPan();schedule();return;
   }
   if(!gesture||gesture.id!==e.pointerId)return;
+  if(gesture.type==='dimension'&&gesture.wall&&Math.hypot(p.x-gesture.start.x,p.y-gesture.start.y)>9){
+   const wall=gesture.wall,session=wallSession&&['x1','y1','x2','y2'].every(k=>wallSession.current[k]===wall[k])?wallSession:null;
+   gesture={...gesture,type:'wall-move',before:copy(segments),currentWall:wall,beforeSession:wallSession,
+    baseSegments:session?session.baseSegments:copy(segments),baseWall:session?session.baseWall:wall,currentOffset:session?session.offset:0};
+   selectedWall=wall;
+  }
   if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
   else if(gesture.type==='wall-move'){updateWall(p,gesture);}
   else if(gesture.type==='wall-resize'){updateWallLength(p,gesture);}
@@ -288,6 +296,10 @@
   const p=xy(e),last=gesture,wasMulti=last?.type==='pinch'||pointers.size>1;pointers.delete(e.pointerId);
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
   if(wasMulti||last?.type==='remaining'){status();draw();return;}
+  if(last?.type==='dimension'){
+   if(!cancelled&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)openDimension(last.dimension);
+   return;
+  }
   if(last?.type==='room-move'){
    if(cancelled){segments=last.before;selected=last.face.id;status();draw();}
    else {const selection=selected;commit(last.before);selected=selection;status();draw();}
@@ -330,6 +342,24 @@
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
   const before=copy(segments);segments=[];first=null;preview=null;commit(before);
  });
+ function openDimension(dimension){
+  cancelInteraction();editingDimension={...dimension};
+  $('dimensionValue').value=String(Math.round((dimension.end-dimension.start)*1000)/100000).replace('.',',');
+  $('dimensionError').textContent='';$('dimensionDialog').showModal();$('dimensionValue').focus();$('dimensionValue').select();
+ }
+ $('dimensionForm').addEventListener('submit',e=>{
+  e.preventDefault();if(!editingDimension)return;
+  const text=$('dimensionValue').value.trim().replace(',','.');
+  const value=/^\d+(?:\.\d+)?$/.test(text)?Number(text)*100:NaN;
+  try{
+   const updated=GridGeometry.resizeDimension(segments,editingDimension,value,MIN,WIDTH,height);
+   GridGeometry.detectWithDoors(updated);
+   const before=copy(segments);segments=updated;commit(before);
+   editingDimension=null;$('dimensionDialog').close();status('Duljina zida je promijenjena');
+  }catch(error){$('dimensionError').textContent=error.message;}
+ });
+ $('dimensionCancel').addEventListener('click',()=>{editingDimension=null;$('dimensionDialog').close();});
+ $('dimensionDialog').addEventListener('close',()=>{editingDimension=null;});
  $('saveJson').addEventListener('click',()=>{
   try{
    const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),wallsVisible};

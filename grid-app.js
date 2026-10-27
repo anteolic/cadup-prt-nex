@@ -206,7 +206,7 @@
    const center=visibleWallCenter(wall);if(!center)continue;
    const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);
    if(visibleLength<36)continue;
-   tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v',1,{axis:e.axis,line:e.line,start:e.span[0],end:e.span[1]});
+   tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v',1,{axis:e.axis,line:e.line,start:e.span[0],end:e.span[1],side:e.side});
   }
   if(selectedWall){
    const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});
@@ -345,6 +345,8 @@
  function openDimension(dimension){
   cancelInteraction();editingDimension={...dimension};
   $('dimensionValue').value=String(Math.round((dimension.end-dimension.start)*1000)/1000).replace('.',',');
+  const wall=GridGeometry.wallForDimension(segments,dimension).wall;
+  $('dimensionThickness').value=String(wall.thickness??RoomGeometry.defaultThickness(model().rooms,wall)).replace('.',',');
   $('dimensionError').textContent='';$('dimensionDialog').showModal();$('dimensionValue').focus();$('dimensionValue').select();
  }
  $('dimensionForm').addEventListener('submit',e=>{
@@ -352,10 +354,27 @@
   const text=$('dimensionValue').value.trim().replace(',','.');
   const value=/^\d+(?:\.\d+)?$/.test(text)?Number(text):NaN;
   try{
-   const updated=GridGeometry.resizeDimension(segments,editingDimension,value,MIN,WIDTH,height);
+   const textThickness=$('dimensionThickness').value.trim().replace(',','.');
+   const thickness=/^\d+(?:\.\d+)?$/.test(textThickness)?Number(textThickness):NaN;
+   if(!Number.isFinite(thickness)||thickness<1||thickness>100)throw new Error('Debljina mora biti od 1 do 100 cm.');
+   if(!Number.isFinite(value)||value<MIN)throw new Error('Duljina mora biti najmanje 5 cm.');
+   const wall=GridGeometry.wallForDimension(segments,editingDimension).wall;
+   const oldThickness=wall.thickness??RoomGeometry.defaultThickness(model().rooms,wall);
+   let updated=thickness===oldThickness?segments:GridGeometry.setWallThickness(segments,editingDimension,thickness);
+   if(Math.abs(value-(editingDimension.end-editingDimension.start))>.0001){
+    let dimension=editingDimension;
+    if(thickness!==oldThickness&&dimension.side!==undefined){
+     const detected=GridGeometry.detectWithDoors(updated),layout=RoomGeometry.layout(detected.rooms,updated);
+     const line=dimension.axis==='h'?wall.y1:wall.x1,expected=line+(dimension.line-line)*thickness/oldThickness;
+     const edges=RoomGeometry.union([...layout.outer,...layout.inner]).edges.filter(e=>e.axis===dimension.axis&&e.side===dimension.side&&Math.abs(e.line-expected)<.001);
+     edges.sort((a,b)=>(Math.min(b.span[1],dimension.end)-Math.max(b.span[0],dimension.start))-(Math.min(a.span[1],dimension.end)-Math.max(a.span[0],dimension.start)));
+     if(edges.length)dimension={...dimension,line:edges[0].line,start:edges[0].span[0],end:edges[0].span[1]};
+    }
+    updated=GridGeometry.resizeDimension(updated,dimension,value,MIN,WIDTH,height);
+   }
    GridGeometry.detectWithDoors(updated);
    const before=copy(segments);segments=updated;commit(before);
-   editingDimension=null;$('dimensionDialog').close();status('Duljina zida je promijenjena');
+   editingDimension=null;$('dimensionDialog').close();status('Mjere zida su promijenjene');
   }catch(error){$('dimensionError').textContent=error.message;}
  });
  $('dimensionCancel').addEventListener('click',()=>{editingDimension=null;$('dimensionDialog').close();});
@@ -379,7 +398,8 @@
     (data.version!==undefined&&data.version!==1)||(data.unit!==undefined&&data.unit!=='cm')||
     (data.wallsVisible!==undefined&&typeof data.wallsVisible!=='boolean'))throw new Error('Neispravan format tlocrta.');
    const valid=data.segments.every(s=>s&&['x1','y1','x2','y2'].every(k=>Number.isFinite(s[k])&&s[k]>=0&&s[k]<=2000)&&
-    (s.x1===s.x2||s.y1===s.y2)&&(s.x1!==s.x2||s.y1!==s.y2));
+    (s.x1===s.x2||s.y1===s.y2)&&(s.x1!==s.x2||s.y1!==s.y2)&&
+    (s.thickness===undefined||(Number.isFinite(s.thickness)&&s.thickness>=1&&s.thickness<=100)));
    if(!valid)throw new Error('JSON sadrži neispravne zidove.');
    const imported=GridGeometry.normalize(data.segments);
    GridGeometry.detectWithDoors(imported); // Provjeri složenost prije zamjene crteža.

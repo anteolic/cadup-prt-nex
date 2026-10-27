@@ -115,3 +115,19 @@ const adjusted=GridGeometry.resizeDimension(combined,{axis:'h',line:70,start:70,
 for(const s of GridGeometry.normalize(separate))assert.ok(adjusted.some(a=>['x1','y1','x2','y2'].every(k=>a[k]===s[k])),'Odvojeni obris se ne mijenja');
 assert.throws(()=>GridGeometry.resizeDimension(outline,{axis:'h',line:70,start:70,end:530},NaN));
 assert.throws(()=>GridGeometry.resizeDimension(outline,{axis:'h',line:70,start:70,end:530},3000));
+
+const partitionDimension={axis:'v',line:295,start:100,end:400};
+const thickPartition=GridGeometry.setWallThickness(divided,partitionDimension,24);
+assert.equal(thickPartition.find(s=>s.x1===300&&s.x2===300).thickness,24);
+assert.ok(thickPartition.filter(s=>s.x1!==300||s.x2!==300).every(s=>s.thickness===undefined),'Debljina pripada samo odabranom zidu');
+const thickLayout=RoomGeometry.layout(GridGeometry.detectWithDoors(thickPartition).rooms,thickPartition);
+assert.equal(thickLayout.inner[0].width,24);assert.equal(thickLayout.inner[0].x,288);
+assert.equal(GridGeometry.resizeWall(thickPartition,thickPartition.find(s=>s.thickness===24),2,350).segments.find(s=>s.thickness===24).y2,350);
+const erasedThick=GridGeometry.eraseLine(thickPartition,line(300,200,300,250));
+assert.equal(erasedThick.filter(s=>s.thickness===24).length,2,'Debljina se čuva s obje strane vrata');
+assert.equal(GridGeometry.detectWithDoors(erasedThick).faces.length,2);
+const adjacentWidths=GridGeometry.normalize([{...line(100,100,200,100),thickness:20},{...line(200,100,300,100),thickness:30}]);
+assert.equal(adjacentWidths.length,2,'Različite debljine se ne spajaju');
+assert.equal(GridGeometry.atomic(adjacentWidths)[1].thickness,30);
+assert.equal(GridGeometry.detectWithDoors(adjacentWidths).doors.length,0,'Promjena debljine na spoju nije otvor');
+assert.throws(()=>GridGeometry.setWallThickness(divided,partitionDimension,0));

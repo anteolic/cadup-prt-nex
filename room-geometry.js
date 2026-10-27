@@ -97,6 +97,27 @@ globalThis.RoomGeometry = (() => {
   }
   return result;
  }
+ function defaultThickness(rects,wall){
+  const x=(wall.x1+wall.x2)/2,y=(wall.y1+wall.y2)/2,h=wall.y1===wall.y2;
+  const covered=(a,b)=>rects.some(r=>a>=r.x&&a<=r.x+r.width&&b>=r.y&&b<=r.y+r.height);
+  return covered(x-(h?0:.001),y-(h?.001:0))!==covered(x+(h?0:.001),y+(h?.001:0))?30:10;
+ }
+ function outerWalls(rects,physicalWalls){
+  if(!physicalWalls?.some(s=>s.thickness!==undefined))return shell(rects,30);
+  const pieces=[];let custom=false;
+  for(const e of union(rects).edges){
+   const matches=physicalWalls.filter(s=>(s.y1===s.y2)===(e.axis==='h')&&(e.axis==='h'?s.y1:s.x1)===e.line);
+   const cuts=[...new Set([...e.span,...matches.flatMap(s=>e.axis==='h'?[s.x1,s.x2]:[s.y1,s.y2]).filter(v=>v>e.span[0]&&v<e.span[1])])].sort((a,b)=>a-b);
+   for(let i=1;i<cuts.length;i++){
+    const start=cuts[i-1],end=cuts[i],wall=matches.find(s=>(e.axis==='h'?s.x1:s.y1)<=start&&(e.axis==='h'?s.x2:s.y2)>=end);
+    const t=wall?.thickness??30;custom||=t!==30;
+    const a=start-(start===e.span[0]?t:0),b=end+(end===e.span[1]?t:0);
+    pieces.push(e.axis==='h'?{x:a,y:e.line+(e.side<0?-t:0),width:b-a,height:t}:{x:e.line+(e.side<0?-t:0),y:a,width:t,height:b-a});
+   }
+  }
+  if(!custom)return shell(rects,30);
+  let outside=pieces;for(const r of rects)outside=subtract(outside,r);return outside;
+ }
  function layout(rects,physicalWalls=null){
   const xs=[...new Set(rects.flatMap(r=>[r.x,r.x+r.width]))].sort((a,b)=>a-b);
   const ys=[...new Set(rects.flatMap(r=>[r.y,r.y+r.height]))].sort((a,b)=>a-b);
@@ -127,19 +148,19 @@ globalThis.RoomGeometry = (() => {
      const mid=(cuts[i-1]+cuts[i])/2,x=h?mid:line,y=h?line:mid;
      // Samo rub zatvorene prostorije već ima vanjski zid; ostali potezi moraju biti vidljivi.
      if(covered(x-(h?0:.001),y-(h?.001:0))===covered(x+(h?0:.001),y+(h?.001:0)))
-      segments.push({axis:h?'h':'v',line,start:cuts[i-1],end:cuts[i]});
+      segments.push({axis:h?'h':'v',line,start:cuts[i-1],end:cuts[i],thickness:s.thickness??10});
     }
    }
   }
-  const inner=segments.map(s=>s.axis==='v'?{x:s.line-5,y:s.start,width:10,height:s.end-s.start}:{x:s.start,y:s.line-5,width:s.end-s.start,height:10});
+  const inner=segments.map(s=>{const t=s.thickness??10;return s.axis==='v'?{x:s.line-t/2,y:s.start,width:t,height:s.end-s.start}:{x:s.start,y:s.line-t/2,width:s.end-s.start,height:t};});
   // Kvadratni spoj popunjava vanjski kut dvaju stvarnih okomitih poteza.
   const joints=new Set();
   for(const a of segments)for(const b of segments){
    if(a.axis!=='h'||b.axis!=='v'||b.line<a.start||b.line>a.end||a.line<b.start||a.line>b.end)continue;
-   const key=b.line+':'+a.line;if(joints.has(key))continue;joints.add(key);
-   inner.push({x:b.line-5,y:a.line-5,width:10,height:10});
+   const key=b.line+':'+a.line+':'+(a.thickness??10)+':'+(b.thickness??10);if(joints.has(key))continue;joints.add(key);
+   const tx=b.thickness??10,ty=a.thickness??10;inner.push({x:b.line-tx/2,y:a.line-ty/2,width:tx,height:ty});
   }
-  const outer=shell(rects,30);
+  const outer=outerWalls(rects,physicalWalls);
   const net=groups(rects).map(group=>{
    let pieces=group.rects;for(const wall of inner)pieces=subtract(pieces,wall);
    const width=pieces.length?Math.max(...pieces.map(p=>p.x+p.width))-Math.min(...pieces.map(p=>p.x)):0;
@@ -149,5 +170,5 @@ globalThis.RoomGeometry = (() => {
   let free=rects;for(const wall of inner)free=subtract(free,wall);
   return {outer,inner,net,area:union(free).area,segments};
  }
- return {connected,shell,union,subtract,layout,roomKey,groups,split};
+ return {connected,shell,union,subtract,defaultThickness,layout,roomKey,groups,split};
 })();

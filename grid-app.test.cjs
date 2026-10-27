@@ -119,6 +119,12 @@ click(250,200);assert.equal(api.first,null);assert.equal(api.segments.length,2);
   assert.ok(el('status').textContent.startsWith('Uvoz nije uspio:'));
  }
  await load(JSON.stringify({segments:[]}));assert.equal(api.segments.length,0,'Valjan prazan tlocrt se može uvesti');
+ await load(JSON.stringify({unit:'cm',segments:[{x1:100,y1:100,x2:400,y2:100,thickness:25}]}));
+ assert.equal(api.segments[0].thickness,25,'JSON uvoz čuva debljinu');
+ el('saveJson').click();assert.equal(JSON.parse(await downloadedBlob.text()).segments[0].thickness,25,'JSON izvoz čuva debljinu');
+ const beforeBadThickness=JSON.stringify(api.segments);
+ await load(JSON.stringify({segments:[{x1:100,y1:100,x2:400,y2:100,thickness:-5}]}));
+ assert.equal(JSON.stringify(api.segments),beforeBadThickness,'Neispravna debljina ne mijenja crtež');
  console.log('PASS: JSON preuzimanje, povratni uvoz, undo/redo i zaštita od neispravnog uvoza.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
 
@@ -169,3 +175,22 @@ assert.equal(el('dimensionDialog').open,true);
 el('dimensionValue').value='520.0';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.length,1);
 assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));
+
+// U istom prozoru mijenja se samo debljina, uz nepromijenjene osi i undo/redo.
+el('drawMode').click();let thicknessLabel=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
+click((thicknessLabel.left+thicknessLabel.right)/2,(thicknessLabel.top+thicknessLabel.bottom)/2);
+assert.equal(el('dimensionThickness').value,'30');const beforeThickness=JSON.stringify(api.segments);
+el('dimensionThickness').value='0';el('dimensionForm').submit({preventDefault(){}});
+assert.equal(JSON.stringify(api.segments),beforeThickness);assert.equal(el('dimensionDialog').open,true);
+el('dimensionThickness').value='50';el('dimensionForm').submit({preventDefault(){}});
+assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.length,1);
+assert.equal(api.segments.filter(s=>s.thickness===50).length,1);
+assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660),'Sama debljina ne mijenja duljinu osi');
+assert.equal(Math.min(...api.model().layout.outer.map(r=>r.y)),150);
+const afterThickness=JSON.stringify(api.segments);api.undo();assert.equal(JSON.stringify(api.segments),beforeThickness);api.redo();assert.equal(JSON.stringify(api.segments),afterThickness);
+// Istodobni unos duljine i debljine daje traženu novu kotu.
+let combinedLabel=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===150);
+click((combinedLabel.left+combinedLabel.right)/2,(combinedLabel.top+combinedLabel.bottom)/2);
+el('dimensionValue').value='600';el('dimensionThickness').value='40';el('dimensionForm').submit({preventDefault(){}});
+assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.length,1);
+assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===160&&e.span[1]-e.span[0]===600));

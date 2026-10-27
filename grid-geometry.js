@@ -3,18 +3,26 @@ globalThis.GridGeometry=(()=>{
  function normalize(input){
   const lines=new Map();
   for(const s of input){
-   if(!['x1','y1','x2','y2'].every(k=>Number.isFinite(s[k])))continue;
+   if(!s||!['x1','y1','x2','y2'].every(k=>Number.isFinite(s[k])))continue;
    const h=s.y1===s.y2;if(!h&&s.x1!==s.x2)continue;
    const line=h?s.y1:s.x1,start=h?Math.min(s.x1,s.x2):Math.min(s.y1,s.y2),end=h?Math.max(s.x1,s.x2):Math.max(s.y1,s.y2);
    if(start===end)continue;
-   const key=(h?'h':'v')+':'+line;if(!lines.has(key))lines.set(key,{h,line,spans:[]});lines.get(key).spans.push([start,end]);
+   const thickness=Number.isFinite(s.thickness)&&s.thickness>=1&&s.thickness<=100?s.thickness:undefined;
+   const key=(h?'h':'v')+':'+line;if(!lines.has(key))lines.set(key,{h,line,spans:[]});lines.get(key).spans.push({start,end,thickness});
   }
-  const merged=[];
+  const result=[];
   for(const {h,line,spans} of lines.values()){
-   spans.sort((a,b)=>a[0]-b[0]);let span=null;
-   for(const q of spans){if(span&&q[0]<=span[1])span[1]=Math.max(span[1],q[1]);else{span=[...q];merged.push({h,line,span});}}
+   const cuts=[...new Set(spans.flatMap(s=>[s.start,s.end]))].sort((a,b)=>a-b);let previous=null;
+   for(let i=1;i<cuts.length;i++){
+    const start=cuts[i-1],end=cuts[i],cover=spans.filter(s=>s.start<=start&&s.end>=end);
+    if(!cover.length){previous=null;continue;}
+    const thickness=cover.filter(s=>s.thickness!==undefined).at(-1)?.thickness;
+    if(previous&&previous.thickness===thickness&&(h?previous.x2:previous.y2)===start){if(h)previous.x2=end;else previous.y2=end;continue;}
+    previous=h?{x1:start,y1:line,x2:end,y2:line}:{x1:line,y1:start,x2:line,y2:end};
+    if(thickness!==undefined)previous.thickness=thickness;result.push(previous);
+   }
   }
-  return merged.map(s=>s.h?{x1:s.span[0],y1:s.line,x2:s.span[1],y2:s.line}:{x1:s.line,y1:s.span[0],x2:s.line,y2:s.span[1]});
+  return result;
  }
  function erase(input,index,start,end){
   const result=[];
@@ -74,7 +82,7 @@ globalThis.GridGeometry=(()=>{
     const a=spans[i-1],b=spans[i],start=h?a.x2:a.y2,end=h?b.x1:b.y1,line=h?a.y1:a.x1;
     const solidLength=h?(a.x2-a.x1)+(b.x2-b.x1):(a.y2-a.y1)+(b.y2-b.y1);
     // Dvije prostorije kad je otvor kraći od susjednih punih dijelova pregrade.
-    if(end-start>=solidLength)continue;
+    if(end<=start||end-start>=solidLength)continue;
     const cuts=[start,end,...enclosed.rooms.flatMap(r=>h?[r.x,r.x+r.width]:[r.y,r.y+r.height]).filter(v=>v>start&&v<end)].sort((a,b)=>a-b);
     if(!cuts.slice(1).every((v,j)=>v===cuts[j]||interior(h?(v+cuts[j])/2:line,h?line:(v+cuts[j])/2)))continue;
     doors.push(h?{x1:start,y1:line,x2:end,y2:line}:{x1:line,y1:start,x2:line,y2:end});
@@ -93,7 +101,7 @@ globalThis.GridGeometry=(()=>{
     if(along>start&&along<end&&line>=low&&line<=high)cuts.add(along);
    }
    const sorted=[...cuts].sort((a,b)=>a-b);
-   for(let i=0;i<sorted.length-1;i++)result.push(h?{x1:sorted[i],y1:s.y1,x2:sorted[i+1],y2:s.y1}:{x1:s.x1,y1:sorted[i],x2:s.x1,y2:sorted[i+1]});
+   for(let i=0;i<sorted.length-1;i++)result.push(h?{...s,x1:sorted[i],x2:sorted[i+1]}:{...s,y1:sorted[i],y2:sorted[i+1]});
   }
   return result;
  }
@@ -110,23 +118,32 @@ globalThis.GridGeometry=(()=>{
   }
   return normalize(result);
  }
- // Promjena kote pomiče vezani kraj i susjedne zidove, čuvajući zatvoren obris.
- function resizeDimension(input,dimension,length,min=5,width=2000,height=2000){
+ function wallForDimension(input,dimension){
   const h=dimension.axis==='h',lines=atomic(input),start=dimension.start,end=dimension.end;
-  if(!Number.isFinite(length)||length<min)throw new Error('Duljina mora biti najmanje 5 cm.');
   let root=-1,best=Infinity;
   for(let i=0;i<lines.length;i++){
    const s=lines[i];if((s.y1===s.y2)!==h)continue;
    const overlap=Math.min(end,h?s.x2:s.y2)-Math.max(start,h?s.x1:s.y1);
    const distance=Math.abs(dimension.line-(h?s.y1:s.x1));
-   if(overlap<=0||distance>30.001)continue;
+   if(overlap<=0||distance>100.001)continue;
    const score=distance*10000-overlap;if(score<best){best=score;root=i;}
   }
   if(root<0)throw new Error('Nije pronađen zid za ovu mjeru.');
+  return {wall:lines[root],lines,index:root};
+ }
+ function setWallThickness(input,dimension,thickness){
+  if(!Number.isFinite(thickness)||thickness<1||thickness>100)throw new Error('Debljina mora biti od 1 do 100 cm.');
+  const {lines,index}=wallForDimension(input,dimension);lines[index]={...lines[index],thickness};return normalize(lines);
+ }
+ // Promjena kote pomiče vezani kraj i susjedne zidove, čuvajući zatvoren obris.
+ function resizeDimension(input,dimension,length,min=5,width=2000,height=2000){
+  const h=dimension.axis==='h',lines=atomic(input),start=dimension.start,end=dimension.end;
+  if(!Number.isFinite(length)||length<min)throw new Error('Duljina mora biti najmanje 5 cm.');
+  const {index:root}=wallForDimension(input,dimension);
   const wall=lines[root],line=h?wall.y1:wall.x1,axis=h?'x':'y';
   const candidates=lines.filter(s=>(s.y1===s.y2)===h&&(h?s.y1:s.x1)===line).flatMap(s=>[s[axis+'1'],s[axis+'2']]);
   const cut=candidates.reduce((a,b)=>Math.abs(b-end)<Math.abs(a-end)?b:a);
-  if(Math.abs(cut-end)>30.001)throw new Error('Za ovaj dio zida upotrijebi krajnju ručku.');
+  if(Math.abs(cut-end)>100.001)throw new Error('Za ovaj dio zida upotrijebi krajnju ručku.');
   const neighbors=new Map(),key=(x,y)=>x+':'+y;
   lines.forEach((s,i)=>{for(const n of [1,2]){const k=key(s['x'+n],s['y'+n]);if(!neighbors.has(k))neighbors.set(k,[]);neighbors.get(k).push(i);}});
   const connected=new Set([root]),queue=[root];
@@ -203,15 +220,15 @@ globalThis.GridGeometry=(()=>{
   for(const s of atomic(input)){
    const a={x:s.x1,y:s.y1},b={x:s.x2,y:s.y2},moveA=inside(a),moveB=inside(b);
    const p={x:a.x+(moveA?dx:0),y:a.y+(moveA?dy:0)},q={x:b.x+(moveB?dx:0),y:b.y+(moveB?dy:0)};
-   if(p.x===q.x||p.y===q.y)result.push({x1:p.x,y1:p.y,x2:q.x,y2:q.y});
+   if(p.x===q.x||p.y===q.y)result.push({...s,x1:p.x,y1:p.y,x2:q.x,y2:q.y});
    else{
     // Udaljeni kraj susjednog zida ostaje na mjestu, a spoj dobiva ortogonalni pregib.
     const horizontal=s.y1===s.y2;
     const elbow=moveA?(horizontal?{x:p.x,y:q.y}:{x:q.x,y:p.y}):(horizontal?{x:q.x,y:p.y}:{x:p.x,y:q.y});
-    result.push({x1:p.x,y1:p.y,x2:elbow.x,y2:elbow.y},{x1:elbow.x,y1:elbow.y,x2:q.x,y2:q.y});
+    result.push({...s,x1:p.x,y1:p.y,x2:elbow.x,y2:elbow.y},{...s,x1:elbow.x,y1:elbow.y,x2:q.x,y2:q.y});
    }
   }
   return {segments:normalize(result),dx,dy};
  }
- return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,resizeDimension,resizeWall,moveWall,moveRoom};
+ return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,wallForDimension,setWallThickness,resizeDimension,resizeWall,moveWall,moveRoom};
 })();

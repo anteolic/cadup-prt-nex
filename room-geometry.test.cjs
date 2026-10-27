@@ -73,3 +73,11 @@ for(const dx of [-100,100])for(const dy of [-100,100]){
 const doorWalls=[{x1:100,y1:100,x2:200,y2:100},{x1:200,y1:120,x2:200,y2:200}];
 const doorLayout=RoomGeometry.layout([],doorWalls);
 assert.ok(!doorLayout.inner.some(r=>200>r.x&&200<r.x+r.width&&110>r.y&&110<r.y+r.height),'Blizina kuta ne zatvara otvor za vrata');
+
+const outlineWalls=[{x1:100,y1:100,x2:500,y2:100,thickness:50},{x1:500,y1:100,x2:500,y2:300},{x1:100,y1:300,x2:500,y2:300},{x1:100,y1:100,x2:100,y2:300}];
+const variableOuter=RoomGeometry.layout([a],outlineWalls);
+assert.equal(Math.min(...variableOuter.outer.map(r=>r.y)),50,'Odabrani vanjski zid ima debljinu 50 cm');
+assert.equal(Math.max(...variableOuter.outer.map(r=>r.y+r.height)),330,'Suprotni zid ostaje 30 cm');
+for(const r of variableOuter.outer)assert.ok(r.x+r.width<=a.x||r.x>=a.x+a.width||r.y+r.height<=a.y||r.y>=a.y+a.height,'Vanjska debljina ne ulazi u slobodni prostor');
+const thickCorner=RoomGeometry.layout([],[{x1:100,y1:200,x2:200,y2:200,thickness:20},{x1:200,y1:200,x2:200,y2:300,thickness:40}]);
+assert.ok(thickCorner.inner.some(r=>r.x===180&&r.y===190&&r.width===40&&r.height===20),'Kut spaja različite debljine bez rupe');

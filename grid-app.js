@@ -496,8 +496,7 @@
   const raw=point(p.x,p.y);let key=null,group=null,object=null;
   if(editingGroup){
    const box=CadObjects.selectionBounds(objects.filter(item=>item.group===editingGroup));
-   if(box&&(raw.x<box.left||raw.x>box.right||raw.y<box.top||raw.y>box.bottom))key='close:'+editingGroup;
-   else{object=CadObjects.hit(objects.filter(item=>item.group===editingGroup),raw.x,raw.y);if(object)key='object:'+object.id;}
+   if(box&&raw.x>=box.left&&raw.x<=box.right&&raw.y>=box.top&&raw.y<=box.bottom){object=CadObjects.hit(objects.filter(item=>item.group===editingGroup),raw.x,raw.y);if(object)key='object:'+object.id;}
   }else{
    object=CadObjects.hit(objects,raw.x,raw.y);group=object?.group;
    if(group)key='open:'+group;else if(object)key='object:'+object.id;
@@ -506,7 +505,7 @@
   const previous=lastGroupTap;lastGroupTap={key,time:e.timeStamp,x:p.x,y:p.y};
   if(!previous||previous.key!==key||e.timeStamp-previous.time<0||e.timeStamp-previous.time>380||Math.hypot(p.x-previous.x,p.y-previous.y)>22)return false;
   lastGroupTap=null;
-  if(key.startsWith('close:'))closeGroupEditor();else if(key.startsWith('open:'))openGroupEditor(group);
+  if(key.startsWith('open:'))openGroupEditor(group);
   else{editingObjectId=object.id;objectIds=new Set([object.id]);objectMulti=false;selectedWall=null;wallSession=null;objectEditorKey=null;status();draw();}
   return true;
  }
@@ -515,6 +514,10 @@
   const p=xy(e),last=gesture,wasMulti=last?.type==='pinch'||pointers.size>1;pointers.delete(e.pointerId);
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
   if(wasMulti||last?.type==='remaining'){lastGroupTap=null;status();draw();return;}
+  if(mode==='edit'&&editingGroup&&last?.type==='pan'&&!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9){
+   const raw=point(p.x,p.y),box=CadObjects.selectionBounds(objects.filter(item=>item.group===editingGroup));
+   if(box&&(raw.x<box.left||raw.x>box.right||raw.y<box.top||raw.y>box.bottom)){closeGroupEditor();return;}
+  }
   if(handleGroupDoubleTap(e,p,last,cancelled))return;
   if(last?.type==='erase-span'){if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)deleteEraseTarget(last.target);else{eraseHover=null;eraseObjectIds=[];draw();}return;}
   if(last?.type==='pick-pan'){

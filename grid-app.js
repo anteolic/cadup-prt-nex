@@ -53,7 +53,7 @@
  function restore(){
   try{
    const saved=localStorage.getItem(KEY);
-   if(saved){const data=JSON.parse(saved);segments=GridGeometry.normalize(Array.isArray(data.segments)?data.segments:[]);objects=CadObjects.validate(data.objects??[]);wallsVisible=data.wallsVisible!==false;if(data.historyVersion===1){past=readHistory(data.past);future=readHistory(data.future);}}
+   if(saved){const data=JSON.parse(saved);segments=GridGeometry.normalize(Array.isArray(data.segments)?data.segments:[]);objects=CadObjects.validate(data.objects??[]);wallsVisible=true;if(data.historyVersion===1){past=readHistory(data.past);future=readHistory(data.future);}}
    else{
     // Zadržavaju se obrisi spremljenih prostorija; stari ručno crtani zidovi se ne učitavaju.
     const old=JSON.parse(localStorage.getItem('infoa_tlocrt_minimal_v1')||'null');
@@ -101,9 +101,6 @@
   $('drawMode').classList.toggle('active',mode==='draw');$('drawMode').setAttribute('aria-pressed',String(mode==='draw'));
   $('drawMode').setAttribute('title',mode==='draw'?'Završi crtanje i uredi':'Crtaj');
   $('drawMode').setAttribute('aria-label',mode==='draw'?'Završi crtanje i uredi':'Crtaj');
-  $('toggleWalls').setAttribute('aria-pressed',String(wallsVisible));
-  $('toggleWalls').setAttribute('aria-label',wallsVisible?'Sakrij zidove':'Prikaži zidove');
-  $('toggleWalls').setAttribute('title',wallsVisible?'Zidovi uključeni':'Zidovi isključeni');
   const editingWall=mode==='edit'&&!!selectedWall;
   $('wallActions').hidden=!editingWall;
   const editingObjects=mode==='edit'&&(objectIds.size>0||objectMulti);
@@ -259,7 +256,9 @@
    const boxes=RoomGeometry.wallSelection(current.rooms,segments,selectedWall,current.layout);
    g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
    g.fillStyle='#93c5fd';g.fill();g.strokeStyle='#2563eb';g.lineWidth=2;
-   const gripScale=handleScale();
+   g.strokeStyle='#dc2626';g.lineWidth=1.5;g.setLineDash([7,5]);
+   g.beginPath();for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();g.setLineDash([]);
+   g.strokeStyle='#dc2626';const gripScale=handleScale();
    if(mode==='edit')for(const [index,p] of [a,b].entries()){
     if(gesture?.type==='wall-resize'&&gesture.endpoint===index+1)continue;
     g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,11*gripScale,0,Math.PI*2);g.fill();g.stroke();
@@ -429,7 +428,6 @@
   }catch(_){status('Nova verzija nije učitana. Provjeri vezu i pokušaj ponovno. Tlocrt je sačuvan.');}
   finally{button.disabled=false;button.textContent='↻ Učitaj novu verziju';}
  });
- $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
  function deselectWall(){customNaming=false;objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
  function selectedDimension(){if(!selectedWall)return null;const h=selectedWall.y1===selectedWall.y2;return {axis:h?'h':'v',line:h?selectedWall.y1:selectedWall.x1,start:h?selectedWall.x1:selectedWall.y1,end:h?selectedWall.x2:selectedWall.y2};}
@@ -505,7 +503,7 @@
    GridGeometry.detectWithDoors(imported); // Provjeri složenost prije zamjene crteža.
    if(importedLibrary.length){persistCustomLibrary(mergedLibrary);customLibrary=mergedLibrary;renderObjectLibrary();}
    cancelInteraction();const before=snapshot();segments=imported;objects=importedObjects;objectIds.clear();
-   wallsVisible=data.wallsVisible!==false;selected=null;selectedWall=null;wallSession=null;
+   wallsVisible=true;selected=null;selectedWall=null;wallSession=null;
    commit(before);save();resetClear();draw();status('Tlocrt je uvezen · Poništi vraća prethodni crtež');
   }catch(error){status('Uvoz nije uspio: '+(error instanceof SyntaxError?'Datoteka nije valjan JSON.':error.message));}
   finally{input.value='';}

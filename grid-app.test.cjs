@@ -4,7 +4,7 @@ let downloadedBlob=null,downloadName=null;
 const updateRequests=[];let updateFailure=null;
 const publishedHtml=fs.readFileSync(__dirname+'/CADup.html','utf8');
 const gridLines=[],paintCalls=[],gripCircles=[];let gridStart=null;
-const canvas=new Proxy({arc(x,y,r){if(r>=11&&this.strokeStyle==='#2563eb')gripCircles.push({x,y,r});},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
+const canvas=new Proxy({arc(x,y,r){if(r>=11&&this.strokeStyle==='#dc2626')gripCircles.push({x,y,r});},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
  if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
@@ -29,7 +29,7 @@ assert.ok(!labels.some(t=>t.startsWith('Prostorija ')));assert.ok(!labels.some(t
 assert.ok(labels.some(t=>t.endsWith(' cm')),'Duljine zidova ostaju vidljive');
 assert.equal(el('roomArea').textContent,'');
 line(200,100,200,250);assert.equal(api.model().faces.length,2);assert.equal(api.model().layout.inner[0].width,10);
-el('toggleWalls').click();assert.equal(api.visible,false);assert.equal(api.model().faces.length,2);
+assert.equal(api.visible,true);assert.equal(api.model().faces.length,2);
 enterEdit();const beforeEraseSelection=JSON.stringify(api.segments);
 click(200,150);assert.ok(api.selection);assert.equal(JSON.stringify(api.segments),beforeEraseSelection,'Prvi dodir samo označava');
 el('wallDelete').click();assert.equal(api.model().faces.length,1,'Brisanje u načinu Uredi uklanja cijelu pregradu');
@@ -100,9 +100,7 @@ assert.equal(api.model().faces.length,0);assert.equal(api.model().layout.inner.l
 enterEdit();click(150,100);drag(200,100,250,100);
 assert.ok(api.segments.some(s=>s.x2===500&&s.y2===200),'Ručka produžuje nepotpuni vodoravni zid');
 
-assert.equal(el('toggleWalls').attributes['aria-pressed'],String(api.visible));
-el('toggleWalls').click();assert.equal(el('toggleWalls').attributes['aria-pressed'],String(api.visible));
-assert.equal(el('toggleWalls').attributes['aria-label'],api.visible?'Sakrij zidove':'Prikaži zidove');
+assert.equal(api.visible,true);
 // Tri uzastopna dodira moraju dati dva povezana poteza, bez novog početka.
 el('clearAll').click();el('clearAll').click();startDrawing();
 click(100,100);click(250,100);click(250,200);
@@ -162,7 +160,7 @@ el('topMenu').open=false;
 el('clearAll').click();el('clearAll').click();startDrawing();
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);
 enterEdit();
-const topDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
+const topDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===185);
 assert.ok(topDimension);const beforeLabel=JSON.stringify(api.segments);
 click((topDimension.left+topDimension.right)/2,(topDimension.top+topDimension.bottom)/2);
 assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);assert.equal(JSON.stringify(api.segments),beforeLabel);
@@ -183,11 +181,11 @@ assert.equal(JSON.stringify(api.segments),beforeThickness);assert.ok(el('dimensi
 el('dimensionThickness').value='50';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(api.model().faces.length,1);assert.equal(api.segments.filter(s=>s.thickness===50).length,1);
 assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));
-assert.equal(Math.min(...api.model().layout.outer.map(r=>r.y)),150);
+assert.equal(Math.min(...api.model().layout.outer.map(r=>r.y)),175);
 const afterThickness=JSON.stringify(api.segments);api.undo();assert.equal(JSON.stringify(api.segments),beforeThickness);api.redo();assert.equal(JSON.stringify(api.segments),afterThickness);
 click(200,100);el('dimensionValue').value='520';el('dimensionThickness').value='40';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
-assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===160&&e.span[1]-e.span[0]===600));
+assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===180&&e.span[1]-e.span[0]===550));
 // Odabir zida ne dodaje naglašenu kotu uz postojeća donja polja.
 assert.ok(api.dimensions.every(r=>r.dimension.side===-1||r.dimension.side===1),'Prikazane su samo postojeće rubne kote');
 deselect();assert.equal(el('wallActions').hidden,true);
@@ -404,8 +402,8 @@ el('saveCustom').click();el('customName').value='Kutak <A>';el('customSaveForm')
 el('clearAll').click();el('clearAll').click();api.fit();
 line(100,100,200,100);line(200,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);line(200,100,200,250);
 enterEdit();click(150,100);assert.equal(api.selection.x1,200);assert.equal(api.selection.x2,600);assert.equal(el('dimensionValue').value,'400');
-assert.equal(api.model().faces.length,2);assert.ok(api.dimensions.some(r=>r.dimension.axis==='h'&&r.dimension.end-r.dimension.start===195),'Kote između zidova ostaju vidljive');
-assert.ok(labels.includes('195 cm'));
+assert.equal(api.model().faces.length,2);assert.ok(api.dimensions.some(r=>r.dimension.axis==='h'&&r.dimension.end-r.dimension.start===180),'Kote između zidova ostaju vidljive');
+assert.ok(labels.includes('180 cm'));
 el('dimensionThickness').value='20';el('dimensionForm').submit({preventDefault(){}});
 assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===200&&s.x2===600&&s.thickness===20));
 

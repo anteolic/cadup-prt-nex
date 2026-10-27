@@ -102,23 +102,43 @@ globalThis.RoomGeometry = (() => {
   const covered=(a,b)=>rects.some(r=>a>=r.x&&a<=r.x+r.width&&b>=r.y&&b<=r.y+r.height);
   return covered(x-(h?0:.001),y-(h?.001:0))!==covered(x+(h?0:.001),y+(h?.001:0))?30:10;
  }
- function outerWalls(rects,physicalWalls){
-  if(!physicalWalls?.some(s=>s.thickness!==undefined))return shell(rects,30);
-  const pieces=[];let custom=false;
-  for(const e of union(rects).edges){
-   const matches=physicalWalls.filter(s=>(s.y1===s.y2)===(e.axis==='h')&&(e.axis==='h'?s.y1:s.x1)===e.line);
-   const cuts=[...new Set([...e.span,...matches.flatMap(s=>e.axis==='h'?[s.x1,s.x2]:[s.y1,s.y2]).filter(v=>v>e.span[0]&&v<e.span[1])])].sort((a,b)=>a-b);
+ function physicalLayout(rects,walls){
+  const outer=[],inner=[],segments=[],physicalParts=[],physicalJoints=[];
+  const xs=[...new Set(rects.flatMap(r=>[r.x,r.x+r.width]))],ys=[...new Set(rects.flatMap(r=>[r.y,r.y+r.height]))];
+  for(const source of walls){
+   const h=source.y1===source.y2,line=h?source.y1:source.x1,start=h?source.x1:source.y1,end=h?source.x2:source.y2;
+   const cuts=[...new Set([start,end,...(h?xs:ys).filter(v=>v>start&&v<end)])].sort((a,b)=>a-b);
    for(let i=1;i<cuts.length;i++){
-    const start=cuts[i-1],end=cuts[i],wall=matches.find(s=>(e.axis==='h'?s.x1:s.y1)<=start&&(e.axis==='h'?s.x2:s.y2)>=end);
-    const t=wall?.thickness??30;custom||=t!==30;
-    const a=start-(start===e.span[0]?t:0),b=end+(end===e.span[1]?t:0);
-    pieces.push(e.axis==='h'?{x:a,y:e.line+(e.side<0?-t:0),width:b-a,height:t}:{x:e.line+(e.side<0?-t:0),y:a,width:t,height:b-a});
+    const a=cuts[i-1],b=cuts[i],piece=h?{x1:a,y1:line,x2:b,y2:line}:{x1:line,y1:a,x2:line,y2:b};
+    const exterior=defaultThickness(rects,piece)===30,t=source.thickness??(exterior?30:10);
+    const box=h?{x:a,y:line-t/2,width:b-a,height:t}:{x:line-t/2,y:a,width:t,height:b-a};
+    (exterior?outer:inner).push(box);segments.push({axis:h?'h':'v',line,start:a,end:b,thickness:t});physicalParts.push({source,box,exterior});
    }
   }
-  if(!custom)return shell(rects,30);
-  let outside=pieces;for(const r of rects)outside=subtract(outside,r);return outside;
+  const seen=new Set();
+  for(const a of physicalParts)for(const b of physicalParts){
+   if(a.source.y1!==a.source.y2||b.source.x1!==b.source.x2)continue;
+   const x=b.source.x1,y=a.source.y1;
+   // Spoj postoji samo ako se stvarne osnovne linije točno sijeku ili dodiruju.
+   if(x<a.box.x||x>a.box.x+a.box.width||y<b.box.y||y>b.box.y+b.box.height)continue;
+   const key=x+':'+y+':'+b.box.width+':'+a.box.height;if(seen.has(key))continue;seen.add(key);
+   const box={x:x-b.box.width/2,y:y-a.box.height/2,width:b.box.width,height:a.box.height};
+   (a.exterior||b.exterior?outer:inner).push(box);physicalJoints.push({x,y,box,sources:[a.source,b.source]});
+  }
+  const boxes=[...outer,...inner];
+  const net=groups(rects).map(group=>{let free=group.rects;for(const box of boxes)free=subtract(free,box);return {id:group.id,area:union(free).area,width:free.length?Math.max(...free.map(r=>r.x+r.width))-Math.min(...free.map(r=>r.x)):0,height:free.length?Math.max(...free.map(r=>r.y+r.height))-Math.min(...free.map(r=>r.y)):0};});
+  let free=rects;for(const box of boxes)free=subtract(free,box);
+  return {outer,inner,net,area:union(free).area,segments,physicalParts,physicalJoints,centered:true};
  }
  function wallSelection(rects,physicalWalls,wall,layout){
+  if(layout.centered){
+   const h=wall.y1===wall.y2,line=h?wall.y1:wall.x1,start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2;
+   const same=source=>(source.y1===source.y2)===h&&(h?source.y1:source.x1)===line;
+   const result=[];
+   for(const part of layout.physicalParts){if(!same(part.source))continue;const box=part.box,a=Math.max(start,h?box.x:box.y),b=Math.min(end,h?box.x+box.width:box.y+box.height);if(b>a)result.push(h?{x:a,y:box.y,width:b-a,height:box.height}:{x:box.x,y:a,width:box.width,height:b-a});}
+   for(const joint of layout.physicalJoints)if(joint.sources.some(same)&&(h?joint.x:joint.y)>=start&&(h?joint.x:joint.y)<=end)result.push(joint.box);
+   return result;
+  }
   const h=wall.y1===wall.y2,line=h?wall.y1:wall.x1,start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2;
   const mid=(start+end)/2,x=h?mid:line,y=h?line:mid;
   const covered=(a,b)=>rects.some(r=>a>=r.x&&a<=r.x+r.width&&b>=r.y&&b<=r.y+r.height);
@@ -145,6 +165,7 @@ globalThis.RoomGeometry = (() => {
   return result;
  }
  function layout(rects,physicalWalls=null){
+  if(physicalWalls!==null)return physicalLayout(rects,physicalWalls);
   const xs=[...new Set(rects.flatMap(r=>[r.x,r.x+r.width]))].sort((a,b)=>a-b);
   const ys=[...new Set(rects.flatMap(r=>[r.y,r.y+r.height]))].sort((a,b)=>a-b);
   const members=(x,y)=>[...new Set(rects.filter(r=>contains(r,x,y)).map(roomKey))].sort((a,b)=>a-b).join(',');
@@ -163,21 +184,6 @@ globalThis.RoomGeometry = (() => {
    const x=(xs[i]+xs[i+1])/2;
    add('h',ys[j],xs[i],xs[i+1],members(x,(ys[j-1]+ys[j])/2),members(x,(ys[j]+ys[j+1])/2));
   }
-  if(physicalWalls){
-   // Debljina zida dolazi od stvarnih poteza, uključujući slijepe pregrade.
-   segments.length=0;
-   const covered=(x,y)=>rects.some(r=>x>=r.x&&x<=r.x+r.width&&y>=r.y&&y<=r.y+r.height);
-   for(const s of physicalWalls){
-    const h=s.y1===s.y2,line=h?s.y1:s.x1,start=h?s.x1:s.y1,end=h?s.x2:s.y2;
-    const cuts=[...new Set([start,end,...(h?xs:ys).filter(v=>v>start&&v<end)])].sort((a,b)=>a-b);
-    for(let i=1;i<cuts.length;i++){
-     const mid=(cuts[i-1]+cuts[i])/2,x=h?mid:line,y=h?line:mid;
-     // Samo rub zatvorene prostorije već ima vanjski zid; ostali potezi moraju biti vidljivi.
-     if(covered(x-(h?0:.001),y-(h?.001:0))===covered(x+(h?0:.001),y+(h?.001:0)))
-      segments.push({axis:h?'h':'v',line,start:cuts[i-1],end:cuts[i],thickness:s.thickness??10});
-    }
-   }
-  }
   const inner=segments.map(s=>{const t=s.thickness??10;return s.axis==='v'?{x:s.line-t/2,y:s.start,width:t,height:s.end-s.start}:{x:s.start,y:s.line-t/2,width:s.end-s.start,height:t};});
   // Kvadratni spoj popunjava vanjski kut dvaju stvarnih okomitih poteza.
   const joints=new Set();
@@ -186,7 +192,7 @@ globalThis.RoomGeometry = (() => {
    const key=b.line+':'+a.line+':'+(a.thickness??10)+':'+(b.thickness??10);if(joints.has(key))continue;joints.add(key);
    const tx=b.thickness??10,ty=a.thickness??10;inner.push({x:b.line-tx/2,y:a.line-ty/2,width:tx,height:ty});
   }
-  const outer=outerWalls(rects,physicalWalls);
+  const outer=shell(rects,30);
   const net=groups(rects).map(group=>{
    let pieces=group.rects;for(const wall of inner)pieces=subtract(pieces,wall);
    const width=pieces.length?Math.max(...pieces.map(p=>p.x+p.width))-Math.min(...pieces.map(p=>p.x)):0;

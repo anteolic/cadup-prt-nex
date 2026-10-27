@@ -76,21 +76,31 @@ assert.ok(!doorLayout.inner.some(r=>200>r.x&&200<r.x+r.width&&110>r.y&&110<r.y+r
 
 const outlineWalls=[{x1:100,y1:100,x2:500,y2:100,thickness:50},{x1:500,y1:100,x2:500,y2:300},{x1:100,y1:300,x2:500,y2:300},{x1:100,y1:100,x2:100,y2:300}];
 const variableOuter=RoomGeometry.layout([a],outlineWalls);
-assert.equal(Math.min(...variableOuter.outer.map(r=>r.y)),50,'Odabrani vanjski zid ima debljinu 50 cm');
-assert.equal(Math.max(...variableOuter.outer.map(r=>r.y+r.height)),330,'Suprotni zid ostaje 30 cm');
-for(const r of variableOuter.outer)assert.ok(r.x+r.width<=a.x||r.x>=a.x+a.width||r.y+r.height<=a.y||r.y>=a.y+a.height,'Vanjska debljina ne ulazi u slobodni prostor');
+assert.equal(Math.min(...variableOuter.outer.map(r=>r.y)),75,'Odabrani vanjski zid ima debljinu 50 cm');
+assert.equal(Math.max(...variableOuter.outer.map(r=>r.y+r.height)),315,'Suprotni zid ostaje 30 cm');
+assert.ok(variableOuter.outer.some(r=>r.y===75&&r.height===50),'Osnovna linija y=100 je u sredini zida');
 const thickCorner=RoomGeometry.layout([],[{x1:100,y1:200,x2:200,y2:200,thickness:20},{x1:200,y1:200,x2:200,y2:300,thickness:40}]);
 assert.ok(thickCorner.inner.some(r=>r.x===180&&r.y===190&&r.width===40&&r.height===20),'Kut spaja različite debljine bez rupe');
 
 // Odabir gumicom ispunjava stvarnu debljinu i vanjski pomak zida.
 const selectionPlan=RoomGeometry.layout([a],outlineWalls);
 const topSelection=RoomGeometry.wallSelection([a],outlineWalls,outlineWalls[0],selectionPlan);
-assert.equal(Math.min(...topSelection.map(r=>r.y)),50);
-assert.equal(Math.max(...topSelection.map(r=>r.y+r.height)),100);
-assert.equal(Math.min(...topSelection.map(r=>r.x)),50,'Odabir uključuje i vanjski kut');
+assert.equal(Math.min(...topSelection.map(r=>r.y)),75);
+assert.equal(Math.max(...topSelection.map(r=>r.y+r.height)),125);
+assert.equal(Math.min(...topSelection.map(r=>r.x)),85,'Odabir uključuje i vanjski kut');
 const standalone=[{x1:100,y1:200,x2:400,y2:200,thickness:24}];
 const standaloneLayout=RoomGeometry.layout([],standalone);
 assert.deepEqual(RoomGeometry.wallSelection([],standalone,standalone[0],standaloneLayout),[{x:100,y:188,width:300,height:24}]);
 const adjacent=[{x1:100,y1:200,x2:200,y2:200,thickness:20},{x1:200,y1:200,x2:400,y2:200,thickness:30}];
 const selectedFirst=RoomGeometry.wallSelection([],adjacent,adjacent[0],RoomGeometry.layout([],adjacent));
 assert.ok(selectedFirst.every(r=>r.x+r.width<=200),'Odabir ne boji susjedni kolinearni segment');
+// Kutovi se dopunjuju samo na točnom dodiru osnovnih linija, ne prema debljini ili blizini.
+const axisHorizontal={x1:100,y1:100,x2:200,y2:100,thickness:20},axisVertical={x1:200,y1:100,x2:200,y2:200,thickness:20};
+const exactCorner=RoomGeometry.layout([],[axisHorizontal,axisVertical]);assert.equal(exactCorner.physicalJoints.length,1);
+assert.ok([...exactCorner.outer,...exactCorner.inner].some(r=>205>r.x&&205<r.x+r.width&&95>r.y&&95<r.y+r.height));
+const nearCorner=RoomGeometry.layout([],[axisHorizontal,{...axisVertical,x1:201,x2:201}]);assert.equal(nearCorner.physicalJoints.length,0);
+assert.ok(![...nearCorner.outer,...nearCorner.inner].some(r=>206>r.x&&206<r.x+r.width&&95>r.y&&95<r.y+r.height),'Nema umjetnog dopunjavanja preko 1 cm razmaka');
+const shortOfAxis=RoomGeometry.layout([],[axisHorizontal,{...axisVertical,y1:101}]);assert.equal(shortOfAxis.physicalJoints.length,0);
+const parallelGap=RoomGeometry.layout([],[axisHorizontal,{x1:201,y1:100,x2:300,y2:100,thickness:20}]);
+assert.ok(!parallelGap.inner.some(r=>r.x<200.5&&r.x+r.width>200.5),'Razmak između kolinearnih osnovnih linija ostaje otvoren');
+assert.equal(RoomGeometry.layout([],[axisHorizontal]).inner[0].y,90);assert.equal(RoomGeometry.layout([],[axisHorizontal]).inner[0].height,20);

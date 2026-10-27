@@ -106,7 +106,7 @@ globalThis.CadObjects=(()=>{
    const h=wall.y1===wall.y2,line=h?wall.y1:wall.x1,start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2,mid=(start+end)/2;
    if((h?box.right:box.bottom)<=start||(h?box.left:box.top)>=end)continue;
    const negative=covered(h?mid:line-.001,h?line-.001:mid),positive=covered(h?mid:line+.001,h?line+.001:mid),outer=negative!==positive,t=wall.thickness??(outer?30:10);
-   const low=outer?(negative?line:line-t):line-t/2,high=outer?(negative?line+t:line):line+t/2;
+   const low=line-t/2,high=line+t/2;
    const center=h?box.y:box.x,offset=center<=line?low-(h?box.bottom:box.right):high-(h?box.top:box.left);
    if(h&&Math.abs(offset)<distanceY){distanceY=Math.abs(offset);dy=offset;}
    if(!h&&Math.abs(offset)<distanceX){distanceX=Math.abs(offset);dx=offset;}

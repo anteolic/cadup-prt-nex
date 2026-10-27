@@ -54,7 +54,8 @@
  const lengthText=cm=>cm>=100?(cm/100).toLocaleString('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m':cm.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm';
  function resetClear(){clearArmed=false;$('clearAll').textContent='Briši';$('clearAll').classList.remove('armed');}
  function status(message){
-  $('status').textContent=message||(mode==='edit'?(selectedWall?'Povuci ručke za duljinu · sredinu za pomak':'Povuci unutrašnjost prostorije ili odaberi zid'):first?(mode==='erase'?'2. Dodirni kraj brisanja · povuci za duljinu':'Dodirni sljedeću točku · dvostruki dodir završava'):(mode==='erase'?'1. Dodirni početak brisanja':'1. Dodirni početak linije'));
+  $('status').textContent=message||'';
+  $('status').hidden=!message;
   $('roomArea').textContent='';
   for(const [id,value] of [['drawMode','draw'],['eraseMode','erase'],['editMode','edit']]){
    $(id).classList.toggle('active',mode===value);$(id).setAttribute('aria-pressed',String(mode===value));

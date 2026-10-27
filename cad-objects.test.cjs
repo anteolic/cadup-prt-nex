@@ -28,3 +28,12 @@ assert.equal(C.selectionBounds(groupRotation).width,C.selectionBounds(grouped).d
 let fullTurn=[sofa];for(let i=0;i<4;i++)fullTurn=C.rotate(fullTurn,[sofa.id]);assert.deepEqual(fullTurn,[sofa],'Četiri klika vraćaju početni položaj');
 for(const kind of ['base-cabinet','drawer-cabinet','corner-cabinet','sink-cabinet','wall-cabinet','tall-cabinet','oven','dishwasher'])assert.ok(C.definition(kind)&&!C.definition(kind).hidden);
 assert.equal(C.definition('kitchen').hidden,true,'Stari kuhinjski niz ostaje kompatibilan, ali nije u novoj biblioteci');
+
+const snapRoom=[{x:100,y:100,width:500,height:500}],topWall={x1:100,y1:100,x2:600,y2:100};
+const snapSofa={id:'snap-sofa',kind:'sofa',x:300,y:160,width:200,depth:100,rotation:0,group:null};
+assert.equal(C.bounds(C.snapToWalls([snapSofa],[snapSofa.id],[topWall],snapRoom)[0]).top,100,'Namještaj se hvata za unutarnju plohu vanjskog zida');
+const innerWall={x1:400,y1:100,x2:400,y2:600,thickness:24},leftFurniture={...snapSofa,x:280,y:300};
+assert.equal(C.bounds(C.snapToWalls([leftFurniture],[leftFurniture.id],[innerWall],snapRoom)[0]).right,388,'Snap poštuje stvarnu debljinu unutarnjeg zida');
+const farFurniture={...snapSofa,y:300};assert.equal(C.snapToWalls([farFurniture],[farFurniture.id],[topWall],snapRoom)[0].y,300,'Udaljeni elementi ne skaču na zid');
+const snapGroup=[{...snapSofa,id:'g1',width:100,x:250,y:160,group:'g'},{...snapSofa,id:'g2',width:100,x:400,y:160,group:'g'}];
+const snappedGroup=C.snapToWalls(snapGroup,['g1','g2'],[topWall],snapRoom);assert.equal(C.selectionBounds(snappedGroup).top,100);assert.equal(snappedGroup[1].x-snappedGroup[0].x,150);

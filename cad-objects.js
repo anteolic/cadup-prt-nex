@@ -80,6 +80,22 @@ globalThis.CadObjects=(()=>{
   if(b.left<0||b.top<0||b.right>2000||b.bottom>2000){angle=rotation(angle+180);attached={...attached,rotation:angle};b=bounds(attached);}
   return b.left<0||b.top<0||b.right>2000||b.bottom>2000?item:attached;
  }
+ function snapToWalls(items,ids,walls,rooms=[],tolerance=20){
+  const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);
+  if(group.length===1&&['door','double-door','window'].includes(group[0].kind))return items.map(item=>selected.has(item.id)?attach(item,walls):{...item});
+  const box=selectionBounds(group),covered=(x,y)=>rooms.some(r=>x>=r.x&&x<=r.x+r.width&&y>=r.y&&y<=r.y+r.height);
+  let dx=0,dy=0,distanceX=tolerance+.001,distanceY=tolerance+.001;
+  for(const wall of walls){
+   const h=wall.y1===wall.y2,line=h?wall.y1:wall.x1,start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2,mid=(start+end)/2;
+   if((h?box.right:box.bottom)<=start||(h?box.left:box.top)>=end)continue;
+   const negative=covered(h?mid:line-.001,h?line-.001:mid),positive=covered(h?mid:line+.001,h?line+.001:mid),outer=negative!==positive,t=wall.thickness??(outer?30:10);
+   const low=outer?(negative?line:line-t):line-t/2,high=outer?(negative?line+t:line):line+t/2;
+   const center=h?box.y:box.x,offset=center<=line?low-(h?box.bottom:box.right):high-(h?box.top:box.left);
+   if(h&&Math.abs(offset)<distanceY){distanceY=Math.abs(offset);dy=offset;}
+   if(!h&&Math.abs(offset)<distanceX){distanceX=Math.abs(offset);dx=offset;}
+  }
+  return move(items,ids,dx,dy);
+ }
  function draw(g,item,scale,ox,oy,selected=false,wallThickness=0){
   const fx=item.width*scale/100,fy=item.depth*scale/100;
   g.save();g.translate(ox+item.x*scale,oy+item.y*scale);g.rotate(item.rotation*Math.PI/180);g.scale(fx,fy);
@@ -117,8 +133,7 @@ globalThis.CadObjects=(()=>{
    case 'door':line(-50,0,-50,-95);g.beginPath();g.arc(-50,0,95,-Math.PI/2,0);g.stroke();break;
    case 'double-door':line(-50,0,-50,-90);line(50,0,50,-90);g.beginPath();g.ellipse(-50,0,50,90,0,-Math.PI/2,0);g.stroke();g.beginPath();g.ellipse(50,0,50,90,0,Math.PI,Math.PI*1.5);g.stroke();break;
   }
-  if(selected){g.setLineDash([5/Math.max(fx,fy),3/Math.max(fx,fy)]);g.strokeRect(-50,['door','double-door'].includes(item.kind)?-100:-50,100,100);}
   g.restore();
  }
- return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,duplicate,group,ungroup,attach,draw};
+ return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,duplicate,group,ungroup,attach,snapToWalls,draw};
 })();

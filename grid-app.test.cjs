@@ -375,3 +375,15 @@ el('topMenu').open=true;el('objectMenu').open=true;el('objectMenu').toggle();ass
 el('topMenu').open=true;el('topMenu').toggle();assert.equal(el('objectMenu').open,false);
 const menuSibling={tagName:'DETAILS',open:true},menuTarget={tagName:'DETAILS',open:true,parentElement:{children:[]}};menuTarget.parentElement.children=[menuTarget,menuSibling];
 el('objectLibrary').toggle({target:menuTarget});assert.equal(menuSibling.open,false);
+
+// Unos mjera odmah mijenja scenu, zadržava decimalni unos i grupira jedan unos za Undo.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('sofa');
+context.document.activeElement=el('objectWidth');el('objectForm').focusin({target:{tagName:'INPUT'}});
+for(const value of ['3','30','300','300,','300,5']){el('objectWidth').value=value;el('objectForm').input({preventDefault(){}});assert.equal(el('objectWidth').value,value);}
+assert.equal(api.objects[0].width,300.5);el('objectForm').focusout();context.document.activeElement=null;
+api.undo();assert.equal(api.objects[0].width,220,'Jedan Undo poništi cijelo upisivanje');api.redo();assert.equal(api.objects[0].width,300.5);
+el('clearAll').click();el('clearAll').click();line(100,100,300,100);click(200,100);
+context.document.activeElement=el('dimensionValue');el('dimensionForm').focusin({target:{tagName:'INPUT'}});
+for(const value of ['100','200','350']){el('dimensionValue').value=value;el('dimensionForm').input({preventDefault(){}});assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionValue').value,value);}
+assert.equal(api.segments[0].x2-api.segments[0].x1,350);el('dimensionForm').focusout();context.document.activeElement=null;
+api.undo();assert.equal(api.segments[0].x2-api.segments[0].x1,400);api.redo();assert.equal(api.segments[0].x2-api.segments[0].x1,350);

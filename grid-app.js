@@ -3,7 +3,7 @@
  const $=id=>document.getElementById(id),board=$('board'),g=board.getContext('2d');
  const KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null;
+ let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false;
  let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null,editorSelectionKey=null;
@@ -11,8 +11,19 @@
  const copy=a=>a.map(s=>({...s}));
  const snapshot=()=>({segments:copy(segments),objects:copy(objects)});
  function restoreSnapshot(state){segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;}
+ function recordChange(before){
+  if(!liveEdit||!liveEdit.recorded){past.push(liveEdit?liveEdit.before:before);if(past.length>HISTORY)past.shift();}
+  if(liveEdit)liveEdit.recorded=true;future=[];
+ }
+ function setEditorValue(id,value){if(document.activeElement!==$(id))$(id).value=value;}
+ function bindLiveEditor(id,apply){
+  const form=$(id);form.addEventListener('submit',apply);form.addEventListener('input',apply);
+  form.addEventListener('focusin',e=>{if(e.target?.tagName==='INPUT')liveEdit={before:snapshot(),recorded:false};});
+  form.addEventListener('focusout',()=>{liveEdit=null;});
+  form.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur?.();}});
+ }
  function commitObjects(before,ids=[]){
-  if(JSON.stringify(before)!==JSON.stringify(snapshot())){past.push(before);if(past.length>HISTORY)past.shift();future=[];save();}
+  if(JSON.stringify(before)!==JSON.stringify(snapshot())){recordChange(before);save();}
   selectedWall=null;wallSession=null;objectIds=new Set(ids);objectEditorKey=null;status();draw();
  }
  function save(){
@@ -90,9 +101,9 @@
   $('mainTools').hidden=false;
   syncDimensionEditor();$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
  }
- function commit(before){
+ function commit(before,keepWall=false){
   if(JSON.stringify(before)===JSON.stringify(segments)){status();draw();return;}
-  past.push(Array.isArray(before)?{segments:before,objects:copy(objects)}:before);if(past.length>HISTORY)past.shift();future=[];selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
+  recordChange(Array.isArray(before)?{segments:before,objects:copy(objects)}:before);selected=null;if(!keepWall)selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
  function add(end){
   if(!first)return;
@@ -102,11 +113,12 @@
   first=mode==='draw'?{...end}:null;preview=first;commit(before);
  }
  function undo(){
+  liveEdit=null;
   if(gesture?.type==='object-move'||gesture?.type==='wall-move'||gesture?.type==='wall-resize'){cancelInteraction();return;}
   first=null;preview=null;
   if(!past.length){status();draw();return;}future.push(snapshot());restoreSnapshot(past.pop());selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
- function redo(){if(!future.length)return;first=null;preview=null;gesture=null;pointers.clear();past.push(snapshot());restoreSnapshot(future.pop());selected=null;selectedWall=null;wallSession=null;save();status();draw();}
+ function redo(){liveEdit=null;if(!future.length)return;first=null;preview=null;gesture=null;pointers.clear();past.push(snapshot());restoreSnapshot(future.pop());selected=null;selectedWall=null;wallSession=null;save();status();draw();}
  function hitWall(x,y){
   const raw=point(x,y);let best=null,solid=null,solidDistance=Infinity,distance=wallsVisible?Math.max(15,30*scale+3):15;
   const current=model();
@@ -276,10 +288,6 @@
   }
   g.globalAlpha=1;
   if(objectIds.size>1){const box=CadObjects.selectionBounds(objects.filter(item=>objectIds.has(item.id)));if(box){g.strokeStyle='#2563eb';g.lineWidth=1.5;g.setLineDash([5,4]);g.strokeRect(ox+box.left*scale,oy+box.top*scale,box.width*scale,box.depth*scale);g.setLineDash([]);}}
-  if(objectIds.size){
-   const box=CadObjects.selectionBounds(objects.filter(item=>objectIds.has(item.id)));
-   if(box){g.strokeStyle='#2563eb';g.lineWidth=1.5;g.setLineDash([]);g.strokeRect(ox+box.left*scale,oy+box.top*scale,box.width*scale,box.depth*scale);}
-  }
   paintTags();g.restore();g.globalAlpha=1;
  }
  const xy=e=>{const r=board.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
@@ -340,7 +348,7 @@
   if(!gesture||gesture.id!==e.pointerId)return;
   if(gesture.type==='object-move'){
    let moved=CadObjects.move(gesture.before.objects,gesture.ids,Math.round((p.x-gesture.start.x)/scale/5)*5,Math.round((p.y-gesture.start.y)/scale/5)*5);
-   if(gesture.ids.length===1)moved=moved.map(item=>item.id===gesture.ids[0]?CadObjects.attach(item,segments):item);
+   moved=CadObjects.snapToWalls(moved,gesture.ids,segments,model().rooms,Math.min(30,14/scale));
    objects=moved;schedule();
   }
   else if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
@@ -391,7 +399,7 @@
  board.addEventListener('wheel',e=>{closeMenu();e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
  function closeMenu(){$('topMenu').open=false;$('objectMenu').open=false;}
  document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;});
- function changeMode(next){closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;resetClear();status();draw();}
+ function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('reloadApp').addEventListener('click',async()=>{
   const button=$('reloadApp');if(button.disabled)return;
@@ -429,11 +437,11 @@
   if(mode!=='edit'||!selectedWall){editorSelectionKey=null;editingDimension=null;$('dimensionError').textContent='';return;}
   const key=JSON.stringify(selectedWall);if(editorSelectionKey===key)return;
   editorSelectionKey=key;editingDimension=selectedDimension();
-  $('dimensionValue').value=String(Math.round((editingDimension.end-editingDimension.start)*1000)/1000).replace('.',',');
-  $('dimensionThickness').value=String(selectedWall.thickness??RoomGeometry.defaultThickness(model().rooms,selectedWall)).replace('.',',');
+  setEditorValue('dimensionValue',String(Math.round((editingDimension.end-editingDimension.start)*1000)/1000).replace('.',','));
+  setEditorValue('dimensionThickness',String(selectedWall.thickness??RoomGeometry.defaultThickness(model().rooms,selectedWall)).replace('.',','));
   $('dimensionError').textContent='';
  }
- $('dimensionForm').addEventListener('submit',e=>{
+ function applyWallInputs(e){
   e.preventDefault();if(!editingDimension)return;
   const text=$('dimensionValue').value.trim().replace(',','.');
   const value=/^\d+(?:\.\d+)?$/.test(text)?Number(text):NaN;
@@ -458,10 +466,11 @@
    }
    GridGeometry.detectWithDoors(updated);
    const h=wall.y1===wall.y2,selection=GridGeometry.wallForDimension(updated,{axis:h?'h':'v',line:h?wall.y1:wall.x1,start:h?wall.x1:wall.y1,end:h?wall.x2:wall.y2}).wall;
-   const before=copy(segments);segments=updated;commit(before);selectedWall=selection;status();draw();
-   $('dimensionError').textContent='';status('Mjere zida su promijenjene');
+   const before=copy(segments);segments=updated;selectedWall=selection;commit(before,true);status();draw();
+   $('dimensionError').textContent='';status();
   }catch(error){$('dimensionError').textContent=error.message;}
- });
+ }
+ bindLiveEditor('dimensionForm',applyWallInputs);
  $('saveJson').addEventListener('click',()=>{
   try{
    const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),objects:copy(objects),wallsVisible};
@@ -512,13 +521,13 @@
  function syncObjectEditor(){
   const items=objects.filter(item=>objectIds.has(item.id)),count=items.length;
   $('objectMulti').setAttribute('aria-pressed',String(objectMulti));$('objectMulti').classList.toggle('active',objectMulti);
-  $('objectGroup').disabled=count<2;$('objectUngroup').disabled=!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;$('objectApply').disabled=!count;
+  $('objectGroup').disabled=count<2;$('objectUngroup').disabled=!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;
   $('objectTitle').textContent=count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':'Dodirni elemente za višestruki odabir';
   $('objectRotate').disabled=!count;
   const key=JSON.stringify(items);if(key===objectEditorKey)return;objectEditorKey=key;$('objectError').textContent='';
   if(!count){$('objectWidth').value='';$('objectDepth').value='';return;}
   const box=count===1?items[0]:CadObjects.selectionBounds(items);
-  $('objectWidth').value=String(Math.round(box.width*10)/10).replace('.',',');$('objectDepth').value=String(Math.round(box.depth*10)/10).replace('.',',');
+  setEditorValue('objectWidth',String(Math.round(box.width*10)/10).replace('.',','));setEditorValue('objectDepth',String(Math.round(box.depth*10)/10).replace('.',','));
  }
  $('objectLibrary').innerHTML=buildObjectLibrary();
  function objectLibraryIcon(item){
@@ -552,10 +561,11 @@
  $('objectGroup').addEventListener('click',()=>{if(objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});
  $('objectUngroup').addEventListener('click',()=>{const before=snapshot();objects=CadObjects.ungroup(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
  $('objectDelete').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();objects=objects.filter(item=>!objectIds.has(item.id));objectMulti=false;commitObjects(before);});
- $('objectForm').addEventListener('submit',e=>{
+ function applyObjectInputs(e){
   e.preventDefault();if(!objectIds.size)return;const parse=id=>Number($(id).value.trim().replace(',','.'));
   try{const before=snapshot();objects=CadObjects.resize(objects,[...objectIds],parse('objectWidth'),parse('objectDepth'),objects.find(item=>objectIds.has(item.id))?.rotation??0);commitObjects(before,[...objectIds]);}
   catch(error){$('objectError').textContent=error.message;}
- });
+ }
+ bindLiveEditor('objectForm',applyObjectInputs);
  restore();status();new ResizeObserver(resize).observe(board);resize();
 })();

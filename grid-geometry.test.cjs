@@ -131,3 +131,11 @@ assert.equal(adjacentWidths.length,2,'Različite debljine se ne spajaju');
 assert.equal(GridGeometry.atomic(adjacentWidths)[1].thickness,30);
 assert.equal(GridGeometry.detectWithDoors(adjacentWidths).doors.length,0,'Promjena debljine na spoju nije otvor');
 assert.throws(()=>GridGeometry.setWallThickness(divided,partitionDimension,0));
+// Kolinearni zid se uređuje kao cjelina i uz T spoj; topologija prostorija ostaje razdvojena.
+const mergedTop=GridGeometry.normalize(divided).find(s=>s.y1===100&&s.y2===100);
+assert.equal(mergedTop.x1,100);assert.equal(mergedTop.x2,500);
+const movedMerged=GridGeometry.moveWall(divided,mergedTop,-50);assert.equal(GridGeometry.detect(movedMerged.segments).faces.length,2);
+assert.ok(movedMerged.segments.some(s=>s.x1===300&&s.x2===300&&s.y1===50),'T spoj prati cijeli pomaknuti zid');
+const resizedMerged=GridGeometry.resizeWall(divided,mergedTop,2,600);assert.ok(resizedMerged.segments.some(s=>s.y1===100&&s.y2===100&&s.x1===100&&s.x2===600));
+const thickMerged=GridGeometry.setWallThickness(divided,{axis:'h',line:100,start:100,end:500},24);
+assert.ok(thickMerged.some(s=>s.y1===100&&s.y2===100&&s.x1===100&&s.x2===500&&s.thickness===24));

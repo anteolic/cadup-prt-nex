@@ -119,7 +119,7 @@ globalThis.GridGeometry=(()=>{
   return normalize(result);
  }
  function wallForDimension(input,dimension){
-  const h=dimension.axis==='h',lines=atomic(input),start=dimension.start,end=dimension.end;
+  const h=dimension.axis==='h',lines=normalize(input),start=dimension.start,end=dimension.end;
   let root=-1,best=Infinity;
   for(let i=0;i<lines.length;i++){
    const s=lines[i];if((s.y1===s.y2)!==h)continue;
@@ -139,8 +139,8 @@ globalThis.GridGeometry=(()=>{
  function resizeDimension(input,dimension,length,min=5,width=2000,height=2000){
   const h=dimension.axis==='h',lines=atomic(input),start=dimension.start,end=dimension.end;
   if(!Number.isFinite(length)||length<min)throw new Error('Duljina mora biti najmanje 5 cm.');
-  const {index:root}=wallForDimension(input,dimension);
-  const wall=lines[root],line=h?wall.y1:wall.x1,axis=h?'x':'y';
+  const wall=wallForDimension(input,dimension).wall,line=h?wall.y1:wall.x1,axis=h?'x':'y';
+  const root=lines.findIndex(s=>(s.y1===s.y2)===h&&(h?s.y1:s.x1)===line&&s[axis+'1']>=wall[axis+'1']&&s[axis+'2']<=wall[axis+'2']);
   const candidates=lines.filter(s=>(s.y1===s.y2)===h&&(h?s.y1:s.x1)===line).flatMap(s=>[s[axis+'1'],s[axis+'2']]);
   const cut=candidates.reduce((a,b)=>Math.abs(b-end)<Math.abs(a-end)?b:a);
   if(Math.abs(cut-end)>100.001)throw new Error('Za ovaj dio zida upotrijebi krajnju ručku.');
@@ -161,7 +161,8 @@ globalThis.GridGeometry=(()=>{
   return normalize(resized);
  }
  function resizeWall(input,wall,endpoint,position,min=5,width=2000,height=2000){
-  const lines=atomic(input),index=lines.findIndex(s=>['x1','y1','x2','y2'].every(k=>s[k]===wall[k]));
+  let lines=normalize(input),index=lines.findIndex(s=>['x1','y1','x2','y2'].every(k=>s[k]===wall[k]));
+  if(index<0){lines=atomic(input);index=lines.findIndex(s=>['x1','y1','x2','y2'].every(k=>s[k]===wall[k]));}
   if(index<0||![1,2].includes(endpoint)||!Number.isFinite(position))return {segments:normalize(input),wall};
   const horizontal=wall.y1===wall.y2,axis=horizontal?'x':'y',limit=horizontal?width:height;
   const low=endpoint===1?0:wall[axis+'1']+min,high=endpoint===1?wall[axis+'2']-min:limit;
@@ -171,9 +172,9 @@ globalThis.GridGeometry=(()=>{
  }
  function moveWall(input,wall,requested,min=5,width=2000,height=2000){
   const lines=atomic(input),horizontal=wall.y1===wall.y2,axis=horizontal?'y':'x';
-  const matches=s=>['x1','y1','x2','y2'].every(k=>s[k]===wall[k]);
+  const matches=s=>(s.y1===s.y2)===horizontal&&(horizontal?s.y1===wall.y1&&s.x1>=wall.x1&&s.x2<=wall.x2:s.x1===wall.x1&&s.y1>=wall.y1&&s.y2<=wall.y2);
   if(!lines.some(matches))return {segments:normalize(input),wall,delta:0};
-  const endpoints=[{x:wall.x1,y:wall.y1},{x:wall.x2,y:wall.y2}],at=p=>endpoints.some(e=>e.x===p.x&&e.y===p.y);
+  const endpoints=lines.filter(matches).flatMap(s=>[{x:s.x1,y:s.y1},{x:s.x2,y:s.y2}]),at=p=>endpoints.some(e=>e.x===p.x&&e.y===p.y);
   const coordinate=horizontal?wall.y1:wall.x1;
   let low=-coordinate,high=(horizontal?height:width)-coordinate;
   let safeLow=low,safeHigh=high;

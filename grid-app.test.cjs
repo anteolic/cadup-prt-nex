@@ -203,12 +203,12 @@ line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,1
 enterEdit();const eraseOriginal=JSON.stringify(api.segments);
 click(200,175);assert.equal(api.selection.x1,400);assert.equal(el('wallActions').hidden,false);
 click(400,400);assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);assert.equal(JSON.stringify(api.segments),eraseOriginal);
-click(200,175);click(150,100);assert.equal(api.selection.y1,200);assert.equal(api.selection.x2,400);
+click(200,175);click(150,100);assert.equal(api.selection.y1,200);assert.equal(api.selection.x2,600);
 assert.equal(JSON.stringify(api.segments),eraseOriginal);
 click(175,100);assert.equal(JSON.stringify(api.segments),eraseOriginal,'Ponovljeni odabir ne briše zid');
 el('wallDelete').click();assert.equal(api.selection,null);
 assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1<400));
-assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===400));
+assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200),'Briše se cijeli spojeni ravni zid');
 api.undo();assert.equal(JSON.stringify(api.segments),eraseOriginal);api.redo();assert.notEqual(JSON.stringify(api.segments),eraseOriginal);
 
 // Precrtavanje postojećeg zida ne briše njegov dio.
@@ -399,3 +399,12 @@ assert.equal(JSON.parse(memory.get('cadup_custom_library_v1')).length,1);assert.
 const customTemplate=api.customLibrary[0];api.addCustomObject(customTemplate.id);assert.equal(api.objects.length,4);assert.equal(api.objectIds.length,2);
 assert.notEqual(api.objects[2].group,api.objects[0].group);assert.equal(api.objects[2].group,api.objects[3].group);
 el('saveCustom').click();el('customName').value='Kutak <A>';el('customSaveForm').submit({preventDefault(){}});assert.equal(api.customLibrary.length,1,'Isto ime se ne prepisuje');
+
+// Merged zid na T spoju ima jednu selekciju, ali ostaju unutarnje kote između pregrada.
+el('clearAll').click();el('clearAll').click();api.fit();
+line(100,100,200,100);line(200,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);line(200,100,200,250);
+enterEdit();click(150,100);assert.equal(api.selection.x1,200);assert.equal(api.selection.x2,600);assert.equal(el('dimensionValue').value,'400');
+assert.equal(api.model().faces.length,2);assert.ok(api.dimensions.some(r=>r.dimension.axis==='h'&&r.dimension.end-r.dimension.start===195),'Kote između zidova ostaju vidljive');
+assert.ok(labels.includes('195 cm'));
+el('dimensionThickness').value='20';el('dimensionForm').submit({preventDefault(){}});
+assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===200&&s.x2===600&&s.thickness===20));

@@ -133,7 +133,7 @@
  function hitWall(x,y){
   const raw=point(x,y);let best=null,solid=null,solidDistance=Infinity,distance=wallsVisible?Math.max(15,30*scale+3):15;
   const current=model();
-  for(const wall of GridGeometry.atomic(segments)){
+  for(const wall of GridGeometry.normalize(segments)){
    const horizontal=wall.y1===wall.y2,along=horizontal?raw.x:raw.y;
    const d=Math.hypot((horizontal?raw.y:raw.x)-(horizontal?wall.y1:wall.x1),along-clamp(along,horizontal?wall.x1:wall.y1,horizontal?wall.x2:wall.y2))*scale;
    if(RoomGeometry.wallSelection(current.rooms,segments,wall,current.layout).some(r=>raw.x>=r.x&&raw.x<=r.x+r.width&&raw.y>=r.y&&raw.y<=r.y+r.height)&&d<solidDistance){solidDistance=d;solid=wall;}

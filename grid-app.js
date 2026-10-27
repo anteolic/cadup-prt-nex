@@ -3,15 +3,15 @@
  const $=id=>document.getElementById(id),board=$('board'),g=board.getContext('2d');
  const CUSTOM_KEY='cadup_custom_library_v1',KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- let customLibrary=[],customNaming=false,objectDeleteArmed=null,wallDeleteArmed=null;
+ let customLibrary=[],customNaming=false;
  let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
- let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false,cursor=null,eraseHover=null,eraseObjectIds=[],eraseSelected=null;
+ let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false,cursor=null,eraseHover=null,eraseObjectIds=[];
  let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null,editorSelectionKey=null;
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
  const snapshot=()=>({segments:copy(segments),objects:copy(objects)});
- function restoreSnapshot(state){wallDeleteArmed=null;objectDeleteArmed=null;eraseSelected=null;eraseHover=null;eraseObjectIds=[];segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;}
+ function restoreSnapshot(state){eraseHover=null;eraseObjectIds=[];segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;}
  function recordChange(before){
   if(!liveEdit||!liveEdit.recorded){past.push(liveEdit?liveEdit.before:before);if(past.length>HISTORY)past.shift();}
   if(liveEdit)liveEdit.recorded=true;future=[];
@@ -34,7 +34,7 @@
   form.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur?.();}});
  }
  function commitObjects(before,ids=[]){
-  objectDeleteArmed=null;  eraseSelected=null;eraseHover=null;eraseObjectIds=[];
+  eraseHover=null;eraseObjectIds=[];
   if(JSON.stringify(before)!==JSON.stringify(snapshot())){recordChange(before);save();}
   selectedWall=null;wallSession=null;objectIds=new Set(ids);objectEditorKey=null;status();draw();
  }
@@ -145,7 +145,7 @@
   syncDimensionEditor();$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
  }
  function commit(before,keepWall=false){
-  eraseSelected=null;eraseHover=null;eraseObjectIds=[];
+  eraseHover=null;eraseObjectIds=[];
   if(JSON.stringify(before)===JSON.stringify(segments)){status();draw();return;}
   recordChange(Array.isArray(before)?{segments:before,objects:copy(objects)}:before);selected=null;if(!keepWall)selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
@@ -187,11 +187,8 @@
   const wall=hitEraseSpan(p.x,p.y);return wall?{kind:'wall',wall}:null;
  }
  function updateEraseHover(p){const target=eraseTarget(p);eraseHover=target?.kind==='wall'?target.wall:null;eraseObjectIds=target?.kind==='object'?target.ids:[];return target;}
- function eraseTargetKey(target){return target.kind==='wall'?JSON.stringify(['wall',target.wall.x1,target.wall.y1,target.wall.x2,target.wall.y2]):JSON.stringify(['object',...target.ids.slice().sort()]);}
- function confirmErase(target){
+ function deleteEraseTarget(target){
   if(!target){changeMode('edit');return;}
-  if(!eraseSelected||eraseTargetKey(eraseSelected)!==eraseTargetKey(target)){eraseSelected=target;draw();return;}
-  eraseSelected=null;
   if(target.kind==='wall')eraseSpan(target.wall);
   else{const before=snapshot(),ids=new Set(target.ids);objects=objects.filter(item=>!ids.has(item.id));commitObjects(before);}
  }
@@ -328,7 +325,7 @@
   if(mode==='erase'){
    const nodes=new Map();for(const wall of GridGeometry.atomic(segments))for(const n of [1,2])nodes.set(wall['x'+n]+':'+wall['y'+n],{x:wall['x'+n],y:wall['y'+n]});
    for(const node of nodes.values()){const p=screen(node);g.beginPath();g.arc(p.x,p.y,3,0,Math.PI*2);g.fillStyle='#fff';g.fill();g.strokeStyle='#dc2626';g.lineWidth=1;g.stroke();}
-   const wall=eraseSelected?.kind==='wall'?eraseSelected.wall:!eraseSelected?eraseHover:null;
+   const wall=eraseHover;
    if(wall){g.strokeStyle='#dc2626';g.lineWidth=4;g.beginPath();g.moveTo(ox+wall.x1*scale,oy+wall.y1*scale);g.lineTo(ox+wall.x2*scale,oy+wall.y2*scale);g.stroke();}
   }
   if(mode==='edit'&&selectedWall){
@@ -369,7 +366,7 @@
     }
     g.globalAlpha=objectAlpha;
    }
-   const eraseIds=eraseSelected?.kind==='object'?eraseSelected.ids:!eraseSelected?eraseObjectIds:[];
+   const eraseIds=eraseObjectIds;
    CadObjects.draw(g,item,scale,ox,oy,active,0,mode==='erase'&&eraseIds.includes(item.id));
   }
   g.globalAlpha=1;
@@ -453,7 +450,7 @@
   const p=xy(e),last=gesture,wasMulti=last?.type==='pinch'||pointers.size>1;pointers.delete(e.pointerId);
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
   if(wasMulti||last?.type==='remaining'){status();draw();return;}
-  if(last?.type==='erase-span'){if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)confirmErase(last.target);else{eraseHover=null;eraseObjectIds=[];draw();}return;}
+  if(last?.type==='erase-span'){if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)deleteEraseTarget(last.target);else{eraseHover=null;eraseObjectIds=[];draw();}return;}
   if(last?.type==='pan'){status();draw();return;}
   if(last?.type==='object-select')return;
   if(last?.type==='object-move'){
@@ -490,12 +487,10 @@
  board.addEventListener('wheel',e=>{closeMenu();e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
  function closeMenu(){$('topMenu').open=false;$('objectMenu').open=false;}
  document.addEventListener('pointerdown',e=>{
-  if(!e.target?.closest?.('#wallDelete')){wallDeleteArmed=null;$('wallDelete').textContent='Briši';}
-  if(!e.target?.closest?.('#objectDelete')){objectDeleteArmed=null;$('objectDelete').textContent='Obriši';}
   if(liveEdit&&e.target!==liveEdit.input){const input=liveEdit.input;finishMeasureInput();input.blur?.();}
   if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
  },true);
- function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;eraseHover=null;eraseObjectIds=[];eraseSelected=null;cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
+ function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('eraseMode').addEventListener('click',()=>changeMode(mode==='erase'?'edit':'erase'));
  $('reloadApp').addEventListener('click',async()=>{
@@ -523,18 +518,13 @@
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
  function deselectWall(){customNaming=false;objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
  function selectedDimension(){if(!selectedWall)return null;const current=model();return RoomGeometry.visibleWallDimension(current.rooms,segments,selectedWall,current.layout);}
- $('wallDelete').addEventListener('click',()=>{
-  if(!selectedWall)return;const key=JSON.stringify(selectedWall);
-  if(wallDeleteArmed!==key){wallDeleteArmed=key;$('wallDelete').textContent='Potvrdi brisanje';return;}
-  wallDeleteArmed=null;$('wallDelete').textContent='Briši';eraseSpan(selectedWall);
- });
+ $('wallDelete').addEventListener('click',()=>eraseSpan(selectedWall));
  $('clearAll').addEventListener('click',()=>{
   if(!segments.length&&!objects.length)return;
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
   const before=snapshot();segments=[];objects=[];objectIds.clear();first=null;preview=null;commit(before);
  });
  function syncDimensionEditor(){
-  if(wallDeleteArmed!==JSON.stringify(selectedWall)){wallDeleteArmed=null;$('wallDelete').textContent='Briši';}
   if(mode!=='edit'||!selectedWall){editorSelectionKey=null;editingDimension=null;$('dimensionError').textContent='';return;}
   const key=JSON.stringify(selectedWall);if(editorSelectionKey===key)return;
   editorSelectionKey=key;editingDimension=selectedDimension();
@@ -623,7 +613,6 @@
   $('objectMulti').setAttribute('aria-pressed',String(objectMulti));$('objectMulti').classList.toggle('active',objectMulti);
   $('objectGroup').disabled=count<2;$('objectUngroup').disabled=!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;
   $('objectTitle').textContent=count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':'Dodirni elemente za višestruki odabir';
-  if(!count)objectDeleteArmed=null;$('objectDelete').textContent=objectDeleteArmed?'Potvrdi brisanje':'Obriši';
   $('objectRotate').disabled=!count;$('objectMirror').disabled=!count;$('saveCustom').disabled=!count;if(!count)customNaming=false;$('customSaveForm').hidden=!customNaming;
   const key=JSON.stringify(items);if(key===objectEditorKey)return;objectEditorKey=key;$('objectError').textContent='';
   if(!count){$('objectWidth').value='';$('objectDepth').value='';return;}
@@ -690,8 +679,7 @@
  $('objectGroup').addEventListener('click',()=>{if(objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});
  $('objectUngroup').addEventListener('click',()=>{const before=snapshot();objects=CadObjects.ungroup(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
  $('objectDelete').addEventListener('click',()=>{
-  if(!objectIds.size)return;const key=JSON.stringify([...objectIds].sort());
-  if(objectDeleteArmed!==key){objectDeleteArmed=key;$('objectDelete').textContent='Potvrdi brisanje';return;}
+  if(!objectIds.size)return;
   const before=snapshot();objects=objects.filter(item=>!objectIds.has(item.id));objectMulti=false;commitObjects(before);
  });
  function applyObjectInputs(e){

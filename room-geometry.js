@@ -152,6 +152,16 @@ globalThis.RoomGeometry = (() => {
   let free=rects;for(const box of boxes)free=subtract(free,box);
   return {outer,inner,net,area:union(free).area,segments,physicalParts,physicalJoints,wallGroups,disconnectedOverlap,unjoinedCaps,centered:true};
  }
+ // Visible face length excludes corners and the thickness of intersecting walls.
+ function visibleWallDimension(rects,physicalWalls,wall,layout){
+  const h=wall.y1===wall.y2,axis=h?'h':'v',line=h?wall.y1:wall.x1;
+  const start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2,t=wall.thickness??defaultThickness(rects,wall);
+  const candidates=union([...layout.outer,...layout.inner]).edges.filter(e=>e.axis===axis&&Math.abs(e.line-line)<=t/2+.001)
+   .map(e=>({axis,line:e.line,start:Math.max(start,e.span[0]),end:Math.min(end,e.span[1]),side:e.side}))
+   .filter(e=>e.end>e.start&&e.start<=(start+end)/2&&e.end>=(start+end)/2);
+  candidates.sort((a,b)=>(a.end-a.start)-(b.end-b.start));
+  return candidates[0]||{axis,line,start,end};
+ }
  function wallSelection(rects,physicalWalls,wall,layout){
   if(layout.centered){
    const h=wall.y1===wall.y2,line=h?wall.y1:wall.x1,start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2;
@@ -224,5 +234,5 @@ globalThis.RoomGeometry = (() => {
   let free=rects;for(const wall of inner)free=subtract(free,wall);
   return {outer,inner,net,area:union(free).area,segments};
  }
- return {connected,shell,union,subtract,defaultThickness,wallSelection,layout,roomKey,groups,split};
+ return {connected,shell,union,subtract,defaultThickness,visibleWallDimension,wallSelection,layout,roomKey,groups,split};
 })();

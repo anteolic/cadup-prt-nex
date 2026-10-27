@@ -3,7 +3,7 @@
  const $=id=>document.getElementById(id),board=$('board'),g=board.getContext('2d');
  const CUSTOM_KEY='cadup_custom_library_v1',KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- let customLibrary=[],customNaming=false,objectDeleteArmed=null;
+ let customLibrary=[],customNaming=false,objectDeleteArmed=null,wallDeleteArmed=null;
  let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false,cursor=null,eraseHover=null,eraseObjectIds=[],eraseSelected=null;
@@ -11,7 +11,7 @@
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
  const snapshot=()=>({segments:copy(segments),objects:copy(objects)});
- function restoreSnapshot(state){objectDeleteArmed=null;eraseSelected=null;eraseHover=null;eraseObjectIds=[];segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;}
+ function restoreSnapshot(state){wallDeleteArmed=null;objectDeleteArmed=null;eraseSelected=null;eraseHover=null;eraseObjectIds=[];segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;}
  function recordChange(before){
   if(!liveEdit||!liveEdit.recorded){past.push(liveEdit?liveEdit.before:before);if(past.length>HISTORY)past.shift();}
   if(liveEdit)liveEdit.recorded=true;future=[];
@@ -333,7 +333,9 @@
   if(mode==='edit'&&selectedWall){
    const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});
    const horizontal=selectedWall.y1===selectedWall.y2;
-   const boxes=RoomGeometry.wallSelection(current.rooms,segments,selectedWall,current.layout);
+   const dimension=selectedDimension();
+   const visibleWall=horizontal?{...selectedWall,x1:dimension.start,x2:dimension.end}:{...selectedWall,y1:dimension.start,y2:dimension.end};
+   const boxes=RoomGeometry.wallSelection(current.rooms,segments,visibleWall,current.layout).map(r=>horizontal?{...r,x:Math.max(r.x,dimension.start),width:Math.min(r.x+r.width,dimension.end)-Math.max(r.x,dimension.start)}:{...r,y:Math.max(r.y,dimension.start),height:Math.min(r.y+r.height,dimension.end)-Math.max(r.y,dimension.start)}).filter(r=>r.width>0&&r.height>0);
    g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
    g.fillStyle='#93c5fd';g.fill();g.strokeStyle='#2563eb';g.lineWidth=2;
    drawWallAxes();
@@ -484,6 +486,7 @@
  board.addEventListener('wheel',e=>{closeMenu();e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
  function closeMenu(){$('topMenu').open=false;$('objectMenu').open=false;}
  document.addEventListener('pointerdown',e=>{
+  if(!e.target?.closest?.('#wallDelete')){wallDeleteArmed=null;$('wallDelete').textContent='Briši';}
   if(!e.target?.closest?.('#objectDelete')){objectDeleteArmed=null;$('objectDelete').textContent='Obriši';}
   if(liveEdit&&e.target!==liveEdit.input){const input=liveEdit.input;finishMeasureInput();input.blur?.();}
   if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
@@ -515,13 +518,19 @@
  });
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
  function deselectWall(){customNaming=false;objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
- function selectedDimension(){if(!selectedWall)return null;const h=selectedWall.y1===selectedWall.y2;return {axis:h?'h':'v',line:h?selectedWall.y1:selectedWall.x1,start:h?selectedWall.x1:selectedWall.y1,end:h?selectedWall.x2:selectedWall.y2};}
+ function selectedDimension(){if(!selectedWall)return null;const current=model();return RoomGeometry.visibleWallDimension(current.rooms,segments,selectedWall,current.layout);}
+ $('wallDelete').addEventListener('click',()=>{
+  if(!selectedWall)return;const key=JSON.stringify(selectedWall);
+  if(wallDeleteArmed!==key){wallDeleteArmed=key;$('wallDelete').textContent='Potvrdi brisanje';return;}
+  wallDeleteArmed=null;$('wallDelete').textContent='Briši';eraseSpan(selectedWall);
+ });
  $('clearAll').addEventListener('click',()=>{
   if(!segments.length&&!objects.length)return;
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
   const before=snapshot();segments=[];objects=[];objectIds.clear();first=null;preview=null;commit(before);
  });
  function syncDimensionEditor(){
+  if(wallDeleteArmed!==JSON.stringify(selectedWall)){wallDeleteArmed=null;$('wallDelete').textContent='Briši';}
   if(mode!=='edit'||!selectedWall){editorSelectionKey=null;editingDimension=null;$('dimensionError').textContent='';return;}
   const key=JSON.stringify(selectedWall);if(editorSelectionKey===key)return;
   editorSelectionKey=key;editingDimension=selectedDimension();
@@ -543,12 +552,9 @@
    let updated=thickness===oldThickness?segments:GridGeometry.setWallThickness(segments,editingDimension,thickness);
    if(Math.abs(value-(editingDimension.end-editingDimension.start))>.0001){
     let dimension=editingDimension;
-    if(thickness!==oldThickness&&dimension.side!==undefined){
+    if(thickness!==oldThickness){
      const detected=GridGeometry.detectWithDoors(updated),layout=RoomGeometry.layout(detected.rooms,updated);
-     const line=dimension.axis==='h'?wall.y1:wall.x1,expected=line+(dimension.line-line)*thickness/oldThickness;
-     const edges=RoomGeometry.union([...layout.outer,...layout.inner]).edges.filter(e=>e.axis===dimension.axis&&e.side===dimension.side&&Math.abs(e.line-expected)<.001);
-     edges.sort((a,b)=>(Math.min(b.span[1],dimension.end)-Math.max(b.span[0],dimension.start))-(Math.min(a.span[1],dimension.end)-Math.max(a.span[0],dimension.start)));
-     if(edges.length)dimension={...dimension,line:edges[0].line,start:edges[0].span[0],end:edges[0].span[1]};
+     dimension=RoomGeometry.visibleWallDimension(detected.rooms,updated,{...wall,thickness},layout);
     }
     updated=GridGeometry.resizeDimension(updated,dimension,value,MIN,WIDTH,height);
    }
@@ -614,7 +620,7 @@
   $('objectGroup').disabled=count<2;$('objectUngroup').disabled=!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;
   $('objectTitle').textContent=count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':'Dodirni elemente za višestruki odabir';
   if(!count)objectDeleteArmed=null;$('objectDelete').textContent=objectDeleteArmed?'Potvrdi brisanje':'Obriši';
-  $('objectRotate').disabled=!count;$('saveCustom').disabled=!count;if(!count)customNaming=false;$('customSaveForm').hidden=!customNaming;
+  $('objectRotate').disabled=!count;$('objectMirror').disabled=!count;$('saveCustom').disabled=!count;if(!count)customNaming=false;$('customSaveForm').hidden=!customNaming;
   const key=JSON.stringify(items);if(key===objectEditorKey)return;objectEditorKey=key;$('objectError').textContent='';
   if(!count){$('objectWidth').value='';$('objectDepth').value='';return;}
   const box=count===1?items[0]:CadObjects.selectionBounds(items);
@@ -674,6 +680,7 @@
   }catch(error){$('customMessage').textContent=error.message;}
  });
  $('objectMulti').addEventListener('click',()=>{objectMulti=!objectMulti;status();draw();});
+ $('objectMirror').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();objects=CadObjects.mirror(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
  $('objectRotate').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{objects=CadObjects.rotate(objects,[...objectIds]);commitObjects(before,[...objectIds]);}catch(error){$('objectError').textContent=error.message;}});
  $('objectCopy').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{const result=CadObjects.duplicate(objects,[...objectIds]);objects=result.items;commitObjects(before,result.ids);}catch(error){$('objectError').textContent=error.message;}});
  $('objectGroup').addEventListener('click',()=>{if(objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});

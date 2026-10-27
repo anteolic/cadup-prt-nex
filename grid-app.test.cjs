@@ -166,27 +166,27 @@ assert.ok(topDimension);const beforeLabel=JSON.stringify(api.segments);
 click((topDimension.left+topDimension.right)/2,(topDimension.top+topDimension.bottom)/2);
 assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);assert.equal(JSON.stringify(api.segments),beforeLabel);
 click(200,100);assert.ok(api.selection);assert.equal(el('wallActions').hidden,false);
-assert.equal(el('dimensionValue').value,'400');assert.equal(el('dimensionThickness').value,'30');
+assert.equal(el('dimensionValue').value,'370');assert.equal(el('dimensionThickness').value,'30');
 const beforeNumber=JSON.stringify(api.segments);
 el('dimensionValue').value='0';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(JSON.stringify(api.segments),beforeNumber);assert.ok(el('dimensionError').textContent);
 el('dimensionValue').value='440';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
-assert.ok(api.segments.some(s=>s.x1===640&&s.x2===640));
+assert.ok(api.segments.some(s=>s.x1===670&&s.x2===670));
 api.undo();assert.equal(JSON.stringify(api.segments),beforeNumber);api.redo();
 click(200,100);el('dimensionValue').value='460';el('dimensionForm').submit({preventDefault(){}});
-assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));
+assert.ok(api.segments.some(s=>s.x1===690&&s.x2===690));
 const beforeThickness=JSON.stringify(api.segments);
 el('dimensionThickness').value='0';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(JSON.stringify(api.segments),beforeThickness);assert.ok(el('dimensionError').textContent);
 el('dimensionThickness').value='50';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(api.model().faces.length,1);assert.equal(api.segments.filter(s=>s.thickness===50).length,1);
-assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));
+assert.ok(api.segments.some(s=>s.x1===690&&s.x2===690));
 assert.equal(Math.min(...api.model().layout.outer.map(r=>r.y)),175);
 const afterThickness=JSON.stringify(api.segments);api.undo();assert.equal(JSON.stringify(api.segments),beforeThickness);api.redo();assert.equal(JSON.stringify(api.segments),afterThickness);
 click(200,100);el('dimensionValue').value='520';el('dimensionThickness').value='40';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
-assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===180&&e.span[1]-e.span[0]===550));
+assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===180&&e.span[1]-e.span[0]===580));
 // Odabir zida ne dodaje naglašenu kotu uz postojeća donja polja.
 assert.ok(api.dimensions.every(r=>r.dimension.side===-1||r.dimension.side===1),'Prikazane su samo postojeće rubne kote');
 deselect();assert.equal(el('wallActions').hidden,true);
@@ -402,7 +402,7 @@ el('saveCustom').click();el('customName').value='Kutak <A>';el('customSaveForm')
 // Zid na T spoju uređuje se po segmentima, uz unutarnje kote između pregrada.
 el('clearAll').click();el('clearAll').click();api.fit();
 line(100,100,200,100);line(200,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);line(200,100,200,250);
-enterEdit();click(150,100);assert.equal(api.selection.x1,200);assert.equal(api.selection.x2,400);assert.equal(el('dimensionValue').value,'200');
+enterEdit();click(150,100);assert.equal(api.selection.x1,200);assert.equal(api.selection.x2,400);assert.equal(el('dimensionValue').value,'180');
 assert.equal(api.model().faces.length,2);assert.ok(api.dimensions.some(r=>r.dimension.axis==='h'&&r.dimension.end-r.dimension.start===180),'Kote između zidova ostaju vidljive');
 assert.ok(labels.includes('180 cm'));
 el('dimensionThickness').value='20';el('dimensionForm').submit({preventDefault(){}});
@@ -471,3 +471,7 @@ el('clearAll').click();el('clearAll').click();startDrawing();click(100,100);blue
 
 // I zasebna tipka za brisanje predmeta traži drugi klik.
 api.addObject('chair');const deleteButtonBefore=JSON.stringify(api.objects);el('objectDelete').click();assert.equal(JSON.stringify(api.objects),deleteButtonBefore);assert.equal(el('objectDelete').textContent,'Potvrdi brisanje');el('objectDelete').click();assert.equal(api.objects.length,0);
+
+// Delete is also available in the selected wall editor, with two clicks.
+el('clearAll').click();el('clearAll').click();line(100,100,300,100);enterEdit();click(200,100);
+const beforeEditDelete=JSON.stringify(api.segments);el('wallDelete').click();assert.equal(JSON.stringify(api.segments),beforeEditDelete);assert.equal(el('wallDelete').textContent,'Potvrdi brisanje');el('wallDelete').click();assert.equal(api.segments.length,0);api.undo();assert.equal(JSON.stringify(api.segments),beforeEditDelete);

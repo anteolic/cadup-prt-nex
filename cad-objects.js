@@ -34,8 +34,10 @@ globalThis.CadObjects=(()=>{
   return input.map(item=>{
    if(!item||typeof item.id!=='string'||!item.id||item.id.length>100||seen.has(item.id)||!definition(item.kind)||
     !['x','y','width','depth','rotation'].every(k=>Number.isFinite(item[k]))||item.width<5||item.depth<5||item.width>2000||item.depth>2000||item.rotation%90!==0||
+    (item.mirrored!==undefined&&typeof item.mirrored!=='boolean')||
     (item.group!=null&&(typeof item.group!=='string'||item.group.length>100)))throw new Error('Neispravan element u JSON-u.');
    seen.add(item.id);const result={id:item.id,kind:item.kind,x:item.x,y:item.y,width:item.width,depth:item.depth,rotation:rotation(item.rotation),group:item.group??null};
+   if(item.mirrored)result.mirrored=true;
    const b=bounds(result);if(b.left<-.001||b.top<-.001||b.right>2000.001||b.bottom>2000.001)throw new Error('Element je izvan tlocrta.');return result;
   });
  }
@@ -59,6 +61,17 @@ globalThis.CadObjects=(()=>{
   const center=group.length===1?group[0]:selectionBounds(group);
   const turned=constrain(group.map(item=>({...item,x:center.x-(item.y-center.y),y:center.y+(item.x-center.x),rotation:rotation(item.rotation+90)})));
   const map=new Map(turned.map(item=>[item.id,item]));return items.map(item=>map.get(item.id)||{...item});
+ }
+ // Reflect across the vertical axis of the selection, including each CAD symbol.
+ function mirror(items,ids){
+  const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);
+  const center=group.length===1?group[0]:selectionBounds(group);
+  return items.map(item=>{
+   if(!selected.has(item.id))return {...item};
+   const reflected={...item,x:2*center.x-item.x,rotation:rotation(-item.rotation)};
+   if(item.mirrored)delete reflected.mirrored;else reflected.mirrored=true;
+   return reflected;
+  });
  }
  function duplicate(items,ids){
   const selected=new Set(ids),groups=new Map(),copies=items.filter(item=>selected.has(item.id)).map(item=>{
@@ -115,7 +128,7 @@ globalThis.CadObjects=(()=>{
  }
  function draw(g,item,scale,ox,oy,selected=false,wallThickness=0,erase=false){
   const fx=item.width*scale/100,fy=item.depth*scale/100;
-  g.save();g.translate(ox+item.x*scale,oy+item.y*scale);g.rotate(item.rotation*Math.PI/180);g.scale(fx,fy);
+  g.save();g.translate(ox+item.x*scale,oy+item.y*scale);g.rotate(item.rotation*Math.PI/180);g.scale(item.mirrored?-fx:fx,fy);
   g.lineWidth=1.2/Math.max(.1,Math.min(fx,fy));g.strokeStyle=erase?'#dc2626':selected?'#2563eb':'#475569';g.fillStyle=erase?'#fee2e2':selected?'#dbeafe':'#f8fafc';
   const rect=(x,y,w,h)=>{g.beginPath();g.rect(x,y,w,h);g.fill();g.stroke();},line=(x,y,a,b)=>{g.beginPath();g.moveTo(x,y);g.lineTo(a,b);g.stroke();},ellipse=(x,y,rx,ry)=>{g.beginPath();g.ellipse(x,y,rx,ry,0,0,Math.PI*2);g.stroke();};
   const opening=['door','double-door','window'].includes(item.kind);
@@ -152,5 +165,5 @@ globalThis.CadObjects=(()=>{
   }
   g.restore();
  }
- return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,duplicate,group,ungroup,attach,createTemplate,validateTemplates,instantiate,snapToWalls,draw};
+ return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,mirror,duplicate,group,ungroup,attach,createTemplate,validateTemplates,instantiate,snapToWalls,draw};
 })();

@@ -111,3 +111,13 @@ assert.equal(shortOfAxis.wallGroups.length,2);assert.equal(parallelGap.wallGroup
 
 const almostClosed=[axisHorizontal,{x1:205,y1:100,x2:205,y2:200,thickness:20},{x1:100,y1:200,x2:205,y2:200,thickness:20},{x1:100,y1:100,x2:100,y2:200,thickness:20}];
 const unjoinedLoop=RoomGeometry.layout([],almostClosed);assert.equal(unjoinedLoop.wallGroups.length,1,'Zidovi su povezani preko druge strane tlocrta');assert.ok(unjoinedLoop.unjoinedCaps.some(cap=>cap.x1===200&&cap.x2===200),'Lokalni prekid ostaje odvojen i kad postoji druga veza oko tlocrta');
+
+// Visible wall measure stops at adjoining wall faces rather than the axes.
+{
+ const walls=[{x1:200,y1:200,x2:600,y2:200},{x1:200,y1:200,x2:200,y2:500},{x1:600,y1:200,x2:600,y2:500},{x1:200,y1:500,x2:600,y2:500},{x1:400,y1:200,x2:400,y2:500}];
+ const rects=[{id:1,x:200,y:200,width:200,height:300},{id:2,x:400,y:200,width:200,height:300}];
+ const layout=RoomGeometry.layout(rects,walls),wall={x1:200,y1:200,x2:400,y2:200};
+ const d=RoomGeometry.visibleWallDimension(rects,walls,wall,layout);
+ assert.equal(d.start,215);assert.equal(d.end,395);assert.equal(d.end-d.start,180);
+ assert.ok(RoomGeometry.union([...layout.outer,...layout.inner]).edges.some(e=>e.axis===d.axis&&e.line===d.line&&e.span[0]===d.start&&e.span[1]===d.end));
+}

@@ -43,3 +43,14 @@ assert.deepEqual(C.validateTemplates(JSON.parse(JSON.stringify([template]))),[te
 const instance=C.instantiate(template,700,700);assert.equal(instance.items.length,2);assert.ok(instance.items[0].group);assert.equal(instance.items[0].group,instance.items[1].group);assert.notEqual(instance.items[0].id,template.items[0].id);
 const instance2=C.instantiate(template,20,20);assert.notEqual(instance2.items[0].group,instance.items[0].group);assert.equal(C.validate(instance2.items).length,2);
 assert.throws(()=>C.createTemplate(grouped,grouped.map(item=>item.id),' '));assert.throws(()=>C.validateTemplates([{...template,id:'" onclick="alert(1)'}]));
+
+// Mirror reflects positions and asymmetric symbols, persists and reverses exactly.
+for(const angle of [0,90,180,270]){
+ const a={...C.create('door',500,500),rotation:angle},b={...C.create('desk',800,650),rotation:90};
+ const input=[a,b],ids=input.map(o=>o.id),mirrored=C.mirror(input,ids),box=C.selectionBounds(input);
+ assert.equal(mirrored[0].x,2*box.x-a.x);assert.equal(mirrored[0].rotation,((360-angle)%360));assert.equal(mirrored[0].mirrored,true);
+ assert.deepEqual(C.selectionBounds(mirrored),box);assert.deepEqual(C.mirror(mirrored,ids),input);
+ assert.deepEqual(C.validate(JSON.parse(JSON.stringify(mirrored))),mirrored);
+ assert.equal(C.duplicate(mirrored,ids).items[2].mirrored,true);
+ assert.equal(C.instantiate(C.createTemplate(mirrored,ids,'Mirror test'),1000,1000).items[0].mirrored,true);
+}

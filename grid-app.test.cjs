@@ -56,9 +56,9 @@ assert.ok(api.segments.some(s=>s.y1===250&&s.y2===250&&s.x1===200));
 drag(150,125,150,75);assert.equal(api.model().faces.length,2);
 assert.ok(api.segments.some(s=>s.y1===150&&s.y2===150&&s.x1===200),'Spušteni segment podiže se iznad početne ravnine');
 api.undo();api.undo();
-const beforeRoomMove=JSON.stringify(api.segments);drag(150,175,125,200);
-assert.notEqual(JSON.stringify(api.segments),beforeRoomMove,'Povlačenje unutrašnjosti pomiče prostoriju');
-assert.equal(api.model().faces.length,2);api.undo();assert.equal(JSON.stringify(api.segments),beforeRoomMove);
+const beforeRoomMove=JSON.stringify(api.segments),beforeRoomCamera={scale:api.view.scale,ox:api.view.ox,oy:api.view.oy};drag(150,175,125,200);
+assert.equal(JSON.stringify(api.segments),beforeRoomMove,'Povlačenje unutrašnjosti ne pomiče prostoriju');
+assert.equal(api.model().faces.length,2);assert.deepEqual({scale:api.view.scale,ox:api.view.ox,oy:api.view.oy},beforeRoomCamera,'Povlačenje praznog prostora ne pomiče ni prikaz');
 // Neprekinuti niz: svaki novi dodir dodaje segment i zadržava kraj za nastavak.
 el('clearAll').click();el('clearAll').click();startDrawing();
 click(100,100);click(300,100);click(300,250);click(100,250);

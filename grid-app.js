@@ -64,7 +64,9 @@
   $('toggleWalls').setAttribute('aria-label',wallsVisible?'Sakrij zidove':'Prikaži zidove');
   $('toggleWalls').setAttribute('title',wallsVisible?'Zidovi uključeni':'Zidovi isključeni');
   $('cancel').hidden=!first;
-  $('wallActions').hidden=mode!=='edit'||!selectedWall;
+  const editingWall=mode==='edit'&&!!selectedWall;
+  $('wallActions').hidden=!editingWall;
+  $('mainTools').hidden=editingWall;
   syncDimensionEditor();$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
  }
  function commit(before){
@@ -142,11 +144,12 @@
  function fit(){scale=w/WIDTH;ox=0;oy=0;limitPan();draw();}
  function resize(){
   const width=board.clientWidth,boardHeight=board.clientHeight;if(!width||!boardHeight)return;
-  const oldFit=w/WIDTH,center=w?point(w/2,h/2):{x:WIDTH/2,y:1000},factor=oldFit?scale/oldFit:1;
+  const initial=!w;
   w=width;h=boardHeight;dpr=Math.min(window.devicePixelRatio||1,3);board.width=w*dpr;board.height=h*dpr;
-  // Model ne ovisi o visini prozora: rotacija uređaja ne mijenja prostorije.
-  height=2000;scale=w/WIDTH*Math.max(1,h/w)*factor;
-  ox=oldFit?w/2-center.x*scale:0;oy=oldFit?h/2-center.y*scale:0;limitPan();draw();
+  // Samo prvo otvaranje postavlja prikaz. Tipkovnica, paneli i rotacija ne mijenjaju kameru.
+  height=2000;
+  if(initial){scale=Math.max(w/WIDTH,h/height);ox=0;oy=0;}
+  draw();
  }
  function schedule(){if(frame)return;frame=true;requestAnimationFrame(()=>{frame=false;status();draw();});}
  function tag(x,y,text,color='#24557e',vertical=false,priority=1,dimension=null){pendingTags.push({x,y,text,color,vertical,priority,dimension});}
@@ -260,8 +263,7 @@
   if(pointers.size>1){pinch();return;}
   const endpoint=mode==='edit'?hitHandle(p.x,p.y):null;
   if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
-  const label=mode==='edit'&&dimensionHits.find(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom);
-  if(label){gesture={type:'dimension',id:e.pointerId,start:p,dimension:label.dimension,wall:mode==='edit'?hitWall(p.x,p.y):null};return;}
+  if(mode==='edit'&&dimensionHits.some(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom)){gesture={type:'ignored',id:e.pointerId};return;}
   if(mode==='edit'){
    const wall=hitWall(p.x,p.y);selectedWall=wall;
    if(wall){
@@ -288,12 +290,6 @@
    scale=clamp(gesture.scale*Math.hypot(a.x-b.x,a.y-b.y)/gesture.distance,w/WIDTH,w/WIDTH*25);ox=mid.x-gesture.anchor.x*scale;oy=mid.y-gesture.anchor.y*scale;limitPan();schedule();return;
   }
   if(!gesture||gesture.id!==e.pointerId)return;
-  if(gesture.type==='dimension'&&gesture.wall&&Math.hypot(p.x-gesture.start.x,p.y-gesture.start.y)>9){
-   const wall=gesture.wall,session=wallSession&&['x1','y1','x2','y2'].every(k=>wallSession.current[k]===wall[k])?wallSession:null;
-   gesture={...gesture,type:'wall-move',before:copy(segments),currentWall:wall,beforeSession:wallSession,
-    baseSegments:session?session.baseSegments:copy(segments),baseWall:session?session.baseWall:wall,currentOffset:session?session.offset:0};
-   selectedWall=wall;
-  }
   if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
   else if(gesture.type==='wall-move'){updateWall(p,gesture);}
   else if(gesture.type==='wall-resize'){updateWallLength(p,gesture);}
@@ -308,10 +304,6 @@
   const p=xy(e),last=gesture,wasMulti=last?.type==='pinch'||pointers.size>1;pointers.delete(e.pointerId);
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
   if(wasMulti||last?.type==='remaining'){status();draw();return;}
-  if(last?.type==='dimension'){
-   if(!cancelled&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)openDimension(last.dimension);
-   return;
-  }
   if(last?.type==='room-move'){
    if(cancelled){segments=last.before;selected=last.face.id;status();draw();}
    else {const selection=selected;commit(last.before);selected=selection;status();draw();}
@@ -365,13 +357,6 @@
   $('dimensionValue').value=String(Math.round((editingDimension.end-editingDimension.start)*1000)/1000).replace('.',',');
   $('dimensionThickness').value=String(selectedWall.thickness??RoomGeometry.defaultThickness(model().rooms,selectedWall)).replace('.',',');
   $('dimensionError').textContent='';
- }
- function openDimension(dimension){
-  cancelInteraction();const wall=GridGeometry.wallForDimension(segments,dimension).wall;selectedWall=wall;status();draw();
-  editingDimension={...dimension};editorSelectionKey=JSON.stringify(wall);
-  $('dimensionValue').value=String(Math.round((dimension.end-dimension.start)*1000)/1000).replace('.',',');
-  $('dimensionThickness').value=String(wall.thickness??RoomGeometry.defaultThickness(model().rooms,wall)).replace('.',',');
-  $('dimensionError').textContent='';$('dimensionValue').focus();$('dimensionValue').select();
  }
  $('dimensionForm').addEventListener('submit',e=>{
   e.preventDefault();if(!editingDimension)return;
@@ -428,7 +413,7 @@
    GridGeometry.detectWithDoors(imported); // Provjeri složenost prije zamjene crteža.
    cancelInteraction();const before=copy(segments);segments=imported;
    wallsVisible=data.wallsVisible!==false;selected=null;selectedWall=null;wallSession=null;
-   commit(before);save();resetClear();fit();status('Tlocrt je uvezen · Poništi vraća prethodni crtež');
+   commit(before);save();resetClear();draw();status('Tlocrt je uvezen · Poništi vraća prethodni crtež');
   }catch(error){status('Uvoz nije uspio: '+(error instanceof SyntaxError?'Datoteka nije valjan JSON.':error.message));}
   finally{input.value='';}
  });

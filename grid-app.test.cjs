@@ -4,7 +4,7 @@ let downloadedBlob=null,downloadName=null;
 const gridLines=[],paintCalls=[];let gridStart=null;
 const canvas=new Proxy({fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
- if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
+ if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
 }
 const context=vm.createContext({console,Blob,URL:{createObjectURL(blob){downloadedBlob=blob;return 'blob:test';},revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
@@ -123,6 +123,8 @@ click(250,200);assert.equal(api.first,null);assert.equal(api.segments.length,2);
  await load(JSON.stringify({unit:'cm',segments:[{x1:100,y1:100,x2:400,y2:100,thickness:25}]}));
  assert.equal(api.segments[0].thickness,25,'JSON uvoz čuva debljinu');
  el('saveJson').click();assert.equal(JSON.parse(await downloadedBlob.text()).segments[0].thickness,25,'JSON izvoz čuva debljinu');
+ const cameraBeforeImport={scale:api.view.scale,ox:api.view.ox,oy:api.view.oy};
+ await load(exported);assert.deepEqual({scale:api.view.scale,ox:api.view.ox,oy:api.view.oy},cameraBeforeImport,'Uvoz ne mijenja kameru');
  const beforeBadThickness=JSON.stringify(api.segments);
  await load(JSON.stringify({segments:[{x1:100,y1:100,x2:400,y2:100,thickness:-5}]}));
  assert.equal(JSON.stringify(api.segments),beforeBadThickness,'Neispravna debljina ne mijenja crtež');
@@ -150,51 +152,41 @@ el('topMenu').open=true;context.document.pointerdown({target:{closest:()=>null}}
 el('topMenu').open=true;context.document.pointerdown({target:{closest:()=>el('topMenu')}});assert.equal(el('topMenu').open,true);
 el('topMenu').open=false;
 
-// Dodir stvarno prikazane vanjske kote otvara unos i mijenja spojene zidove.
+// Dimenzije su samo oznake; uređivanje počinje odabirom samog zida.
 el('clearAll').click();el('clearAll').click();el('drawMode').click();
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);
 el('editMode').click();
 const topDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
-assert.ok(topDimension);click((topDimension.left+topDimension.right)/2,(topDimension.top+topDimension.bottom)/2);
-assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionValue').value,'460');
+assert.ok(topDimension);const beforeLabel=JSON.stringify(api.segments);
+click((topDimension.left+topDimension.right)/2,(topDimension.top+topDimension.bottom)/2);
+assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);assert.equal(JSON.stringify(api.segments),beforeLabel);
+click(200,100);assert.ok(api.selection);assert.equal(el('wallActions').hidden,false);
+assert.equal(el('dimensionValue').value,'400');assert.equal(el('dimensionThickness').value,'30');
 const beforeNumber=JSON.stringify(api.segments);
 el('dimensionValue').value='0';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(JSON.stringify(api.segments),beforeNumber);assert.ok(el('dimensionError').textContent);
-el('dimensionValue').value='500,00';el('dimensionForm').submit({preventDefault(){}});
+el('dimensionValue').value='440';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
-assert.ok(api.segments.some(s=>s.x1===640&&s.x2===640),'Vezani vanjski zid pomiče se s novom mjerom');
+assert.ok(api.segments.some(s=>s.x1===640&&s.x2===640));
 api.undo();assert.equal(JSON.stringify(api.segments),beforeNumber);api.redo();
-const beforeCancel=JSON.stringify(api.segments);
-el('editMode').click();const another=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
-click((another.left+another.right)/2,(another.top+another.bottom)/2);el('wallDeselect').click();
-assert.equal(JSON.stringify(api.segments),beforeCancel);assert.equal(el('dimensionError').textContent,'');
-
-// Ručni unos kote pripada načinu Uredi.
-el('editMode').click();const directDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
-click((directDimension.left+directDimension.right)/2,(directDimension.top+directDimension.bottom)/2);
-assert.equal(el('wallActions').hidden,false);
-el('dimensionValue').value='520.0';el('dimensionForm').submit({preventDefault(){}});
-assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
+click(200,100);el('dimensionValue').value='460';el('dimensionForm').submit({preventDefault(){}});
 assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));
-
-// U istom prozoru mijenja se samo debljina, uz nepromijenjene osi i undo/redo.
-el('editMode').click();let thicknessLabel=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
-click((thicknessLabel.left+thicknessLabel.right)/2,(thicknessLabel.top+thicknessLabel.bottom)/2);
-assert.equal(el('dimensionThickness').value,'30');const beforeThickness=JSON.stringify(api.segments);
+const beforeThickness=JSON.stringify(api.segments);
 el('dimensionThickness').value='0';el('dimensionForm').submit({preventDefault(){}});
-assert.equal(JSON.stringify(api.segments),beforeThickness);assert.equal(el('wallActions').hidden,false);
+assert.equal(JSON.stringify(api.segments),beforeThickness);assert.ok(el('dimensionError').textContent);
 el('dimensionThickness').value='50';el('dimensionForm').submit({preventDefault(){}});
-assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
-assert.equal(api.segments.filter(s=>s.thickness===50).length,1);
-assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660),'Sama debljina ne mijenja duljinu osi');
+assert.equal(api.model().faces.length,1);assert.equal(api.segments.filter(s=>s.thickness===50).length,1);
+assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));
 assert.equal(Math.min(...api.model().layout.outer.map(r=>r.y)),150);
 const afterThickness=JSON.stringify(api.segments);api.undo();assert.equal(JSON.stringify(api.segments),beforeThickness);api.redo();assert.equal(JSON.stringify(api.segments),afterThickness);
-// Istodobni unos duljine i debljine daje traženu novu kotu.
-let combinedLabel=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===150);
-click((combinedLabel.left+combinedLabel.right)/2,(combinedLabel.top+combinedLabel.bottom)/2);
-el('dimensionValue').value='600';el('dimensionThickness').value='40';el('dimensionForm').submit({preventDefault(){}});
+click(200,100);el('dimensionValue').value='520';el('dimensionThickness').value='40';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
 assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===160&&e.span[1]-e.span[0]===600));
+// Ni odabrana kota ne otvara drugi editor niti mijenja upisane vrijednosti.
+const selectedLabel=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===200);assert.ok(selectedLabel);
+el('dimensionValue').value='525';click((selectedLabel.left+selectedLabel.right)/2,(selectedLabel.top+selectedLabel.bottom)/2);
+assert.equal(el('dimensionValue').value,'525');assert.ok(api.selection);
+el('wallDeselect').click();assert.equal(el('wallActions').hidden,true);
 
 // Mreža ostaje vidljiva i nakon odabira početka linije.
 el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();
@@ -255,3 +247,25 @@ assert.equal(el('dimensionValue').value,'450');assert.equal(el('dimensionThickne
 assert.ok(api.segments.some(s=>s.thickness===12.5&&s.x2-s.x1===450));
 el('dimensionValue').value='475';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionValue').value,'475');assert.ok(api.segments.some(s=>s.x2-s.x1===475));
+
+// Kamera se ne mijenja zbog uređivanja, tipkovnice, panela ni rotacije.
+const camera=()=>({scale:api.view.scale,ox:api.view.ox,oy:api.view.oy});
+api.zoomAt(2,200,150);const stableCamera=camera();
+for(let i=0;i<5;i++)api.resize();assert.deepEqual(camera(),stableCamera,'Ponavljanje ResizeObservera ne povećava zoom');
+board.clientHeight=450;api.resize();assert.deepEqual(camera(),stableCamera,'Otvaranje tipkovnice ne mijenja kameru');
+board.clientHeight=800;api.resize();assert.deepEqual(camera(),stableCamera);
+board.clientWidth=400;board.clientHeight=800;api.resize();assert.deepEqual(camera(),stableCamera,'Rotacija i promjena širine zadržavaju zoom');
+board.clientWidth=1000;api.resize();assert.deepEqual(camera(),stableCamera);
+el('editMode').click();assert.deepEqual(camera(),stableCamera);
+const wallMid=api.segments[0],screenView=api.view;
+click(screenView.ox+(wallMid.x1+wallMid.x2)/2*screenView.scale,screenView.oy+(wallMid.y1+wallMid.y2)/2*screenView.scale);
+assert.deepEqual(camera(),stableCamera);
+if(api.selection){el('dimensionValue').value='490';el('dimensionForm').submit({preventDefault(){}});assert.deepEqual(camera(),stableCamera);el('wallDeselect').click();assert.deepEqual(camera(),stableCamera);}
+api.zoomAt(.9);assert.notDeepEqual(camera(),stableCamera,'Korisnik i dalje može promijeniti zoom');
+
+// Uređivanje privremeno zamjenjuje glavne alate na dnu.
+el('editMode').click();const toolbarCamera={scale:api.view.scale,ox:api.view.ox,oy:api.view.oy};
+api.fit();const oneWall=api.segments[0],toolView=api.view;
+click(toolView.ox+(oneWall.x1+oneWall.x2)/2*toolView.scale,toolView.oy+(oneWall.y1+oneWall.y2)/2*toolView.scale);
+assert.ok(api.selection);assert.equal(el('wallActions').hidden,false);assert.equal(el('mainTools').hidden,true);
+el('wallDeselect').click();assert.equal(el('wallActions').hidden,true);assert.equal(el('mainTools').hidden,false);

@@ -40,6 +40,7 @@ footer{padding:5px 8px max(5px,env(safe-area-inset-bottom))}.mode-row{display:fl
 
 .wall-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto auto;gap:5px;margin-bottom:6px;padding:6px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px}.wall-actions[hidden]{display:none}.wall-actions button{min-height:36px;padding:5px 7px;border:1px solid #bfdbfe;background:#fff;border-radius:7px;color:#1e40af;font:inherit;font-size:11px;font-weight:650}#wallDelete{color:#475569;border-color:#cbd5e1}#wallDeselect{padding-inline:9px}
 .wall-actions{display:block;padding:6px}.dimension-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 30px auto 28px;gap:5px;align-items:end}.dimension-fields label{font-size:10px;font-weight:650;color:#1e40af;min-width:0}.dimension-fields input{display:block;width:100%;min-width:0;margin-top:3px;padding:7px 5px;border:1px solid #93c5fd;border-radius:7px;background:#fff;color:#162335;font:inherit;font-size:16px}.dimension-fields button{padding-inline:6px}#dimensionError{margin:5px 0 0;font-size:11px;color:#b91c1c}#dimensionError:empty{display:none}
+.mode-row[hidden]{display:none}.wall-actions{margin-bottom:0}
 </style>
 </head>
 <body>
@@ -72,12 +73,12 @@ footer{padding:5px 8px max(5px,env(safe-area-inset-bottom))}.mode-row{display:fl
   </form>
   <p id="dimensionError" role="alert"></p>
  </div>
- <div class="mode-row"><button id="toggleWalls" aria-label="Sakrij zidove" aria-pressed="true" title="Zidovi uključeni"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4 24V4h20v20h-7v-4h3V8H8v12h4v4H4Z" fill="currentColor"/><path d="M14 8v5h6M8 16h6v4" stroke="currentColor" stroke-width="3"/><path class="wall-off" d="M3 3l22 22" stroke-width="2.5" stroke-linecap="round"/></svg></button><button id="drawMode" class="tool" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button><button id="editMode" class="tool active" aria-pressed="true">Uredi</button><button id="cancel" class="cancel" hidden aria-label="Završi crtanje" title="Završi crtanje">✓</button></div>
+ <div id="mainTools" class="mode-row"><button id="toggleWalls" aria-label="Sakrij zidove" aria-pressed="true" title="Zidovi uključeni"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4 24V4h20v20h-7v-4h3V8H8v12h4v4H4Z" fill="currentColor"/><path d="M14 8v5h6M8 16h6v4" stroke="currentColor" stroke-width="3"/><path class="wall-off" d="M3 3l22 22" stroke-width="2.5" stroke-linecap="round"/></svg></button><button id="drawMode" class="tool" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button><button id="editMode" class="tool active" aria-pressed="true">Uredi</button><button id="cancel" class="cancel" hidden aria-label="Završi crtanje" title="Završi crtanje">✓</button></div>
  <div id="roomArea" hidden></div>
  <span id="status" class="status" role="status" hidden></span>
 </footer>
-<script src="room-geometry.js?v=20261027-28"></script>
-<script src="grid-geometry.js?v=20261027-28"></script>
-<script src="grid-app.js?v=20261027-28"></script>
+<script src="room-geometry.js?v=20261027-30"></script>
+<script src="grid-geometry.js?v=20261027-30"></script>
+<script src="grid-app.js?v=20261027-30"></script>
 </body>
 </html>

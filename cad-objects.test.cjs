@@ -48,7 +48,7 @@ assert.throws(()=>C.createTemplate(grouped,grouped.map(item=>item.id),' '));asse
 for(const angle of [0,90,180,270]){
  const a={...C.create('door',500,500),rotation:angle},b={...C.create('desk',800,650),rotation:90};
  const input=[a,b],ids=input.map(o=>o.id),mirrored=C.mirror(input,ids),box=C.selectionBounds(input);
- assert.equal(mirrored[0].x,a.x);assert.equal(mirrored[0].y,2*box.y-a.y);assert.equal(mirrored[0].rotation,((540-angle)%360));assert.equal(mirrored[0].mirrored,true);
+ const nx=Math.round(Math.cos(angle*Math.PI/180)),ny=Math.round(Math.sin(angle*Math.PI/180)),distance=(a.x-box.x)*nx+(a.y-box.y)*ny;assert.equal(mirrored[0].x,a.x-2*distance*nx);assert.equal(mirrored[0].y,a.y-2*distance*ny);assert.equal(mirrored[0].rotation,angle);assert.equal(mirrored[1].rotation,((2*angle-b.rotation+360)%360));assert.equal(mirrored[0].mirrored,true);
  assert.deepEqual(C.selectionBounds(mirrored),box);assert.deepEqual(C.mirror(mirrored,ids),input);
  assert.deepEqual(C.validate(JSON.parse(JSON.stringify(mirrored))),mirrored);
  assert.equal(C.duplicate(mirrored,ids).items[2].mirrored,true);
@@ -92,4 +92,10 @@ const handleDoor=C.create('door',500,500),deepDoor=C.resizeFromHandle([handleDoo
 {
  const oldWall={x1:100,y1:100,x2:700,y2:100},edgeWall={...oldWall,y1:0,y2:0},door=C.create('door',300,100);
  const followed=C.followWallOpenings([door],[oldWall],[edgeWall],{from:oldWall,to:edgeWall});assert.equal(followed[0].y,0);assert.equal(followed[0].rotation,180);assert.equal(C.validate(followed).length,1);
+}
+
+// Mirroring a single item always flips its own width without changing angle or position.
+for(const angle of [0,90,180,270]){
+ const item={...C.create('desk',700,800),rotation:angle},other=C.create('chair',1000,1000),mirrored=C.mirror([item,other],[item.id]);
+ assert.equal(mirrored[0].rotation,angle);assert.equal(mirrored[0].x,item.x);assert.equal(mirrored[0].y,item.y);assert.equal(mirrored[0].width,item.width);assert.equal(mirrored[0].depth,item.depth);assert.equal(mirrored[0].mirrored,true);assert.deepEqual(mirrored[1],other);assert.deepEqual(C.mirror(mirrored,[item.id]),[item,other]);
 }

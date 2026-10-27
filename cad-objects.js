@@ -80,13 +80,14 @@ globalThis.CadObjects=(()=>{
   const turned=constrain(group.map(item=>({...item,x:center.x-(item.y-center.y),y:center.y+(item.x-center.x),rotation:rotation(item.rotation+90)})));
   const map=new Map(turned.map(item=>[item.id,item]));return items.map(item=>map.get(item.id)||{...item});
  }
- // Reflect across the horizontal axis of the selection, including each CAD symbol.
+ // Mirror in the local width direction; the selected object/group frame rotates with it.
  function mirror(items,ids){
   const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);
-  const center=group.length===1?group[0]:selectionBounds(group);
+  const center=group.length===1?group[0]:selectionBounds(group),angle=group[0].rotation,c=Math.round(Math.cos(angle*Math.PI/180)),s=Math.round(Math.sin(angle*Math.PI/180));
   return items.map(item=>{
    if(!selected.has(item.id))return {...item};
-   const reflected={...item,y:2*center.y-item.y,rotation:rotation(180-item.rotation)};
+   const distance=(item.x-center.x)*c+(item.y-center.y)*s;
+   const reflected={...item,x:item.x-2*distance*c,y:item.y-2*distance*s,rotation:rotation(2*angle-item.rotation)};
    if(item.mirrored)delete reflected.mirrored;else reflected.mirrored=true;
    return reflected;
   });

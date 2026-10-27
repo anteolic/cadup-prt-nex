@@ -448,3 +448,10 @@ assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1<400));assert.ok(api
 api.undo();assert.equal(JSON.stringify(api.segments),beforeSpanErase);click(450,400);assert.equal(JSON.stringify(api.segments),beforeSpanErase);
 board.pointerdown(event(150,100));board.pointermove(event(150,150));board.pointerup(event(150,100));assert.equal(JSON.stringify(api.segments),beforeSpanErase,'Povlačenje ne briše');
 board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),beforeSpanErase);el('eraseMode').click();assert.equal(api.mode,'edit');
+
+// Potvrđeni čvor na križanju je vidljiv i ima prednost pri snap-u.
+el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();click(200,100);el('dimensionValue').value='333';el('dimensionForm').submit({preventDefault(){}});
+line(100,300,400,300);startDrawing();click(270.5,200);click(270.5,450);finishDrawing();
+assert.ok(api.model().junctions.some(n=>n.x===533&&n.y===600&&n.degree===4));
+startDrawing();const junctionSnap=api.snap(275.5,309);assert.equal(junctionSnap.x,533);assert.equal(junctionSnap.y,600);
+paintCalls.length=0;api.draw();assert.ok(paintCalls.some(p=>p.color==='#dc2626'),'Spoj je označen crvenim kružićem');click(275.5,309);assert.equal(api.first.x,533);assert.equal(api.first.y,600);finishDrawing();

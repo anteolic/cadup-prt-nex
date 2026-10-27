@@ -69,7 +69,7 @@
  }
  function model(){
   const key=JSON.stringify(segments);
-  if(cachedKey!==key){const detected=GridGeometry.detectWithDoors(segments),layout=RoomGeometry.layout(detected.rooms,segments);const wallOutlines=layout.wallGroups.map(boxes=>RoomGeometry.union(boxes));cached={...detected,layout,wallOutline:{area:RoomGeometry.union([...layout.outer,...layout.inner]).area,edges:wallOutlines.flatMap(outline=>outline.edges)}};cachedKey=key;}
+  if(cachedKey!==key){const detected=GridGeometry.detectWithDoors(segments),layout=RoomGeometry.layout(detected.rooms,segments);const wallOutlines=layout.wallGroups.map(boxes=>RoomGeometry.union(boxes));cached={...detected,layout,junctions:GridGeometry.junctions(segments),wallOutline:{area:RoomGeometry.union([...layout.outer,...layout.inner]).area,edges:wallOutlines.flatMap(outline=>outline.edges)}};cachedKey=key;}
   return cached;
  }
  const point=(x,y)=>({x:(x-ox)/scale,y:(y-oy)/scale});
@@ -100,6 +100,12 @@
   g.strokeStyle='#dc2626';g.lineWidth=1.5;g.setLineDash([7,5]);g.beginPath();
   for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();g.setLineDash([]);
  }
+ function drawJoinedNodes(){
+  if(mode!=='draw'&&mode!=='erase'&&!selectedWall)return;
+  g.save();g.globalAlpha=1;
+  for(const node of model().junctions){const p=screen(node);g.beginPath();g.arc(p.x,p.y,clamp(3.2*handleScale(),3.2,5),0,Math.PI*2);g.fillStyle='#dc2626';g.fill();g.strokeStyle='#fff';g.lineWidth=.8;g.stroke();}
+  g.restore();
+ }
  function snap(x,y){
   const raw=point(x,y),unit=step();
   let q=snapAlignment(raw,{x:clamp(Math.round(raw.x/unit)*unit,0,WIDTH),y:clamp(Math.round(raw.y/unit)*unit,0,height)}),distance=14;
@@ -111,6 +117,7 @@
    if(s.y1===s.y2&&q.x>=s.x1&&q.x<=s.x2&&Math.abs(raw.y-s.y1)*scale<9)q.y=s.y1;
    if(s.x1===s.x2&&q.y>=s.y1&&q.y<=s.y2&&Math.abs(raw.x-s.x1)*scale<9)q.x=s.x1;
   }
+  let nodeDistance=14;for(const node of model().junctions){const d=Math.hypot(raw.x-node.x,raw.y-node.y)*scale;if(d<nodeDistance){nodeDistance=d;q={x:node.x,y:node.y};}}
   return q;
  }
  function second(x,y,axis=null){
@@ -184,6 +191,11 @@
   for(const s of input){
    if(['x1','y1','x2','y2'].every(k=>s[k]===wall[k]))continue;
    for(const n of [1,2]){const value=s[axis+n],d=Math.abs(raw-value)*scale;if(d<distance){distance=d;target=value;}}
+  }
+  const h=wall.y1===wall.y2,along=h?'x':'y',other=axis==='x'?'y':'x';let nodeDistance=14;
+  for(const node of GridGeometry.junctions(input)){
+   const aligned=axis===along?node[other]===(h?wall.y1:wall.x1):node[other]>=wall[other+'1']&&node[other]<=wall[other+'2'];
+   const d=Math.abs(raw-node[axis])*scale;if(aligned&&d<nodeDistance){nodeDistance=d;target=node[axis];}
   }
   return target;
  }
@@ -341,7 +353,7 @@
   }
   g.globalAlpha=1;
   if(objectIds.size>1){const box=CadObjects.selectionBounds(objects.filter(item=>objectIds.has(item.id)));if(box){g.strokeStyle='#2563eb';g.lineWidth=1.5;g.setLineDash([5,4]);g.strokeRect(ox+box.left*scale,oy+box.top*scale,box.width*scale,box.depth*scale);g.setLineDash([]);}}
-  paintTags();g.restore();g.globalAlpha=1;
+  drawJoinedNodes();paintTags();g.restore();g.globalAlpha=1;
  }
  const xy=e=>{const r=board.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
  function pinch(){

@@ -105,6 +105,11 @@ globalThis.GridGeometry=(()=>{
   }
   return result;
  }
+ function junctions(input){
+  const nodes=new Map();
+  for(const s of atomic(input))for(const n of [1,2]){const x=s['x'+n],y=s['y'+n],key=x+':'+y;if(!nodes.has(key))nodes.set(key,{x,y,degree:0});nodes.get(key).degree++;}
+  return [...nodes.values()].filter(node=>node.degree>=2);
+ }
  function eraseLine(input,stroke){
   const h=stroke.y1===stroke.y2,line=h?stroke.y1:stroke.x1;
   const start=h?Math.min(stroke.x1,stroke.x2):Math.min(stroke.y1,stroke.y2),end=h?Math.max(stroke.x1,stroke.x2):Math.max(stroke.y1,stroke.y2);
@@ -231,5 +236,5 @@ globalThis.GridGeometry=(()=>{
   }
   return {segments:normalize(result),dx,dy};
  }
- return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,wallForDimension,setWallThickness,resizeDimension,resizeWall,moveWall,moveRoom};
+ return {normalize,erase,detect,detectWithDoors,atomic,junctions,eraseLine,wallForDimension,setWallThickness,resizeDimension,resizeWall,moveWall,moveRoom};
 })();

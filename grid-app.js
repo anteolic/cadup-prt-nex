@@ -65,6 +65,7 @@
   $('toggleWalls').setAttribute('title',wallsVisible?'Zidovi uključeni':'Zidovi isključeni');
   const editingWall=mode==='edit'&&!!selectedWall;
   $('wallActions').hidden=!editingWall;
+  $('editorFooter').hidden=!editingWall;
   $('mainTools').hidden=false;
   syncDimensionEditor();$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
  }

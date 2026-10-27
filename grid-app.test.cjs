@@ -306,3 +306,10 @@ const reloadUrl=new URL(context.window.location.href);
 assert.equal(reloadUrl.pathname,'/cadup-prt-nex/CADup.html');assert.equal(reloadUrl.hash,'#drawing');assert.equal(reloadUrl.searchParams.get('mode'),'test');
 assert.ok(Number(reloadUrl.searchParams.get('v'))>39);assert.equal(JSON.stringify(api.segments),beforeReload);
 assert.equal(JSON.stringify(JSON.parse(memory.get('infoa_grid_loops_v1')).segments),beforeReload);
+
+// Dolje se prikazuje samo editor odabranog zida; glavni alati ostaju dostupni gore.
+enterEdit();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainTools').hidden,false);
+api.fit();const footerWall=api.segments[0],footerView=api.view;
+click(footerView.ox+(footerWall.x1+footerWall.x2)/2*footerView.scale,footerView.oy+(footerWall.y1+footerWall.y2)/2*footerView.scale);
+assert.ok(api.selection);assert.equal(el('editorFooter').hidden,false);assert.equal(el('mainTools').hidden,false);
+deselect();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainTools').hidden,false);

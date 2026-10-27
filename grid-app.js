@@ -52,7 +52,7 @@
   return horizontal?{x:q.x,y:first.y}:{x:first.x,y:q.y};
  }
  const lengthText=cm=>cm.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm';
- function resetClear(){clearArmed=false;$('clearAll').textContent='Briši';$('clearAll').classList.remove('armed');}
+ function resetClear(){clearArmed=false;$('clearAll').textContent='Briši sve';$('clearAll').classList.remove('armed');}
  function status(message){
   $('status').textContent=message||'';
   $('status').hidden=!message;

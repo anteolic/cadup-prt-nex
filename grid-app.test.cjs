@@ -182,10 +182,8 @@ const afterThickness=JSON.stringify(api.segments);api.undo();assert.equal(JSON.s
 click(200,100);el('dimensionValue').value='520';el('dimensionThickness').value='40';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
 assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===160&&e.span[1]-e.span[0]===600));
-// Ni odabrana kota ne otvara drugi editor niti mijenja upisane vrijednosti.
-const selectedLabel=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===200);assert.ok(selectedLabel);
-el('dimensionValue').value='525';click((selectedLabel.left+selectedLabel.right)/2,(selectedLabel.top+selectedLabel.bottom)/2);
-assert.equal(el('dimensionValue').value,'525');assert.ok(api.selection);
+// Odabir zida ne dodaje naglašenu kotu uz postojeća donja polja.
+assert.ok(!api.dimensions.some(r=>r.dimension.axis==='h'&&r.dimension.line===200));
 el('wallDeselect').click();assert.equal(el('wallActions').hidden,true);
 
 // Mreža ostaje vidljiva i nakon odabira početka linije.

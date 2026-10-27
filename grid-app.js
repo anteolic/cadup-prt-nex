@@ -231,7 +231,6 @@
    g.strokeStyle='#fff';g.lineWidth=1.6;g.lineCap='round';g.lineJoin='round';g.beginPath();
    g.moveTo(-7,0);g.lineTo(7,0);g.moveTo(-3,-3);g.lineTo(-7,0);g.lineTo(-3,3);
    g.moveTo(3,-3);g.lineTo(7,0);g.lineTo(3,3);g.stroke();g.restore();
-   const center=visibleWallCenter(selectedWall);if(center)tag(center.x+(horizontal?0:20),center.y+(horizontal?-20:0),lengthText(horizontal?selectedWall.x2-selectedWall.x1:selectedWall.y2-selectedWall.y1),'#1d4ed8',!horizontal,5,{axis:horizontal?'h':'v',line:horizontal?selectedWall.y1:selectedWall.x1,start:horizontal?selectedWall.x1:selectedWall.y1,end:horizontal?selectedWall.x2:selectedWall.y2});
   }
   if(first){
    const color='#1675d1';

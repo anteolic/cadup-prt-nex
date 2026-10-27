@@ -20,7 +20,7 @@ line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);
 assert.equal(api.model().faces.length,0);line(100,250,100,100);
 assert.equal(api.model().faces.length,1);assert.equal(api.model().faces[0].area,120000);
 assert.ok(!labels.some(t=>t.startsWith('Prostorija ')));assert.ok(!labels.some(t=>t.includes('m²')));
-assert.ok(labels.some(t=>t.includes('m')),'Duljine zidova ostaju vidljive');
+assert.ok(labels.some(t=>t.endsWith(' cm')),'Duljine zidova ostaju vidljive');
 assert.equal(el('roomArea').textContent,'');
 line(200,100,200,250);assert.equal(api.model().faces.length,2);assert.equal(api.model().layout.inner[0].width,10);
 el('toggleWalls').click();assert.equal(api.visible,false);assert.equal(api.model().faces.length,2);
@@ -34,7 +34,7 @@ line(150,100,175,100);assert.equal(api.model().faces.length,0);api.undo();assert
 const count=JSON.stringify(api.segments);board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),count);
 // Isti stari način podešavanja: klizanje gore-dolje mijenja duljinu vodoravnog poteza.
 el('drawMode').click();click(350,300);board.pointerdown(event(450,300));board.pointermove(event(450,275));
-api.draw();assert.ok(labels.includes('2,50 m'));board.pointerup(event(450,275));
+api.draw();assert.ok(labels.includes('250 cm'));board.pointerup(event(450,275));
 assert.ok(api.segments.some(s=>s.x1===700&&s.x2===950&&s.y1===600&&s.y2===600));
 // Klik izvan čvora sjeda na običnu mrežu.
 const snapped=api.snap(413,333);assert.equal(snapped.x%api.step(),0);assert.equal(snapped.y%api.step(),0);
@@ -149,11 +149,11 @@ line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,1
 el('editMode').click();
 const topDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
 assert.ok(topDimension);click((topDimension.left+topDimension.right)/2,(topDimension.top+topDimension.bottom)/2);
-assert.equal(el('dimensionDialog').open,true);assert.equal(el('dimensionValue').value,'4,6');
+assert.equal(el('dimensionDialog').open,true);assert.equal(el('dimensionValue').value,'460');
 const beforeNumber=JSON.stringify(api.segments);
 el('dimensionValue').value='0';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(JSON.stringify(api.segments),beforeNumber);assert.ok(el('dimensionError').textContent);
-el('dimensionValue').value='5,00';el('dimensionForm').submit({preventDefault(){}});
+el('dimensionValue').value='500,00';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.length,1);
 assert.ok(api.segments.some(s=>s.x1===640&&s.x2===640),'Vezani vanjski zid pomiče se s novom mjerom');
 api.undo();assert.equal(JSON.stringify(api.segments),beforeNumber);api.redo();
@@ -166,6 +166,6 @@ assert.equal(JSON.stringify(api.segments),beforeCancel);assert.equal(el('dimensi
 el('drawMode').click();const directDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
 click((directDimension.left+directDimension.right)/2,(directDimension.top+directDimension.bottom)/2);
 assert.equal(el('dimensionDialog').open,true);
-el('dimensionValue').value='5.2';el('dimensionForm').submit({preventDefault(){}});
+el('dimensionValue').value='520.0';el('dimensionForm').submit({preventDefault(){}});
 assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.length,1);
 assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));

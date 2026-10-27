@@ -51,7 +51,7 @@
   const raw=point(x,y),q=snap(x,y),horizontal=axis?axis==='h':Math.abs(raw.x-first.x)>=Math.abs(raw.y-first.y);
   return horizontal?{x:q.x,y:first.y}:{x:first.x,y:q.y};
  }
- const lengthText=cm=>cm>=100?(cm/100).toLocaleString('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m':cm.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm';
+ const lengthText=cm=>cm.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm';
  function resetClear(){clearArmed=false;$('clearAll').textContent='Briši';$('clearAll').classList.remove('armed');}
  function status(message){
   $('status').textContent=message||'';
@@ -344,13 +344,13 @@
  });
  function openDimension(dimension){
   cancelInteraction();editingDimension={...dimension};
-  $('dimensionValue').value=String(Math.round((dimension.end-dimension.start)*1000)/100000).replace('.',',');
+  $('dimensionValue').value=String(Math.round((dimension.end-dimension.start)*1000)/1000).replace('.',',');
   $('dimensionError').textContent='';$('dimensionDialog').showModal();$('dimensionValue').focus();$('dimensionValue').select();
  }
  $('dimensionForm').addEventListener('submit',e=>{
   e.preventDefault();if(!editingDimension)return;
   const text=$('dimensionValue').value.trim().replace(',','.');
-  const value=/^\d+(?:\.\d+)?$/.test(text)?Number(text)*100:NaN;
+  const value=/^\d+(?:\.\d+)?$/.test(text)?Number(text):NaN;
   try{
    const updated=GridGeometry.resizeDimension(segments,editingDimension,value,MIN,WIDTH,height);
    GridGeometry.detectWithDoors(updated);

@@ -26,15 +26,5 @@ const rotated=C.rotate([sofa],[sofa.id]);assert.equal(rotated[0].rotation,90);as
 const groupRotation=C.rotate(grouped,grouped.map(item=>item.id));assert.ok(groupRotation.every(item=>item.rotation===90));
 assert.equal(C.selectionBounds(groupRotation).width,C.selectionBounds(grouped).depth);assert.equal(C.selectionBounds(groupRotation).depth,C.selectionBounds(grouped).width);
 let fullTurn=[sofa];for(let i=0;i<4;i++)fullTurn=C.rotate(fullTurn,[sofa.id]);assert.deepEqual(fullTurn,[sofa],'Četiri klika vraćaju početni položaj');
-const handleItem={id:'handle-test',kind:'table',x:500,y:500,width:200,depth:100,rotation:0,group:null},handleBefore=C.bounds(handleItem);
-for(const handle of ['n','ne','e','se','s','sw','w','nw']){
- const resized=C.resizeHandle([handleItem],[handleItem.id],handle,handle.includes('w')?-40:40,handle.includes('n')?-30:30)[0],box=C.bounds(resized);
- if(handle.includes('w'))assert.equal(box.right,handleBefore.right);if(handle.includes('e'))assert.equal(box.left,handleBefore.left);
- if(handle.includes('n'))assert.equal(box.bottom,handleBefore.bottom);if(handle.includes('s'))assert.equal(box.top,handleBefore.top);
-}
-const rotatedHandle=C.resizeHandle([{...handleItem,rotation:90}],[handleItem.id],'e',50,0)[0];assert.equal(rotatedHandle.width,200);assert.equal(rotatedHandle.depth,150,'Ručka poštuje zakret elementa');
-const resizedGroup=C.resizeHandle(grouped,grouped.map(item=>item.id),'nw',-50,-50),beforeGroupBox=C.selectionBounds(grouped),afterGroupBox=C.selectionBounds(resizedGroup);
-assert.ok(Math.abs(afterGroupBox.right-beforeGroupBox.right)<1e-6);assert.ok(Math.abs(afterGroupBox.bottom-beforeGroupBox.bottom)<1e-6);assert.ok(Math.abs(afterGroupBox.width-beforeGroupBox.width-50)<1e-6);
-assert.ok(C.resizeHandle([handleItem],[handleItem.id],'nw',5000,5000)[0].width>=5);
 for(const kind of ['base-cabinet','drawer-cabinet','corner-cabinet','sink-cabinet','wall-cabinet','tall-cabinet','oven','dishwasher'])assert.ok(C.definition(kind)&&!C.definition(kind).hidden);
 assert.equal(C.definition('kitchen').hidden,true,'Stari kuhinjski niz ostaje kompatibilan, ali nije u novoj biblioteci');

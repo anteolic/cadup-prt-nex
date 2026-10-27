@@ -102,7 +102,7 @@
   first=mode==='draw'?{...end}:null;preview=first;commit(before);
  }
  function undo(){
-  if(gesture?.type==='object-move'||gesture?.type==='object-resize'||gesture?.type==='wall-move'||gesture?.type==='wall-resize'){cancelInteraction();return;}
+  if(gesture?.type==='object-move'||gesture?.type==='wall-move'||gesture?.type==='wall-resize'){cancelInteraction();return;}
   first=null;preview=null;
   if(!past.length){status();draw();return;}future.push(snapshot());restoreSnapshot(past.pop());selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
@@ -118,19 +118,6 @@
   }return solid||best;
  }
  function handleScale(){return clamp(Math.sqrt(scale/(w/WIDTH)),1,2.5);}
- function objectResizeHandles(){
-  if(mode!=='edit'||!objectIds.size||objectMulti)return [];
-  const box=CadObjects.selectionBounds(objects.filter(item=>objectIds.has(item.id)));if(!box)return [];
-  const points=[['nw',box.left,box.top],['ne',box.right,box.top],['se',box.right,box.bottom],['sw',box.left,box.bottom]];
-  if(Math.min(box.width,box.depth)*scale>=36){
-   if(box.width*scale>=70)points.push(['n',box.x,box.top],['s',box.x,box.bottom]);
-   if(box.depth*scale>=70)points.push(['w',box.left,box.y],['e',box.right,box.y]);
-  }
-  return points.map(([handle,x,y])=>({handle,...screen({x,y}),radius:Math.min(18*handleScale(),Math.max(8,Math.min(box.width,box.depth)*scale/3))}));
- }
- function hitObjectResize(x,y){
-  let best=null,distance=Infinity;for(const handle of objectResizeHandles()){const d=Math.hypot(x-handle.x,y-handle.y);if(d<=handle.radius&&d<distance){distance=d;best=handle;}}return best;
- }
  function hitMoveHandle(x,y){
   if(!selectedWall)return false;
   const p=screen({x:(selectedWall.x1+selectedWall.x2)/2,y:(selectedWall.y1+selectedWall.y2)/2}),horizontal=selectedWall.y1===selectedWall.y2,factor=handleScale();
@@ -159,7 +146,7 @@
   segments=moved.segments;selectedWall=moved.wall;drag.currentWall=moved.wall;drag.currentOffset=moved.delta;schedule();
  }
  function cancelInteraction(){
-  if(gesture?.type==='object-move'||gesture?.type==='object-resize')restoreSnapshot(gesture.before);
+  if(gesture?.type==='object-move')restoreSnapshot(gesture.before);
   if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
   gesture=null;pointers.clear();first=null;preview=null;status();draw();
  }
@@ -292,7 +279,6 @@
   if(objectIds.size){
    const box=CadObjects.selectionBounds(objects.filter(item=>objectIds.has(item.id)));
    if(box){g.strokeStyle='#2563eb';g.lineWidth=1.5;g.setLineDash([]);g.strokeRect(ox+box.left*scale,oy+box.top*scale,box.width*scale,box.depth*scale);}
-   for(const handle of objectResizeHandles()){const r=5*handleScale();g.beginPath();g.roundRect(handle.x-r,handle.y-r,r*2,r*2,2);g.fillStyle='#fff';g.fill();g.strokeStyle='#2563eb';g.lineWidth=2;g.stroke();}
   }
   paintTags();g.restore();g.globalAlpha=1;
  }
@@ -300,7 +286,7 @@
  function pinch(){
   const [a,b]=[...pointers.values()];if(!b)return;
   if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
-  if(gesture?.type==='object-move'||gesture?.type==='object-resize'){const ids=gesture.ids;restoreSnapshot(gesture.before);objectIds=new Set(ids);}
+  if(gesture?.type==='object-move'){const ids=gesture.ids;restoreSnapshot(gesture.before);objectIds=new Set(ids);}
   const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};gesture={type:'pinch',distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),scale,anchor:point(mid.x,mid.y)};
  }
  function adjust(p,drag){
@@ -318,8 +304,6 @@
   const p=xy(e);pointers.set(e.pointerId,p);resetClear();
   if(pointers.size>1){pinch();return;}
   if(mode==='edit'){
-   const handle=hitObjectResize(p.x,p.y);
-   if(handle){gesture={type:'object-resize',id:e.pointerId,start:p,handle:handle.handle,before:snapshot(),ids:[...objectIds]};return;}
    const raw=point(p.x,p.y),item=CadObjects.hit(objects,raw.x,raw.y);
    if(item){
     const ids=CadObjects.expandedSelection(objects,[item.id]);
@@ -354,10 +338,7 @@
    scale=clamp(gesture.scale*Math.hypot(a.x-b.x,a.y-b.y)/gesture.distance,w/WIDTH,w/WIDTH*25);ox=mid.x-gesture.anchor.x*scale;oy=mid.y-gesture.anchor.y*scale;limitPan();schedule();return;
   }
   if(!gesture||gesture.id!==e.pointerId)return;
-  if(gesture.type==='object-resize'){
-   objects=CadObjects.resizeHandle(gesture.before.objects,gesture.ids,gesture.handle,Math.round((p.x-gesture.start.x)/scale),Math.round((p.y-gesture.start.y)/scale));schedule();
-  }
-  else if(gesture.type==='object-move'){
+  if(gesture.type==='object-move'){
    let moved=CadObjects.move(gesture.before.objects,gesture.ids,Math.round((p.x-gesture.start.x)/scale/5)*5,Math.round((p.y-gesture.start.y)/scale/5)*5);
    if(gesture.ids.length===1)moved=moved.map(item=>item.id===gesture.ids[0]?CadObjects.attach(item,segments):item);
    objects=moved;schedule();
@@ -376,7 +357,7 @@
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
   if(wasMulti||last?.type==='remaining'){status();draw();return;}
   if(last?.type==='object-select')return;
-  if(last?.type==='object-move'||last?.type==='object-resize'){
+  if(last?.type==='object-move'){
    if(cancelled){restoreSnapshot(last.before);objectIds=new Set(last.ids);status();draw();}
    else commitObjects(last.before,last.ids);
    return;

@@ -46,11 +46,15 @@ header{flex-wrap:wrap}header #mainTools{display:flex;flex:0 0 auto;gap:4px;margi
 .menu-panel #reloadApp{grid-column:1 / -1}
 footer[hidden]{display:none}#editorFooter .wall-actions{margin:0}
 #editorFooter{position:fixed;left:0;right:0;bottom:0;z-index:20;box-shadow:0 -3px 16px #1623351a;padding-bottom:max(5px,env(safe-area-inset-bottom))}#editorFooter[hidden]{display:none}
+
+.object-menu{flex:none}.object-menu>summary{display:flex;align-items:center;justify-content:center;list-style:none;width:32px;height:28px;padding:3px;border:1px solid #cbd5e1;border-radius:7px;color:#1e40af;background:#f2f6fb;cursor:pointer}.object-menu>summary::-webkit-details-marker{display:none}.object-menu>summary svg{width:22px;height:22px}.object-menu[open]>summary{background:#dbeafe;border-color:#2563eb}
+.object-library{position:fixed;left:8px;top:max(42px,calc(env(safe-area-inset-top) + 38px));width:min(340px,calc(100vw - 16px));max-height:65dvh;overflow:auto;padding:8px;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 8px 24px #16233526;z-index:30}.catalog-category>summary{font-size:13px;font-weight:700;padding:10px 6px;cursor:pointer}.catalog-subcategory{margin:0 0 3px 10px}.catalog-subcategory>summary{font-size:12px;padding:8px 5px;cursor:pointer}.catalog-items{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:4px}.catalog-items button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px 8px;text-align:left;border:1px solid #dbe2eb;border-radius:8px;background:#f8fafc;color:#24354c;font-size:12px}.catalog-items small{font-size:10px;color:#64748b}
+.object-actions[hidden]{display:none}.object-title{font-size:11px;color:#1e40af;font-weight:650;margin:0 0 5px}.object-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 66px 32px;gap:5px;align-items:end}.object-fields label{font-size:10px;color:#1e40af;font-weight:650;min-width:0}.object-fields input,.object-fields select{display:block;width:100%;min-width:0;margin-top:3px;padding:6px;border:1px solid #93c5fd;border-radius:7px;background:white;color:#162335;font-size:16px}.object-actions button{min-height:34px;padding:5px 8px;border:1px solid #bfdbfe;border-radius:7px;background:#fff;color:#1e40af;font:inherit;font-size:11px;font-weight:650}.object-buttons{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}.object-buttons button{flex:1;padding-inline:5px}.object-buttons #objectDelete{background:#fff1f2;border-color:#fecaca;color:#b91c1c}#objectMulti.active{background:#dbeafe;border-color:#2563eb}#objectError{font-size:11px;color:#b91c1c;margin:5px 0 0}#objectError:empty{display:none}
 </style>
 </head>
 <body>
 <header>
- <div id="mainTools" class="mode-row"><button id="toggleWalls" aria-label="Sakrij zidove" aria-pressed="true" title="Zidovi uključeni"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4 24V4h20v20h-7v-4h3V8H8v12h4v4H4Z" fill="currentColor"/><path d="M14 8v5h6M8 16h6v4" stroke="currentColor" stroke-width="3"/><path class="wall-off" d="M3 3l22 22" stroke-width="2.5" stroke-linecap="round"/></svg></button><button id="drawMode" class="tool" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button></div>
+ <div id="mainTools" class="mode-row"><button id="toggleWalls" aria-label="Sakrij zidove" aria-pressed="true" title="Zidovi uključeni"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4 24V4h20v20h-7v-4h3V8H8v12h4v4H4Z" fill="currentColor"/><path d="M14 8v5h6M8 16h6v4" stroke="currentColor" stroke-width="3"/><path class="wall-off" d="M3 3l22 22" stroke-width="2.5" stroke-linecap="round"/></svg></button><button id="drawMode" class="tool" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button><details id="objectMenu" class="object-menu"><summary title="Dodaj element" aria-label="Dodaj namještaj, vrata, prozore ili stepenice"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 6 9-4 9 4v12l-9 4-9-4V6Zm0 0 9 4 9-4M12 10v12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 11v6m-3-3h6" stroke="currentColor" stroke-width="1.8"/></svg></summary><div id="objectLibrary" class="object-library"></div></details></div>
  <div class="brand"><strong>CADup</strong></div>
  <button id="undo" class="top-action" title="Poništi" aria-label="Poništi">↶</button>
  <button id="redo" class="top-action" title="Vrati" aria-label="Vrati">↷</button>
@@ -81,9 +85,21 @@ footer[hidden]{display:none}#editorFooter .wall-actions{margin:0}
   </form>
   <p id="dimensionError" role="alert"></p>
  </div>
+ <div id="objectActions" class="object-actions" hidden>
+  <div id="objectTitle" class="object-title"></div>
+  <form id="objectForm" class="object-fields">
+   <label>Širina (cm)<input id="objectWidth" type="text" inputmode="decimal" required></label>
+   <label>Dubina (cm)<input id="objectDepth" type="text" inputmode="decimal" required></label>
+   <label>Zakret<select id="objectRotation"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+   <button id="objectApply" type="submit" aria-label="Primijeni dimenzije">✓</button>
+  </form>
+  <div class="object-buttons"><button id="objectCopy" type="button">Kopiraj</button><button id="objectMulti" type="button" aria-pressed="false">Više odabira</button><button id="objectGroup" type="button">Grupiraj</button><button id="objectUngroup" type="button">Razgrupiraj</button><button id="objectDelete" type="button">Obriši</button></div>
+  <p id="objectError" role="alert"></p>
+ </div>
 </footer>
-<script src="room-geometry.js?v=20261027-44"></script>
-<script src="grid-geometry.js?v=20261027-44"></script>
-<script src="grid-app.js?v=20261027-44"></script>
+<script src="room-geometry.js?v=20261027-45"></script>
+<script src="grid-geometry.js?v=20261027-45"></script>
+<script src="cad-objects.js?v=20261027-45"></script>
+<script src="grid-app.js?v=20261027-45"></script>
 </body>
 </html>

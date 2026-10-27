@@ -10,9 +10,9 @@ function el(id){
  return nodes.get(id);
 }
 const context=vm.createContext({console,Blob,fetch:async(url,options)=>{updateRequests.push({url,options});if(updateFailure==='network')throw new Error('Offline');return {ok:updateFailure!=='http'&&!(updateFailure==='script'&&url.includes('grid-app.js')),status:updateFailure==='http'||(updateFailure==='script'&&url.includes('grid-app.js'))?503:200,text:async()=>url.includes('CADup.html')?(updateFailure==='incomplete'?'<html></html>':publishedHtml):'/* verified script response */'};},URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
-for(const file of ['room-geometry.js','grid-geometry.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
+for(const file of ['room-geometry.js','grid-geometry.js','cad-objects.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -315,8 +315,8 @@ deselect();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainToo
  await el('reloadApp').click();assert.equal(el('topMenu').open,false);
  const reloadUrl=new URL(context.window.location.href);
  assert.equal(reloadUrl.pathname,'/cadup-prt-nex/CADup.html');assert.ok(Number(reloadUrl.searchParams.get('v'))>42);
- assert.equal(updateRequests.length,4);assert.ok(updateRequests.every(request=>request.options.cache==='reload'));
- for(const file of ['room-geometry.js','grid-geometry.js','grid-app.js'])assert.ok(updateRequests.some(request=>request.url.includes(file+'?v=')));
+ assert.equal(updateRequests.length,5);assert.ok(updateRequests.every(request=>request.options.cache==='reload'));
+ for(const file of ['room-geometry.js','grid-geometry.js','cad-objects.js','grid-app.js'])assert.ok(updateRequests.some(request=>request.url.includes(file+'?v=')));
  assert.equal(JSON.stringify(api.segments),beforeReload);assert.equal(JSON.stringify(JSON.parse(memory.get('infoa_grid_loops_v1')).segments),beforeReload);
  assert.equal(el('reloadApp').disabled,false);
  const previousUrl=context.window.location.href;
@@ -327,3 +327,22 @@ deselect();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainToo
  }
  updateFailure=null;
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+// Biblioteka elemenata: umetanje, izravne mjere, grupe, kopiranje i zajednički undo/redo.
+el('clearAll').click();el('clearAll').click();api.fit();
+api.addObject('sofa');assert.equal(api.objects.length,1);assert.equal(el('objectActions').hidden,false);assert.equal(el('wallActions').hidden,true);
+assert.equal(el('objectWidth').value,'220');el('objectWidth').value='240';el('objectDepth').value='100';el('objectRotation').value='90';el('objectForm').submit({preventDefault(){}});
+assert.equal(api.objects[0].width,240);assert.equal(api.objects[0].rotation,90);
+api.addObject('chair');assert.equal(api.objects.length,2);
+let furniture=api.objects,objectView=api.view,chairPoint={x:objectView.ox+furniture[1].x*objectView.scale,y:objectView.oy+furniture[1].y*objectView.scale};
+drag(chairPoint.x,chairPoint.y,chairPoint.x+100,chairPoint.y);
+assert.ok(api.objects[1].x>api.objects[0].x+100);
+el('objectMulti').click();objectView=api.view;click(objectView.ox+api.objects[0].x*objectView.scale,objectView.oy+api.objects[0].y*objectView.scale);
+assert.equal(api.objectIds.length,2);el('objectGroup').click();assert.ok(api.objects[0].group);assert.equal(api.objects[0].group,api.objects[1].group);
+const groupedFurniture=JSON.stringify(api.objects);el('objectCopy').click();assert.equal(api.objects.length,4);assert.notEqual(api.objects[2].group,api.objects[0].group);
+api.undo();assert.equal(JSON.stringify(api.objects),groupedFurniture);api.redo();assert.equal(api.objects.length,4);
+let groupPoint=api.objects[2];click(objectView.ox+groupPoint.x*objectView.scale,objectView.oy+groupPoint.y*objectView.scale);assert.equal(api.objectIds.length,2);
+el('objectDelete').click();assert.equal(api.objects.length,2);api.undo();assert.equal(api.objects.length,4);
+api.addObject('stairs');assert.equal(api.objects.length,5);assert.equal(api.objects.at(-1).kind,'stairs');
+const beforeInvalidObject=JSON.stringify(api.objects);el('objectWidth').value='0';el('objectForm').submit({preventDefault(){}});assert.equal(JSON.stringify(api.objects),beforeInvalidObject);assert.ok(el('objectError').textContent);
+const beforeObjectClear=JSON.stringify(api.objects);el('clearAll').click();el('clearAll').click();assert.equal(api.objects.length,0);api.undo();assert.equal(JSON.stringify(api.objects),beforeObjectClear,'Briši sve i undo čuvaju cijelu scenu');

@@ -3,16 +3,23 @@
  const $=id=>document.getElementById(id),board=$('board'),g=board.getContext('2d');
  const KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false;
  let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null,editorSelectionKey=null;
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
- function save(){try{localStorage.setItem(KEY,JSON.stringify({segments,wallsVisible}));}catch(_){}}
+ const snapshot=()=>({segments:copy(segments),objects:copy(objects)});
+ function restoreSnapshot(state){segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;}
+ function commitObjects(before,ids=[]){
+  if(JSON.stringify(before)!==JSON.stringify(snapshot())){past.push(before);if(past.length>HISTORY)past.shift();future=[];save();}
+  selectedWall=null;wallSession=null;objectIds=new Set(ids);objectEditorKey=null;status();draw();
+ }
+ function save(){try{localStorage.setItem(KEY,JSON.stringify({segments,objects,wallsVisible}));}catch(_){}}
  function restore(){
   try{
    const saved=localStorage.getItem(KEY);
-   if(saved){const data=JSON.parse(saved);segments=GridGeometry.normalize(Array.isArray(data.segments)?data.segments:[]);wallsVisible=data.wallsVisible!==false;}
+   if(saved){const data=JSON.parse(saved);segments=GridGeometry.normalize(Array.isArray(data.segments)?data.segments:[]);objects=CadObjects.validate(data.objects??[]);wallsVisible=data.wallsVisible!==false;}
    else{
     // Zadržavaju se obrisi spremljenih prostorija; stari ručno crtani zidovi se ne učitavaju.
     const old=JSON.parse(localStorage.getItem('infoa_tlocrt_minimal_v1')||'null');
@@ -65,13 +72,15 @@
   $('toggleWalls').setAttribute('title',wallsVisible?'Zidovi uključeni':'Zidovi isključeni');
   const editingWall=mode==='edit'&&!!selectedWall;
   $('wallActions').hidden=!editingWall;
-  $('editorFooter').hidden=!editingWall;
+  const editingObjects=mode==='edit'&&(objectIds.size>0||objectMulti);
+  $('editorFooter').hidden=!editingWall&&!editingObjects;
+  $('objectActions').hidden=!editingObjects;syncObjectEditor();
   $('mainTools').hidden=false;
   syncDimensionEditor();$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
  }
  function commit(before){
   if(JSON.stringify(before)===JSON.stringify(segments)){status();draw();return;}
-  past.push(before);if(past.length>HISTORY)past.shift();future=[];selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
+  past.push(Array.isArray(before)?{segments:before,objects:copy(objects)}:before);if(past.length>HISTORY)past.shift();future=[];selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
  function add(end){
   if(!first)return;
@@ -83,11 +92,11 @@
   first=mode==='draw'?{...end}:null;preview=first;commit(before);
  }
  function undo(){
-  if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'||gesture?.type==='room-move'){cancelInteraction();return;}
+  if(gesture?.type==='object-move'||gesture?.type==='wall-move'||gesture?.type==='wall-resize'||gesture?.type==='room-move'){cancelInteraction();return;}
   if(first){first=null;preview=null;status();draw();return;}
-  if(!past.length)return;future.push(copy(segments));segments=past.pop();selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
+  if(!past.length)return;future.push(snapshot());restoreSnapshot(past.pop());selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
- function redo(){if(!future.length)return;past.push(copy(segments));segments=future.pop();selected=null;selectedWall=null;wallSession=null;save();status();draw();}
+ function redo(){if(!future.length)return;past.push(snapshot());restoreSnapshot(future.pop());selected=null;selectedWall=null;wallSession=null;save();status();draw();}
  function hitWall(x,y){
   const raw=point(x,y);let best=null,solid=null,solidDistance=Infinity,distance=wallsVisible?Math.max(15,30*scale+3):15;
   const current=model();
@@ -137,6 +146,7 @@
   selected=detected.rooms.find(r=>x>=r.x&&x<=r.x+r.width&&y>=r.y&&y<=r.y+r.height)?.roomKey??null;schedule();
  }
  function cancelInteraction(){
+  if(gesture?.type==='object-move')restoreSnapshot(gesture.before);
   if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
   if(gesture?.type==='room-move'){segments=gesture.before;selected=gesture.face.id;}
   gesture=null;pointers.clear();first=null;preview=null;status();draw();
@@ -167,7 +177,7 @@
   let x=rawX,y=rawY;
   const base=priority===3?7:priority===1?8:12;
   const size=clamp(base+Math.log2(Math.max(1,scale/(w/WIDTH))),base,base+2),boxHeight=size+(priority===3?4:6);
-  g.save();g.globalAlpha=(mode==='edit'&&selectedWall&&priority<5)?0.3:1;g.font='600 '+size+'px system-ui';
+  g.save();g.globalAlpha=(mode==='edit'&&(selectedWall||objectIds.size)&&priority<5)?0.3:1;g.font='600 '+size+'px system-ui';
   const width=g.measureText(text).width+(priority===3?6:10),halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
   x=clamp(x,Math.max(0,ox)+halfX+3,Math.min(w,ox+WIDTH*scale)-halfX-3);
   y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
@@ -192,7 +202,7 @@
   if(!w||!h)return;
   const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.globalAlpha=1;g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
   g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
-  g.globalAlpha=(mode==='edit'&&selectedWall)?0.3:1;
+  g.globalAlpha=(mode==='edit'&&(selectedWall||objectIds.size))?0.3:1;
   // Blaga pastelna ispuna samo zatvorenih prostora; mreža i zidovi crtaju se iznad.
   g.fillStyle='#edf6ef';
   for(const face of current.faces){
@@ -249,6 +259,24 @@
    const center=visibleWallCenter({x1:first.x,y1:first.y,x2:(preview||first).x,y2:(preview||first).y});
    if(length&&center)tag(center.x,center.y-20,lengthText(length),color,false,5);
   }
+  for(const item of objects){
+   const active=objectIds.has(item.id);g.globalAlpha=((selectedWall||objectIds.size)&&!active)?0.3:1;
+   const attached=CadObjects.attach(item,segments),same=Math.abs(attached.x-item.x)<.01&&Math.abs(attached.y-item.y)<.01&&attached.rotation%180===item.rotation%180;
+   const wall=same&&['door','double-door','window'].includes(item.kind)?hitWallForObject(item):null;
+   if(wall){
+    const horizontal=wall.y1===wall.y2,start=(horizontal?item.x:item.y)-item.width/2,end=start+item.width;
+    const objectAlpha=g.globalAlpha;g.globalAlpha=1;g.fillStyle='#fff';
+    for(const box of RoomGeometry.wallSelection(current.rooms,segments,wall,current.layout)){
+     const a=Math.max(start,horizontal?box.x:box.y),b=Math.min(end,horizontal?box.x+box.width:box.y+box.height);if(b<=a)continue;
+     if(horizontal)g.fillRect(ox+a*scale,oy+box.y*scale,(b-a)*scale,box.height*scale);
+     else g.fillRect(ox+box.x*scale,oy+a*scale,box.width*scale,(b-a)*scale);
+    }
+    g.globalAlpha=objectAlpha;
+   }
+   CadObjects.draw(g,item,scale,ox,oy,active);
+  }
+  g.globalAlpha=1;
+  if(objectIds.size>1){const box=CadObjects.selectionBounds(objects.filter(item=>objectIds.has(item.id)));if(box){g.strokeStyle='#2563eb';g.lineWidth=1.5;g.setLineDash([5,4]);g.strokeRect(ox+box.left*scale,oy+box.top*scale,box.width*scale,box.depth*scale);g.setLineDash([]);}}
   paintTags();g.restore();g.globalAlpha=1;
  }
  const xy=e=>{const r=board.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
@@ -256,6 +284,7 @@
   const [a,b]=[...pointers.values()];if(!b)return;
   if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
   if(gesture?.type==='room-move'){segments=gesture.before;selected=gesture.face.id;}
+  if(gesture?.type==='object-move'){const ids=gesture.ids;restoreSnapshot(gesture.before);objectIds=new Set(ids);}
   const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};gesture={type:'pinch',distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),scale,anchor:point(mid.x,mid.y)};
  }
  function adjust(p,drag){
@@ -272,6 +301,16 @@
   if(e.button!==undefined&&e.button!==0)return;e.preventDefault();board.setPointerCapture(e.pointerId);
   const p=xy(e);pointers.set(e.pointerId,p);resetClear();
   if(pointers.size>1){pinch();return;}
+  if(mode==='edit'){
+   const raw=point(p.x,p.y),item=CadObjects.hit(objects,raw.x,raw.y);
+   if(item){
+    const ids=CadObjects.expandedSelection(objects,[item.id]);
+    if(objectMulti||e.shiftKey){const remove=ids.every(id=>objectIds.has(id));for(const id of ids)if(remove)objectIds.delete(id);else objectIds.add(id);gesture={type:'object-select',id:e.pointerId};}
+    else{if(!objectIds.has(item.id))objectIds=new Set(ids);gesture={type:'object-move',id:e.pointerId,start:p,before:snapshot(),ids:[...objectIds]};}
+    selectedWall=null;wallSession=null;objectEditorKey=null;status();draw();return;
+   }
+   if(objectIds.size||objectMulti){objectIds.clear();objectMulti=false;objectEditorKey=null;status();draw();}
+  }
   const endpoint=mode==='edit'?hitHandle(p.x,p.y):null;
   if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
   const moveHandle=mode==='edit'&&hitMoveHandle(p.x,p.y);
@@ -302,7 +341,12 @@
    scale=clamp(gesture.scale*Math.hypot(a.x-b.x,a.y-b.y)/gesture.distance,w/WIDTH,w/WIDTH*25);ox=mid.x-gesture.anchor.x*scale;oy=mid.y-gesture.anchor.y*scale;limitPan();schedule();return;
   }
   if(!gesture||gesture.id!==e.pointerId)return;
-  if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
+  if(gesture.type==='object-move'){
+   let moved=CadObjects.move(gesture.before.objects,gesture.ids,Math.round((p.x-gesture.start.x)/scale/5)*5,Math.round((p.y-gesture.start.y)/scale/5)*5);
+   if(gesture.ids.length===1)moved=moved.map(item=>item.id===gesture.ids[0]?CadObjects.attach(item,segments):item);
+   objects=moved;schedule();
+  }
+  else if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
   else if(gesture.type==='wall-move'){updateWall(p,gesture);}
   else if(gesture.type==='wall-resize'){updateWallLength(p,gesture);}
   else if(gesture.type==='room-move'){updateRoom(p,gesture);}
@@ -316,6 +360,12 @@
   const p=xy(e),last=gesture,wasMulti=last?.type==='pinch'||pointers.size>1;pointers.delete(e.pointerId);
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
   if(wasMulti||last?.type==='remaining'){status();draw();return;}
+  if(last?.type==='object-select')return;
+  if(last?.type==='object-move'){
+   if(cancelled){restoreSnapshot(last.before);objectIds=new Set(last.ids);status();draw();}
+   else commitObjects(last.before,last.ids);
+   return;
+  }
   if(last?.type==='room-move'){
    if(cancelled){segments=last.before;selected=last.face.id;status();draw();}
    else {const selection=selected;commit(last.before);selected=selection;status();draw();}
@@ -346,9 +396,9 @@
  board.addEventListener('lostpointercapture',e=>{if(pointers.has(e.pointerId))release(e,true);});
  board.addEventListener('contextmenu',e=>e.preventDefault());
  board.addEventListener('wheel',e=>{closeMenu();e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
- function closeMenu(){$('topMenu').open=false;}
- document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))closeMenu();});
- function changeMode(next){closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;resetClear();status();draw();}
+ function closeMenu(){$('topMenu').open=false;$('objectMenu').open=false;}
+ document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;});
+ function changeMode(next){closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('reloadApp').addEventListener('click',async()=>{
   const button=$('reloadApp');if(button.disabled)return;
@@ -360,7 +410,7 @@
    if(!response.ok)throw new Error('HTTP '+response.status);
    const html=await response.text();
    const scripts=[...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map(match=>new URL(match[1],target.href));
-   const required=['room-geometry.js','grid-geometry.js','grid-app.js'];
+   const required=['room-geometry.js','grid-geometry.js','cad-objects.js','grid-app.js'];
    if(!required.every(name=>scripts.some(url=>url.origin===target.origin&&url.pathname.endsWith('/'+name))))throw new Error('Nepotpuna stranica');
    for(const url of scripts){
     if(url.origin!==target.origin)continue;
@@ -374,13 +424,13 @@
  });
  $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
- function deselectWall(){selectedWall=null;wallSession=null;status();draw();}
+ function deselectWall(){objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
  function selectedDimension(){if(!selectedWall)return null;const h=selectedWall.y1===selectedWall.y2;return {axis:h?'h':'v',line:h?selectedWall.y1:selectedWall.x1,start:h?selectedWall.x1:selectedWall.y1,end:h?selectedWall.x2:selectedWall.y2};}
  $('wallDelete').addEventListener('click',()=>{if(mode!=='edit'||!selectedWall)return;const before=copy(segments);segments=GridGeometry.eraseLine(segments,selectedWall);selectedWall=null;commit(before);});
  $('clearAll').addEventListener('click',()=>{
-  if(!segments.length)return;
+  if(!segments.length&&!objects.length)return;
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
-  const before=copy(segments);segments=[];first=null;preview=null;commit(before);
+  const before=snapshot();segments=[];objects=[];objectIds.clear();first=null;preview=null;commit(before);
  });
  function syncDimensionEditor(){
   if(mode!=='edit'||!selectedWall){editorSelectionKey=null;editingDimension=null;$('dimensionError').textContent='';return;}
@@ -421,7 +471,7 @@
  });
  $('saveJson').addEventListener('click',()=>{
   try{
-   const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),wallsVisible};
+   const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),objects:copy(objects),wallsVisible};
    const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
    const link=document.createElement('a');link.href=url;link.download='CADup-'+new Date().toISOString().slice(0,10)+'.json';link.click();
    setTimeout(()=>URL.revokeObjectURL(url),1000);status('JSON datoteka je spremna za preuzimanje');
@@ -441,9 +491,10 @@
     (s.x1===s.x2||s.y1===s.y2)&&(s.x1!==s.x2||s.y1!==s.y2)&&
     (s.thickness===undefined||(Number.isFinite(s.thickness)&&s.thickness>=1&&s.thickness<=100)));
    if(!valid)throw new Error('JSON sadrži neispravne zidove.');
+   const importedObjects=CadObjects.validate(data.objects??[]);
    const imported=GridGeometry.normalize(data.segments);
    GridGeometry.detectWithDoors(imported); // Provjeri složenost prije zamjene crteža.
-   cancelInteraction();const before=copy(segments);segments=imported;
+   cancelInteraction();const before=snapshot();segments=imported;objects=importedObjects;objectIds.clear();
    wallsVisible=data.wallsVisible!==false;selected=null;selectedWall=null;wallSession=null;
    commit(before);save();resetClear();draw();status('Tlocrt je uvezen · Poništi vraća prethodni crtež');
   }catch(error){status('Uvoz nije uspio: '+(error instanceof SyntaxError?'Datoteka nije valjan JSON.':error.message));}
@@ -452,9 +503,51 @@
  $('plus').addEventListener('click',()=>zoomAt(1.16));$('minus').addEventListener('click',()=>zoomAt(1/1.16));$('fit').addEventListener('click',fit);
  $('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen?.();}catch(_){}});
  window.addEventListener('keydown',e=>{
+  if(e.key!=='Escape'&&(e.target?.isContentEditable||['INPUT','SELECT','TEXTAREA'].includes(e.target?.tagName)))return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}
   else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
   else if(e.key==='Escape'){if(mode==='draw')changeMode('edit');else{cancelInteraction();deselectWall();}}
+ });
+ function hitWallForObject(item){
+  const horizontal=item.rotation%180===0;return segments.find(wall=>(wall.y1===wall.y2)===horizontal&&Math.abs((horizontal?wall.y1:wall.x1)-(horizontal?item.y:item.x))<.01&&
+   (horizontal?wall.x1:wall.y1)<=(horizontal?item.x:item.y)&&(horizontal?wall.x2:wall.y2)>=(horizontal?item.x:item.y))||null;
+ }
+ function addObject(kind){
+  try{changeMode('edit');const before=snapshot(),center=point(w/2,h/2),item=CadObjects.attach(CadObjects.create(kind,center.x,center.y),segments);objects.push(item);commitObjects(before,[item.id]);}
+  catch(error){status(error.message);}
+ }
+ function syncObjectEditor(){
+  const items=objects.filter(item=>objectIds.has(item.id)),count=items.length;
+  $('objectMulti').setAttribute('aria-pressed',String(objectMulti));$('objectMulti').classList.toggle('active',objectMulti);
+  $('objectGroup').disabled=count<2;$('objectUngroup').disabled=!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;$('objectApply').disabled=!count;
+  $('objectTitle').textContent=count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':'Dodirni elemente za višestruki odabir';
+  $('objectRotation').disabled=count!==1;
+  const key=JSON.stringify(items);if(key===objectEditorKey)return;objectEditorKey=key;$('objectError').textContent='';
+  if(!count){$('objectWidth').value='';$('objectDepth').value='';return;}
+  const box=count===1?items[0]:CadObjects.selectionBounds(items);
+  $('objectWidth').value=String(Math.round(box.width*10)/10).replace('.',',');$('objectDepth').value=String(Math.round(box.depth*10)/10).replace('.',',');$('objectRotation').value=String(count===1?items[0].rotation:0);
+ }
+ $('objectLibrary').innerHTML=buildObjectLibrary();
+ function buildObjectLibrary(){
+  let html='';for(const category of [...new Set(CadObjects.catalog.map(item=>item.category))]){
+   html+='<details class="catalog-category"><summary>'+category+'</summary>';
+   for(const subcategory of [...new Set(CadObjects.catalog.filter(item=>item.category===category).map(item=>item.subcategory))]){
+    html+='<details class="catalog-subcategory"><summary>'+subcategory+'</summary><div class="catalog-items">';
+    for(const item of CadObjects.catalog.filter(item=>item.category===category&&item.subcategory===subcategory))html+='<button type="button" data-object="'+item.kind+'"><span>'+item.name+'</span><small>'+item.width+' × '+item.depth+' cm</small></button>';
+    html+='</div></details>';
+   }html+='</details>';
+  }return html;
+ }
+ $('objectMenu').addEventListener('click',e=>{const button=e.target?.closest?.('[data-object]');if(button)addObject(button.dataset.object);});
+ $('objectMulti').addEventListener('click',()=>{objectMulti=!objectMulti;status();draw();});
+ $('objectCopy').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{const result=CadObjects.duplicate(objects,[...objectIds]);objects=result.items;commitObjects(before,result.ids);}catch(error){$('objectError').textContent=error.message;}});
+ $('objectGroup').addEventListener('click',()=>{if(objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});
+ $('objectUngroup').addEventListener('click',()=>{const before=snapshot();objects=CadObjects.ungroup(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
+ $('objectDelete').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();objects=objects.filter(item=>!objectIds.has(item.id));objectMulti=false;commitObjects(before);});
+ $('objectForm').addEventListener('submit',e=>{
+  e.preventDefault();if(!objectIds.size)return;const parse=id=>Number($(id).value.trim().replace(',','.'));
+  try{const before=snapshot();objects=CadObjects.resize(objects,[...objectIds],parse('objectWidth'),parse('objectDepth'),Number($('objectRotation').value));commitObjects(before,[...objectIds]);}
+  catch(error){$('objectError').textContent=error.message;}
  });
  restore();status();new ResizeObserver(resize).observe(board);resize();
 })();

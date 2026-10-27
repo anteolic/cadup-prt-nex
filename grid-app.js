@@ -6,14 +6,14 @@
  const VIEW_KEY='cadup_view_settings_v1';
  let showGrid=true,showMeasures=true;
  let customLibrary=[],customNaming=false;
- let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null,lastGroupTap=null;
+ let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null,editingObjectId=null,lastGroupTap=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false,cursor=null,eraseHover=null,eraseObjectIds=[];
  let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null,editorSelectionKey=null;
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
  const snapshot=()=>({segments:copy(segments),objects:copy(objects)});
- function restoreSnapshot(state){eraseHover=null;eraseObjectIds=[];segments=copy(state.segments);objects=copy(state.objects||[]);if(editingGroup&&!objects.some(item=>item.group===editingGroup))editingGroup=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;}
+ function restoreSnapshot(state){eraseHover=null;eraseObjectIds=[];segments=copy(state.segments);objects=copy(state.objects||[]);if(editingGroup&&!objects.some(item=>item.group===editingGroup))editingGroup=null;if(editingObjectId&&!objects.some(item=>item.id===editingObjectId))editingObjectId=null;objectIds=new Set(editingObjectId?[editingObjectId]:[]);objectMulti=false;objectEditorKey=null;customNaming=false;}
  function recordChange(before){
   if(!liveEdit||!liveEdit.recorded){past.push(liveEdit?liveEdit.before:before);if(past.length>HISTORY)past.shift();}
   if(liveEdit)liveEdit.recorded=true;future=[];
@@ -36,6 +36,7 @@
   form.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur?.();}});
  }
  function commitObjects(before,ids=[]){
+  if(editingObjectId&&!objects.some(item=>item.id===editingObjectId))editingObjectId=null;
   if(editingGroup&&!objects.some(item=>item.group===editingGroup))editingGroup=null;
   eraseHover=null;eraseObjectIds=[];
   if(JSON.stringify(before)!==JSON.stringify(snapshot())){recordChange(before);save();}
@@ -161,7 +162,7 @@
  }
  function undo(){
   liveEdit=null;
-  if(gesture?.type==='object-move'||gesture?.type==='wall-move'||gesture?.type==='wall-resize'){cancelInteraction();return;}
+  if((gesture?.type==='object-move'||gesture?.type==='object-resize')||gesture?.type==='wall-move'||gesture?.type==='wall-resize'){cancelInteraction();return;}
   first=null;preview=null;
   if(!past.length){status();draw();return;}future.push(snapshot());restoreSnapshot(past.pop());selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
@@ -197,6 +198,20 @@
  }
  function eraseSpan(wall){if(!wall)return;const before=copy(segments);segments=GridGeometry.eraseLine(segments,wall);eraseHover=null;selectedWall=null;commit(before);}
  function handleScale(){return clamp(Math.sqrt(scale/(w/WIDTH)),1,2.5);}
+ function objectHandles(){
+  const item=objects.find(item=>item.id===editingObjectId);if(!item||objectIds.size!==1||!objectIds.has(item.id))return [];
+  const offset=14*handleScale()+8,angle=item.rotation*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle),mirror=item.mirrored?-1:1,opening=['door','double-door'].includes(item.kind);
+  return [{axis:'width',x:item.width/2*mirror,y:opening?-item.depth/2:0,nx:mirror,ny:0},{axis:'depth',x:0,y:opening?-item.depth:item.depth/2,nx:0,ny:opening?-1:1}].map(handle=>{
+   const p=screen({x:item.x+handle.x*c-handle.y*s,y:item.y+handle.x*s+handle.y*c});
+   return {...handle,item,x:p.x+(handle.nx*c-handle.ny*s)*offset,y:p.y+(handle.nx*s+handle.ny*c)*offset};
+  });
+ }
+ function drawObjectHandles(){
+  for(const handle of objectHandles()){
+   if(gesture?.type==='object-resize'&&gesture.axis===handle.axis)continue;
+   const radius=11*handleScale();g.save();g.translate(handle.x,handle.y);g.rotate(handle.item.rotation*Math.PI/180);g.fillStyle='rgba(255,255,255,0.85)';g.strokeStyle='#2563eb';g.lineWidth=1.5;g.beginPath();g.arc(0,0,radius,0,Math.PI*2);g.fill();g.stroke();g.fillStyle='#2563eb';g.font='bold '+(14*handleScale())+'px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText(handle.axis==='width'?'↔':'↕',0,0);g.restore();
+  }
+ }
  function hitHandle(x,y){
   if(!selectedWall)return null;
   let endpoint=null,distance=Math.max(20,11*handleScale()+8);
@@ -233,7 +248,7 @@
   segments=moved.segments;selectedWall=moved.wall;drag.currentWall=moved.wall;drag.currentOffset=moved.delta;schedule();
  }
  function cancelInteraction(){
-  if(gesture?.type==='object-move')restoreSnapshot(gesture.before);
+  if((gesture?.type==='object-move'||gesture?.type==='object-resize'))restoreSnapshot(gesture.before);
   if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
   gesture=null;pointers.clear();first=null;preview=null;status();draw();
  }
@@ -391,13 +406,13 @@
   }
   g.globalAlpha=1;
   if(objectIds.size>1){const box=CadObjects.selectionBounds(objects.filter(item=>objectIds.has(item.id)));if(box){g.strokeStyle='#2563eb';g.lineWidth=1.5;g.setLineDash([5,4]);g.strokeRect(ox+box.left*scale,oy+box.top*scale,box.width*scale,box.depth*scale);g.setLineDash([]);}}
-  drawJoinedNodes();paintTags();g.restore();g.globalAlpha=1;
+  drawJoinedNodes();drawObjectHandles();paintTags();g.restore();g.globalAlpha=1;
  }
  const xy=e=>{const r=board.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
  function pinch(){
   const [a,b]=[...pointers.values()];if(!b)return;
   if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
-  if(gesture?.type==='object-move'){const ids=gesture.ids;restoreSnapshot(gesture.before);objectIds=new Set(ids);}
+  if((gesture?.type==='object-move'||gesture?.type==='object-resize')){const ids=gesture.ids;restoreSnapshot(gesture.before);objectIds=new Set(ids);}
   const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};gesture={type:'pinch',distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),scale,anchor:point(mid.x,mid.y)};
  }
  function adjust(p,drag){
@@ -416,6 +431,8 @@
   if(pointers.size>1){pinch();return;}
   if(mode==='erase'){const target=updateEraseHover(p);gesture={type:'erase-span',id:e.pointerId,start:p,target,ox,oy,moved:false};draw();return;}
   if(mode==='edit'){
+   const handle=objectHandles().find(handle=>Math.hypot(p.x-handle.x,p.y-handle.y)<=14*handleScale());
+   if(handle){gesture={type:'object-resize',id:e.pointerId,start:p,axis:handle.axis,item:{...handle.item},before:snapshot(),ids:[handle.item.id],moved:false};draw();return;}
    const raw=point(p.x,p.y),item=CadObjects.hit(editingGroup?objects.filter(item=>item.group===editingGroup):objects,raw.x,raw.y);
    if(item){
     const ids=editingGroup?[item.id]:CadObjects.expandedSelection(objects,[item.id]);
@@ -423,7 +440,7 @@
     gesture={type:'object-move',id:e.pointerId,start:p,before:snapshot(),ids:[...objectIds]};
     selectedWall=null;wallSession=null;objectEditorKey=null;status();draw();return;
    }
-   if(objectIds.size||objectMulti){objectIds.clear();objectMulti=false;objectEditorKey=null;status();draw();}
+   if(objectIds.size||objectMulti){editingObjectId=null;objectIds.clear();objectMulti=false;objectEditorKey=null;status();draw();}
   }
   if(mode==='edit'&&editingGroup){gesture={type:'pan',id:e.pointerId,start:p,ox,oy,moved:false};status();draw();return;}
   const endpoint=mode==='edit'?hitHandle(p.x,p.y):null;
@@ -460,6 +477,12 @@
    moved=CadObjects.snapToWalls(moved,gesture.ids,segments,model().rooms,Math.min(30,14/scale));
    objects=moved;schedule();
   }
+  else if(gesture.type==='object-resize'){
+   if(!gesture.moved&&Math.hypot(p.x-gesture.start.x,p.y-gesture.start.y)<3)return;
+   gesture.moved=true;const angle=gesture.item.rotation*Math.PI/180,dx=(p.x-gesture.start.x)/scale,dy=(p.y-gesture.start.y)/scale;
+   const delta=gesture.axis==='width'?(dx*Math.cos(angle)+dy*Math.sin(angle))*(gesture.item.mirrored?-1:1):-dx*Math.sin(angle)+dy*Math.cos(angle);
+   objects=CadObjects.resizeFromHandle(gesture.before.objects,gesture.item.id,gesture.axis,delta);schedule();
+  }
   else if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
   else if(gesture.type==='wall-move'){updateWall(p,gesture);}
   else if(gesture.type==='wall-resize'){updateWallLength(p,gesture);}
@@ -470,17 +493,22 @@
  });
  function handleGroupDoubleTap(e,p,last,cancelled){
   if(mode!=='edit'||cancelled||objectMulti||e.shiftKey||!Number.isFinite(e.timeStamp)||!last||last.moved||!['pick-pan','pan','object-move'].includes(last.type)||Math.hypot(p.x-last.start.x,p.y-last.start.y)>9){lastGroupTap=null;return false;}
-  const raw=point(p.x,p.y);let key=null,group=null;
+  const raw=point(p.x,p.y);let key=null,group=null,object=null;
   if(editingGroup){
    const box=CadObjects.selectionBounds(objects.filter(item=>item.group===editingGroup));
    if(box&&(raw.x<box.left||raw.x>box.right||raw.y<box.top||raw.y>box.bottom))key='close:'+editingGroup;
+   else{object=CadObjects.hit(objects.filter(item=>item.group===editingGroup),raw.x,raw.y);if(object)key='object:'+object.id;}
   }else{
-   group=CadObjects.hit(objects,raw.x,raw.y)?.group;if(group)key='open:'+group;
+   object=CadObjects.hit(objects,raw.x,raw.y);group=object?.group;
+   if(group)key='open:'+group;else if(object)key='object:'+object.id;
   }
   if(!key){lastGroupTap=null;return false;}
   const previous=lastGroupTap;lastGroupTap={key,time:e.timeStamp,x:p.x,y:p.y};
   if(!previous||previous.key!==key||e.timeStamp-previous.time<0||e.timeStamp-previous.time>380||Math.hypot(p.x-previous.x,p.y-previous.y)>22)return false;
-  lastGroupTap=null;if(editingGroup)closeGroupEditor();else openGroupEditor(group);return true;
+  lastGroupTap=null;
+  if(key.startsWith('close:'))closeGroupEditor();else if(key.startsWith('open:'))openGroupEditor(group);
+  else{editingObjectId=object.id;objectIds=new Set([object.id]);objectMulti=false;selectedWall=null;wallSession=null;objectEditorKey=null;status();draw();}
+  return true;
  }
  function release(e,cancelled){
   if(!pointers.has(e.pointerId))return;
@@ -495,13 +523,14 @@
     if(pick.kind==='object'){
      if(pick.toggle){const remove=pick.ids.every(id=>objectIds.has(id));for(const id of pick.ids)if(remove)objectIds.delete(id);else objectIds.add(id);}
      else objectIds=new Set(pick.ids);
+     if(!objectIds.has(editingObjectId)||objectIds.size!==1)editingObjectId=null;
      selectedWall=null;wallSession=null;objectEditorKey=null;
     }else{objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=pick.wall;wallSession=null;}
    }
    status();draw();return;
   }
   if(last?.type==='pan'){status();draw();return;}
-  if(last?.type==='object-move'){
+  if(last?.type==='object-move'||last?.type==='object-resize'){
    if(cancelled){restoreSnapshot(last.before);objectIds=new Set(last.ids);status();draw();}
    else commitObjects(last.before,last.ids);
    return;
@@ -539,7 +568,7 @@
   if(liveEdit&&e.target!==liveEdit.input){const input=liveEdit.input;finishMeasureInput();input.blur?.();}
   if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
  },true);
- function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;editingGroup=null;lastGroupTap=null;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
+ function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;editingGroup=null;editingObjectId=null;lastGroupTap=null;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
  function restoreViewSettings(){
   try{const saved=JSON.parse(localStorage.getItem(VIEW_KEY)||'{}');showGrid=saved.grid!==false;showMeasures=saved.measures!==false;}catch(_){}
   $('showGrid').checked=showGrid;$('showMeasures').checked=showMeasures;
@@ -574,13 +603,13 @@
   finally{button.disabled=false;button.textContent='↻ Učitaj novu verziju';}
  });
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
- function deselectWall(){editingGroup=null;customNaming=false;objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
+ function deselectWall(){editingObjectId=null;editingGroup=null;customNaming=false;objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
  function selectedDimension(){if(!selectedWall)return null;const current=model();return RoomGeometry.visibleWallDimension(current.rooms,segments,selectedWall,current.layout);}
  $('wallDelete').addEventListener('click',()=>eraseSpan(selectedWall));
  $('clearAll').addEventListener('click',()=>{
   if(!segments.length&&!objects.length)return;
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
-  const before=snapshot();segments=[];objects=[];editingGroup=null;objectIds.clear();first=null;preview=null;commit(before);
+  const before=snapshot();segments=[];objects=[];editingObjectId=null;editingGroup=null;objectIds.clear();first=null;preview=null;commit(before);
  });
  function syncDimensionEditor(){
   if(mode!=='edit'||!selectedWall){editorSelectionKey=null;editingDimension=null;$('dimensionError').textContent='';return;}
@@ -644,7 +673,7 @@
    const imported=GridGeometry.normalize(data.segments);
    GridGeometry.detectWithDoors(imported); // Provjeri složenost prije zamjene crteža.
    if(importedLibrary.length){persistCustomLibrary(mergedLibrary);customLibrary=mergedLibrary;renderObjectLibrary();}
-   cancelInteraction();const before=snapshot();segments=imported;objects=importedObjects;editingGroup=null;objectIds.clear();
+   cancelInteraction();const before=snapshot();segments=imported;objects=importedObjects;editingObjectId=null;editingGroup=null;objectIds.clear();
    wallsVisible=true;selected=null;selectedWall=null;wallSession=null;
    commit(before);save();resetClear();draw();status('Tlocrt je uvezen · Poništi vraća prethodni crtež');
   }catch(error){status('Uvoz nije uspio: '+(error instanceof SyntaxError?'Datoteka nije valjan JSON.':error.message));}
@@ -735,10 +764,10 @@
  });
  function openGroupEditor(group){
   if(!group||!objects.some(item=>item.group===group))return;
-  lastGroupTap=null;editingGroup=group;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;selectedWall=null;wallSession=null;status();draw();
+  lastGroupTap=null;editingObjectId=null;editingGroup=group;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;selectedWall=null;wallSession=null;status();draw();
  }
  function closeGroupEditor(){
-  lastGroupTap=null;const group=editingGroup;editingGroup=null;objectIds=new Set(objects.filter(item=>item.group===group).map(item=>item.id));objectMulti=false;objectEditorKey=null;status();draw();
+  lastGroupTap=null;editingObjectId=null;const group=editingGroup;editingGroup=null;objectIds=new Set(objects.filter(item=>item.group===group).map(item=>item.id));objectMulti=false;objectEditorKey=null;status();draw();
  }
  $('objectEditGroup').addEventListener('click',()=>{
   finishMeasureInput();

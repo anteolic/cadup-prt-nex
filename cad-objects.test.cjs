@@ -65,3 +65,13 @@ for(const rotation of [0,90,180,270])for(const unit of [5,20,50,100]){
  const moved=C.moveOnGrid([first,second],[first.id,second.id],37,43,unit),groupBox=C.selectionBounds(moved);
  assert.equal(groupBox.left%unit,0);assert.equal(groupBox.bottom%unit,0);assert.equal(moved[1].x-moved[0].x,second.x-first.x);assert.equal(moved[1].y-moved[0].y,second.y-first.y);
 }
+
+// Width/depth handles keep the opposite edge fixed, also after rotate/mirror.
+for(const rotation of [0,90,180,270])for(const mirrored of [false,true])for(const axis of ['width','depth']){
+ const item={...C.create('drawer-cabinet',500,500),width:60,depth:80,rotation,mirrored,group:'handle-group'},other=C.create('chair',900,900);
+ const result=C.resizeFromHandle([item,other],item.id,axis,20),resized=result[0],angle=rotation*Math.PI/180;
+ assert.equal(resized[axis],item[axis]+20);assert.equal(resized.group,item.group);assert.deepEqual(result[1],other);
+ const sign=axis==='width'&&mirrored?-1:1,nx=axis==='width'?Math.cos(angle)*sign:-Math.sin(angle),ny=axis==='width'?Math.sin(angle)*sign:Math.cos(angle);
+ assert.ok(Math.abs((resized.x*nx+resized.y*ny-resized[axis]/2)-(item.x*nx+item.y*ny-item[axis]/2))<1e-7);
+}
+const handleDoor=C.create('door',500,500),deepDoor=C.resizeFromHandle([handleDoor],handleDoor.id,'depth',-20)[0];assert.equal(deepDoor.depth,handleDoor.depth+20);assert.equal(deepDoor.x,handleDoor.x);assert.equal(deepDoor.y,handleDoor.y);

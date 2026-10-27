@@ -4,14 +4,14 @@
  const CUSTOM_KEY='cadup_custom_library_v1',KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  let customLibrary=[],customNaming=false;
- let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null;
+ let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false,cursor=null,eraseHover=null,eraseObjectIds=[];
  let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null,editorSelectionKey=null;
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
  const snapshot=()=>({segments:copy(segments),objects:copy(objects)});
- function restoreSnapshot(state){eraseHover=null;eraseObjectIds=[];segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;}
+ function restoreSnapshot(state){eraseHover=null;eraseObjectIds=[];segments=copy(state.segments);objects=copy(state.objects||[]);if(editingGroup&&!objects.some(item=>item.group===editingGroup))editingGroup=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;}
  function recordChange(before){
   if(!liveEdit||!liveEdit.recorded){past.push(liveEdit?liveEdit.before:before);if(past.length>HISTORY)past.shift();}
   if(liveEdit)liveEdit.recorded=true;future=[];
@@ -34,6 +34,7 @@
   form.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur?.();}});
  }
  function commitObjects(before,ids=[]){
+  if(editingGroup&&!objects.some(item=>item.group===editingGroup))editingGroup=null;
   eraseHover=null;eraseObjectIds=[];
   if(JSON.stringify(before)!==JSON.stringify(snapshot())){recordChange(before);save();}
   selectedWall=null;wallSession=null;objectIds=new Set(ids);objectEditorKey=null;status();draw();
@@ -138,7 +139,7 @@
   $('drawMode').setAttribute('aria-label',mode==='draw'?'Završi crtanje i uredi':'Crtaj');
   const editingWall=mode==='edit'&&!!selectedWall;
   $('wallActions').hidden=!editingWall;
-  const editingObjects=mode==='edit'&&(objectIds.size>0||objectMulti);
+  const editingObjects=mode==='edit'&&(objectIds.size>0||objectMulti||editingGroup);
   $('editorFooter').hidden=!editingWall&&!editingObjects;
   $('objectActions').hidden=!editingObjects;syncObjectEditor();
   $('mainTools').hidden=false;
@@ -353,7 +354,7 @@
    if(length&&center)tag(center.x,center.y-20,lengthText(length),color,false,5);
   }
   for(const item of objects){
-   const active=objectIds.has(item.id);g.globalAlpha=((selectedWall||objectIds.size)&&!active)?0.7:1;
+   const active=objectIds.has(item.id);g.globalAlpha=((selectedWall||objectIds.size||editingGroup)&&!active&&(!editingGroup||item.group!==editingGroup))?0.7:1;
    const attached=CadObjects.attach(item,segments),same=Math.abs(attached.x-item.x)<.01&&Math.abs(attached.y-item.y)<.01&&attached.rotation%180===item.rotation%180;
    const wall=same&&['door','double-door','window'].includes(item.kind)?hitWallForObject(item):null;
    if(wall){
@@ -404,15 +405,16 @@
   if(pointers.size>1){pinch();return;}
   if(mode==='erase'){const target=updateEraseHover(p);gesture={type:'erase-span',id:e.pointerId,start:p,target,ox,oy,moved:false};draw();return;}
   if(mode==='edit'){
-   const raw=point(p.x,p.y),item=CadObjects.hit(objects,raw.x,raw.y);
+   const raw=point(p.x,p.y),item=CadObjects.hit(editingGroup?objects.filter(item=>item.group===editingGroup):objects,raw.x,raw.y);
    if(item){
-    const ids=CadObjects.expandedSelection(objects,[item.id]);
+    const ids=editingGroup?[item.id]:CadObjects.expandedSelection(objects,[item.id]);
     if(objectMulti||e.shiftKey){const remove=ids.every(id=>objectIds.has(id));for(const id of ids)if(remove)objectIds.delete(id);else objectIds.add(id);gesture={type:'object-select',id:e.pointerId};}
     else{if(!objectIds.has(item.id))objectIds=new Set(ids);gesture={type:'object-move',id:e.pointerId,start:p,before:snapshot(),ids:[...objectIds]};}
     selectedWall=null;wallSession=null;objectEditorKey=null;status();draw();return;
    }
    if(objectIds.size||objectMulti){objectIds.clear();objectMulti=false;objectEditorKey=null;status();draw();}
   }
+  if(mode==='edit'&&editingGroup){gesture={type:'pan',id:e.pointerId,start:p,ox,oy,moved:false};status();draw();return;}
   const endpoint=mode==='edit'?hitHandle(p.x,p.y):null;
   if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
   if(mode==='edit'&&dimensionHits.some(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom)){gesture={type:'pan',id:e.pointerId,start:p,ox,oy,moved:false};return;}
@@ -498,7 +500,7 @@
   if(liveEdit&&e.target!==liveEdit.input){const input=liveEdit.input;finishMeasureInput();input.blur?.();}
   if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
  },true);
- function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
+ function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;editingGroup=null;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('eraseMode').addEventListener('click',()=>changeMode(mode==='erase'?'edit':'erase'));
  $('reloadApp').addEventListener('click',async()=>{
@@ -524,13 +526,13 @@
   finally{button.disabled=false;button.textContent='↻ Učitaj novu verziju';}
  });
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
- function deselectWall(){customNaming=false;objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
+ function deselectWall(){editingGroup=null;customNaming=false;objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
  function selectedDimension(){if(!selectedWall)return null;const current=model();return RoomGeometry.visibleWallDimension(current.rooms,segments,selectedWall,current.layout);}
  $('wallDelete').addEventListener('click',()=>eraseSpan(selectedWall));
  $('clearAll').addEventListener('click',()=>{
   if(!segments.length&&!objects.length)return;
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
-  const before=snapshot();segments=[];objects=[];objectIds.clear();first=null;preview=null;commit(before);
+  const before=snapshot();segments=[];objects=[];editingGroup=null;objectIds.clear();first=null;preview=null;commit(before);
  });
  function syncDimensionEditor(){
   if(mode!=='edit'||!selectedWall){editorSelectionKey=null;editingDimension=null;$('dimensionError').textContent='';return;}
@@ -594,7 +596,7 @@
    const imported=GridGeometry.normalize(data.segments);
    GridGeometry.detectWithDoors(imported); // Provjeri složenost prije zamjene crteža.
    if(importedLibrary.length){persistCustomLibrary(mergedLibrary);customLibrary=mergedLibrary;renderObjectLibrary();}
-   cancelInteraction();const before=snapshot();segments=imported;objects=importedObjects;objectIds.clear();
+   cancelInteraction();const before=snapshot();segments=imported;objects=importedObjects;editingGroup=null;objectIds.clear();
    wallsVisible=true;selected=null;selectedWall=null;wallSession=null;
    commit(before);save();resetClear();draw();status('Tlocrt je uvezen · Poništi vraća prethodni crtež');
   }catch(error){status('Uvoz nije uspio: '+(error instanceof SyntaxError?'Datoteka nije valjan JSON.':error.message));}
@@ -606,7 +608,7 @@
   if(e.key!=='Escape'&&(e.target?.isContentEditable||['INPUT','SELECT','TEXTAREA'].includes(e.target?.tagName)))return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}
   else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
-  else if(e.key==='Escape'){if(mode==='draw'||mode==='erase')changeMode('edit');else{cancelInteraction();deselectWall();}}
+  else if(e.key==='Escape'){if(mode==='draw'||mode==='erase')changeMode('edit');else if(editingGroup)closeGroupEditor();else{cancelInteraction();deselectWall();}}
  });
  function hitWallForObject(item){
   const horizontal=item.rotation%180===0;return segments.find(wall=>(wall.y1===wall.y2)===horizontal&&Math.abs((horizontal?wall.y1:wall.x1)-(horizontal?item.y:item.x))<.01&&
@@ -619,9 +621,12 @@
  function syncObjectEditor(){
   const items=objects.filter(item=>objectIds.has(item.id)),count=items.length;
   $('objectMulti').setAttribute('aria-pressed',String(objectMulti));$('objectMulti').classList.toggle('active',objectMulti);
-  $('objectGroup').disabled=count<2;$('objectUngroup').disabled=!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;
-  $('objectTitle').textContent=count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':'Dodirni elemente za višestruki odabir';
+  $('objectGroup').disabled=!!editingGroup||count<2;$('objectUngroup').disabled=!!editingGroup||!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;
+  const group=items[0]?.group,canEditGroup=!!group&&items.every(item=>item.group===group);
+  $('objectEditGroup').hidden=!editingGroup&&!canEditGroup;$('objectEditGroup').textContent=editingGroup?'Zatvori grupu':'Uredi grupu';$('objectEditGroup').setAttribute('aria-pressed',String(!!editingGroup));
+  $('objectTitle').textContent=(editingGroup?'Uređivanje grupe · ':'')+(count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':(editingGroup?'Dodirni element unutar grupe':'Dodirni elemente za višestruki odabir'));
   $('objectRotate').disabled=!count;$('objectMirror').disabled=!count;$('saveCustom').disabled=!count;if(!count)customNaming=false;$('customSaveForm').hidden=!customNaming;
+  $('objectWidth').disabled=!count;$('objectDepth').disabled=!count;
   const key=JSON.stringify(items);if(key===objectEditorKey)return;objectEditorKey=key;$('objectError').textContent='';
   if(!count){$('objectWidth').value='';$('objectDepth').value='';return;}
   const box=count===1?items[0]:CadObjects.selectionBounds(items);
@@ -680,12 +685,22 @@
    $('customName').value='';customNaming=false;$('customSaveForm').hidden=true;$('customMessage').textContent='Spremljeno u Custom: '+template.name;
   }catch(error){$('customMessage').textContent=error.message;}
  });
+ function closeGroupEditor(){
+  const group=editingGroup;editingGroup=null;objectIds=new Set(objects.filter(item=>item.group===group).map(item=>item.id));objectMulti=false;objectEditorKey=null;status();draw();
+ }
+ $('objectEditGroup').addEventListener('click',()=>{
+  finishMeasureInput();
+  if(editingGroup){closeGroupEditor();return;}
+  const items=objects.filter(item=>objectIds.has(item.id)),group=items[0]?.group;
+  if(!group||!items.every(item=>item.group===group))return;
+  editingGroup=group;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;status();draw();
+ });
  $('objectMulti').addEventListener('click',()=>{objectMulti=!objectMulti;status();draw();});
  $('objectMirror').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();objects=CadObjects.mirror(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
  $('objectRotate').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{objects=CadObjects.rotate(objects,[...objectIds]);commitObjects(before,[...objectIds]);}catch(error){$('objectError').textContent=error.message;}});
- $('objectCopy').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{const result=CadObjects.duplicate(objects,[...objectIds]);objects=result.items;commitObjects(before,result.ids);}catch(error){$('objectError').textContent=error.message;}});
- $('objectGroup').addEventListener('click',()=>{if(objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});
- $('objectUngroup').addEventListener('click',()=>{const before=snapshot();objects=CadObjects.ungroup(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
+ $('objectCopy').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{const result=CadObjects.duplicate(objects,[...objectIds]);objects=result.items.map(item=>editingGroup&&result.ids.includes(item.id)?{...item,group:editingGroup}:item);commitObjects(before,result.ids);}catch(error){$('objectError').textContent=error.message;}});
+ $('objectGroup').addEventListener('click',()=>{if(editingGroup||objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});
+ $('objectUngroup').addEventListener('click',()=>{if(editingGroup)return;const before=snapshot();objects=CadObjects.ungroup(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
  $('objectDelete').addEventListener('click',()=>{
   if(!objectIds.size)return;
   const before=snapshot();objects=objects.filter(item=>!objectIds.has(item.id));objectMulti=false;commitObjects(before);

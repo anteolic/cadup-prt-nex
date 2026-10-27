@@ -482,3 +482,13 @@ const panBefore={...api.view},panScene=JSON.stringify(api.segments);drag(500,500
 assert.equal(api.view.ox,panBefore.ox+80);assert.equal(api.view.oy,panBefore.oy+60);assert.equal(api.view.scale,panBefore.scale);assert.equal(JSON.stringify(api.segments),panScene);
 const afterPan={...api.view};click(500,500);assert.deepEqual({...api.view},afterPan,'Tap does not pan');
 el('eraseMode').click();drag(500,500,470,460);assert.equal(api.mode,'erase');assert.equal(api.view.ox,afterPan.ox-30);assert.equal(api.view.oy,afterPan.oy-40);click(500,500);assert.equal(api.mode,'edit');
+
+// Open a group, edit one member, duplicate inside it, and close without ungrouping.
+el('clearAll').click();el('clearAll').click();api.fit();api.addCustomObject(api.customLibrary[0].id);
+const groupMembers=JSON.parse(JSON.stringify(api.objects)),member=groupMembers[0],otherMember=groupMembers[1],groupView=api.view,groupCamera={...api.view};
+assert.equal(api.objectIds.length,2);assert.equal(el('objectEditGroup').hidden,false);el('objectEditGroup').click();assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');assert.equal(api.objectIds.length,0);assert.equal(el('objectActions').hidden,false);
+click(groupView.ox+member.x*groupView.scale,groupView.oy+member.y*groupView.scale);assert.equal(api.objectIds.length,1);assert.equal(api.objectIds[0],member.id);
+el('objectWidth').value=String(member.width+20);el('objectForm').submit({preventDefault(){}});assert.equal(api.objects.find(o=>o.id===member.id).width,member.width+20);assert.equal(JSON.stringify(api.objects.find(o=>o.id===otherMember.id)),JSON.stringify(otherMember));
+el('objectCopy').click();assert.equal(api.objects.length,3);assert.ok(api.objects.every(o=>o.group===member.group));api.undo();assert.equal(api.objects.length,2);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
+click(990,790);assert.equal(api.objectIds.length,0);assert.equal(el('objectActions').hidden,false);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
+el('objectEditGroup').click();assert.equal(el('objectEditGroup').textContent,'Uredi grupu');assert.equal(api.objectIds.length,2);assert.deepEqual({...api.view},groupCamera);

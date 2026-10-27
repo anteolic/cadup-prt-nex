@@ -1,8 +1,8 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const nodes=new Map(),labels=[],memory=new Map();
 let downloadedBlob=null,downloadName=null;
-const gridLines=[];let gridStart=null;
-const canvas=new Proxy({measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
+const gridLines=[],paintCalls=[];let gridStart=null;
+const canvas=new Proxy({fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
  if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},showModal(){this.open=true;},close(){this.open=false;this.onclose?.();},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
@@ -10,12 +10,12 @@ function el(id){
 const context=vm.createContext({console,Blob,URL:{createObjectURL(blob){downloadedBlob=blob;return 'blob:test';},revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
 function click(x,y){board.pointerdown(event(x,y));board.pointerup(event(x,y));}
-function line(x1,y1,x2,y2){el('cancel').click();click(x1,y1);click(x2,y2);el('cancel').click();}
+function line(x1,y1,x2,y2){el('cancel').click();el('drawMode').click();click(x1,y1);click(x2,y2);el('cancel').click();}
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);
 assert.equal(api.model().faces.length,0);line(100,250,100,100);
 assert.equal(api.model().faces.length,1);assert.equal(api.model().faces[0].area,120000);
@@ -24,13 +24,13 @@ assert.ok(labels.some(t=>t.endsWith(' cm')),'Duljine zidova ostaju vidljive');
 assert.equal(el('roomArea').textContent,'');
 line(200,100,200,250);assert.equal(api.model().faces.length,2);assert.equal(api.model().layout.inner[0].width,10);
 el('toggleWalls').click();assert.equal(api.visible,false);assert.equal(api.model().faces.length,2);
-el('eraseMode').click();const beforeEraseSelection=JSON.stringify(api.segments);
+el('editMode').click();const beforeEraseSelection=JSON.stringify(api.segments);
 click(200,150);assert.ok(api.selection);assert.equal(JSON.stringify(api.segments),beforeEraseSelection,'Prvi dodir samo označava');
-click(200,200);assert.equal(api.model().faces.length,1,'Drugi dodir briše cijelu pregradu');
+el('wallDelete').click();assert.equal(api.model().faces.length,1,'Brisanje u načinu Uredi uklanja cijelu pregradu');
 assert.equal(api.selection,null);assert.ok(!api.segments.some(s=>s.x1===400&&s.x2===400));
 api.undo();assert.equal(api.model().faces.length,2);api.redo();assert.equal(api.model().faces.length,1);
 // Gumica otvara obris i undo ga zatvara.
-click(150,100);click(175,100);assert.equal(api.model().faces.length,0);api.undo();assert.equal(api.model().faces.length,1);
+click(150,100);el('wallDelete').click();assert.equal(api.model().faces.length,0);api.undo();assert.equal(api.model().faces.length,1);
 // Otkazivanje gumice ne mijenja spremljeni tlocrt.
 const count=JSON.stringify(api.segments);board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),count);
 // Isti stari način podešavanja: klizanje gore-dolje mijenja duljinu vodoravnog poteza.
@@ -64,10 +64,10 @@ const closed=JSON.stringify(api.segments);
 click(100,100);assert.equal(api.first,null,'Drugi dodir iste točke završava niz');
 assert.equal(JSON.stringify(api.segments),closed,'Završetak ne dodaje ni briše segmente');
 // Pogrešan početak može se prekinuti ponovnim dodirom iste točke.
-click(400,400);assert.ok(api.first);click(400,400);assert.equal(api.first,null);
+el('drawMode').click();click(400,400);assert.ok(api.first);click(400,400);assert.equal(api.first,null);
 assert.equal(JSON.stringify(api.segments),closed);
 // Nakon završetka može se crtati odvojeni niz, a undo/redo čuva segmente.
-click(400,400);click(500,400);click(500,500);click(500,500);
+el('drawMode').click();click(400,400);click(500,400);click(500,500);click(500,500);
 assert.equal(api.first,null);const extended=JSON.stringify(api.segments);
 assert.notEqual(extended,closed);api.undo();assert.notEqual(JSON.stringify(api.segments),extended);
 api.redo();assert.equal(JSON.stringify(api.segments),extended);
@@ -169,8 +169,8 @@ el('editMode').click();const another=api.dimensions.find(r=>r.dimension.axis==='
 click((another.left+another.right)/2,(another.top+another.bottom)/2);el('dimensionCancel').click();
 assert.equal(JSON.stringify(api.segments),beforeCancel);assert.equal(el('dimensionDialog').open,false);
 
-// Ručni unos izravno dodirom kote, bez uključivanja načina Uredi.
-el('drawMode').click();const directDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
+// Ručni unos kote pripada načinu Uredi.
+el('editMode').click();const directDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
 click((directDimension.left+directDimension.right)/2,(directDimension.top+directDimension.bottom)/2);
 assert.equal(el('dimensionDialog').open,true);
 el('dimensionValue').value='520.0';el('dimensionForm').submit({preventDefault(){}});
@@ -178,7 +178,7 @@ assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.le
 assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));
 
 // U istom prozoru mijenja se samo debljina, uz nepromijenjene osi i undo/redo.
-el('drawMode').click();let thicknessLabel=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
+el('editMode').click();let thicknessLabel=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
 click((thicknessLabel.left+thicknessLabel.right)/2,(thicknessLabel.top+thicknessLabel.bottom)/2);
 assert.equal(el('dimensionThickness').value,'30');const beforeThickness=JSON.stringify(api.segments);
 el('dimensionThickness').value='0';el('dimensionForm').submit({preventDefault(){}});
@@ -201,23 +201,46 @@ el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();
 gridLines.length=0;click(100,100);assert.ok(gridLines.length>0);
 el('cancel').click();
 
-// Odabir za brisanje: prazan prostor poništava, drugi zid prebacuje odabir.
+// Uređivanje zida: neutralni odabir, radnje na ekranu i brisanje samo tipkom.
 el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);line(200,100,200,250);
-el('eraseMode').click();const eraseOriginal=JSON.stringify(api.segments);
-click(200,175);assert.equal(api.selection.x1,400);
-click(400,400);assert.equal(api.selection,null);assert.equal(JSON.stringify(api.segments),eraseOriginal);
+el('editMode').click();const eraseOriginal=JSON.stringify(api.segments);
+click(200,175);assert.equal(api.selection.x1,400);assert.equal(el('wallActions').hidden,false);
+click(400,400);assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);assert.equal(JSON.stringify(api.segments),eraseOriginal);
 click(200,175);click(150,100);assert.equal(api.selection.y1,200);assert.equal(api.selection.x2,400);
-assert.equal(JSON.stringify(api.segments),eraseOriginal,'Drugi zid se označi bez brisanja prethodnog');
-board.pointerdown(event(150,100));board.pointermove(event(150,140));board.pointerup(event(150,100));
-assert.equal(JSON.stringify(api.segments),eraseOriginal,'Povlačenje ne potvrđuje brisanje');
-board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),eraseOriginal);
-click(175,100);assert.equal(api.selection,null);
-assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1<400),'Briše se cijeli odabrani dio između spojeva');
-assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===400),'Susjedni segment ostaje');
+assert.equal(JSON.stringify(api.segments),eraseOriginal);
+click(175,100);assert.equal(JSON.stringify(api.segments),eraseOriginal,'Ponovljeni odabir ne briše zid');
+el('wallDelete').click();assert.equal(api.selection,null);
+assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1<400));
+assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===400));
 api.undo();assert.equal(JSON.stringify(api.segments),eraseOriginal);api.redo();assert.notEqual(JSON.stringify(api.segments),eraseOriginal);
 
 // Precrtavanje postojećeg zida ne briše njegov dio.
 el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();
 line(100,100,300,100);const beforeOverdraw=JSON.stringify(api.segments);
 line(150,100,200,100);assert.equal(JSON.stringify(api.segments),beforeOverdraw);
+
+// Završetak crtanja automatski uključuje Uredi; naredbe zidova su samo u tom načinu.
+el('clearAll').click();el('clearAll').click();el('drawMode').click();api.fit();
+click(100,100);click(300,100);click(300,100);
+assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(el('editMode').attributes['aria-pressed'],'true');
+assert.equal(el('wallActions').hidden,true);
+click(200,100);assert.ok(api.selection);assert.equal(el('wallActions').hidden,false);
+paintCalls.length=0;api.draw();assert.ok(paintCalls.some(p=>p.color==='#93c5fd'&&p.alpha===1),'Odabrani zid ima plavu ispunu');
+assert.ok(paintCalls.some(p=>p.color==='#bfc3c8'&&p.alpha===.3),'Ostatak zidova je prigušen');
+assert.ok(el('wallLength').textContent.includes('400 cm'));assert.ok(el('wallThickness').textContent.includes('10 cm'));
+el('wallLength').click();assert.equal(el('dimensionDialog').open,true);assert.equal(el('dimensionValue').value,'400');el('dimensionCancel').click();
+el('wallThickness').click();assert.equal(el('dimensionDialog').open,true);assert.equal(el('dimensionThickness').value,'10');el('dimensionCancel').click();
+const beforeSelectionDelete=JSON.stringify(api.segments);
+el('wallDeselect').click();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
+el('wallDelete').click();assert.equal(JSON.stringify(api.segments),beforeSelectionDelete,'Brisanje bez odabira ništa ne radi');
+click(200,100);el('wallDelete').click();assert.equal(api.segments.length,0);api.undo();assert.equal(JSON.stringify(api.segments),beforeSelectionDelete);
+el('drawMode').click();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
+const drawDimension=api.dimensions[0];assert.ok(drawDimension);
+click((drawDimension.left+drawDimension.right)/2,(drawDimension.top+drawDimension.bottom)/2);
+assert.equal(el('dimensionDialog').open,false,'U crtanju dodir mjere ne pokreće uređivanje');
+el('cancel').click();assert.equal(api.mode,'edit');assert.equal(api.first,null);
+// Srednja ručka pomiče zid; krajnje ručke ostaju za duljinu.
+click(200,100);drag(200,100,200,150);
+assert.ok(api.segments.some(s=>s.y1===300&&s.y2===300));assert.equal(el('wallActions').hidden,false);
+assert.equal(canvas.globalAlpha,1,'Prigušenje ne prelazi u sljedeći kadar');

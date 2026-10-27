@@ -131,4 +131,3 @@ assert.equal(adjacentWidths.length,2,'Različite debljine se ne spajaju');
 assert.equal(GridGeometry.atomic(adjacentWidths)[1].thickness,30);
 assert.equal(GridGeometry.detectWithDoors(adjacentWidths).doors.length,0,'Promjena debljine na spoju nije otvor');
 assert.throws(()=>GridGeometry.setWallThickness(divided,partitionDimension,0));
-

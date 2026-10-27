@@ -3,7 +3,7 @@
  const $=id=>document.getElementById(id),board=$('board'),g=board.getContext('2d');
  const KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- let segments=[],past=[],future=[],first=null,preview=null,mode='draw',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
+ let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false;
  let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null;
  const pointers=new Map();
@@ -57,13 +57,15 @@
   $('status').textContent=message||'';
   $('status').hidden=!message;
   $('roomArea').textContent='';
-  for(const [id,value] of [['drawMode','draw'],['eraseMode','erase'],['editMode','edit']]){
+  for(const [id,value] of [['drawMode','draw'],['editMode','edit']]){
    $(id).classList.toggle('active',mode===value);$(id).setAttribute('aria-pressed',String(mode===value));
   }
   $('toggleWalls').setAttribute('aria-pressed',String(wallsVisible));
   $('toggleWalls').setAttribute('aria-label',wallsVisible?'Sakrij zidove':'Prikaži zidove');
   $('toggleWalls').setAttribute('title',wallsVisible?'Zidovi uključeni':'Zidovi isključeni');
-  $('cancel').hidden=!first&&!(mode==='erase'&&selectedWall);$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
+  $('cancel').hidden=!first;
+  $('wallActions').hidden=mode!=='edit'||!selectedWall;
+  if(selectedWall){const t=selectedWall.thickness??RoomGeometry.defaultThickness(model().rooms,selectedWall);$('wallLength').textContent='Duljina '+lengthText(Math.abs(selectedWall.x2-selectedWall.x1)+Math.abs(selectedWall.y2-selectedWall.y1));$('wallThickness').textContent='Debljina '+lengthText(t);}$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
  }
  function commit(before){
   if(JSON.stringify(before)===JSON.stringify(segments)){status();draw();return;}
@@ -73,7 +75,7 @@
   if(!first)return;
   if(first.x===end.x&&first.y===end.y){status('Odaberi drugu točku linije');return;}
   const before=copy(segments),stroke={x1:first.x,y1:first.y,x2:end.x,y2:end.y};
-  segments=mode==='erase'?GridGeometry.eraseLine(segments,stroke):GridGeometry.normalize([...segments,stroke]);
+  segments=GridGeometry.normalize([...segments,stroke]);
   first=mode==='draw'?{...end}:null;preview=first;commit(before);
  }
  function undo(){
@@ -83,12 +85,14 @@
  }
  function redo(){if(!future.length)return;past.push(copy(segments));segments=future.pop();selected=null;selectedWall=null;wallSession=null;save();status();draw();}
  function hitWall(x,y){
-  const raw=point(x,y);let best=null,distance=wallsVisible?Math.max(15,30*scale+3):15;
+  const raw=point(x,y);let best=null,solid=null,solidDistance=Infinity,distance=wallsVisible?Math.max(15,30*scale+3):15;
+  const current=model();
   for(const wall of GridGeometry.atomic(segments)){
    const horizontal=wall.y1===wall.y2,along=horizontal?raw.x:raw.y;
    const d=Math.hypot((horizontal?raw.y:raw.x)-(horizontal?wall.y1:wall.x1),along-clamp(along,horizontal?wall.x1:wall.y1,horizontal?wall.x2:wall.y2))*scale;
+   if(RoomGeometry.wallSelection(current.rooms,segments,wall,current.layout).some(r=>raw.x>=r.x&&raw.x<=r.x+r.width&&raw.y>=r.y&&raw.y<=r.y+r.height)&&d<solidDistance){solidDistance=d;solid=wall;}
    if(d<distance){distance=d;best=wall;}
-  }return best;
+  }return solid||best;
  }
  function hitHandle(x,y){
   if(!selectedWall)return null;
@@ -125,7 +129,7 @@
  function cancelInteraction(){
   if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
   if(gesture?.type==='room-move'){segments=gesture.before;selected=gesture.face.id;}
-  gesture=null;pointers.clear();first=null;preview=null;if(mode==='erase')selectedWall=null;status();draw();
+  gesture=null;pointers.clear();first=null;preview=null;status();draw();
  }
  function limitPan(){
   const availableX=w-WIDTH*scale,availableY=h-height*scale;
@@ -152,7 +156,7 @@
   let x=rawX,y=rawY;
   const base=priority===3?7:priority===1?8:12;
   const size=clamp(base+Math.log2(Math.max(1,scale/(w/WIDTH))),base,base+2),boxHeight=size+(priority===3?4:6);
-  g.save();g.font='600 '+size+'px system-ui';
+  g.save();g.globalAlpha=(mode==='edit'&&selectedWall&&priority<5)?0.3:1;g.font='600 '+size+'px system-ui';
   const width=g.measureText(text).width+(priority===3?6:10),halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
   x=clamp(x,Math.max(0,ox)+halfX+3,Math.min(w,ox+WIDTH*scale)-halfX-3);
   y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
@@ -175,8 +179,9 @@
  }
  function draw(){
   if(!w||!h)return;
-  const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
+  const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.globalAlpha=1;g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
   g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
+  g.globalAlpha=(mode==='edit'&&selectedWall)?0.3:1;
   // Blaga pastelna ispuna samo zatvorenih prostora; mreža i zidovi crtaju se iznad.
   g.fillStyle='#edf6ef';
   for(const face of current.faces){
@@ -209,26 +214,28 @@
    if(visibleLength<36)continue;
    tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v',1,{axis:e.axis,line:e.line,start:e.span[0],end:e.span[1],side:e.side});
   }
-  if(selectedWall){
+  g.globalAlpha=1;
+  if(mode==='edit'&&selectedWall){
    const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});
    const horizontal=selectedWall.y1===selectedWall.y2;
-   if(mode==='erase'){
-    const boxes=RoomGeometry.wallSelection(current.rooms,segments,selectedWall,current.layout);
-    g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
-    g.fillStyle='#ef4444';g.fill();
-   }else{g.strokeStyle='#1675d1';g.lineWidth=5;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();}
+   const boxes=RoomGeometry.wallSelection(current.rooms,segments,selectedWall,current.layout);
+   g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
+   g.fillStyle='#93c5fd';g.fill();g.strokeStyle='#2563eb';g.lineWidth=2;
    if(mode==='edit')for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,9,0,Math.PI*2);g.fill();g.stroke();}
-   const center=visibleWallCenter(selectedWall);if(center)tag(center.x,center.y,(mode==='erase'?'Obriši ':horizontal?'↕ ':'↔ ')+lengthText(horizontal?selectedWall.x2-selectedWall.x1:selectedWall.y2-selectedWall.y1),mode==='erase'?'#dc2626':'#1675d1',false,5,{axis:horizontal?'h':'v',line:horizontal?selectedWall.y1:selectedWall.x1,start:horizontal?selectedWall.x1:selectedWall.y1,end:horizontal?selectedWall.x2:selectedWall.y2});
+   const middle={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+   g.fillStyle='#2563eb';g.fillRect(middle.x-7,middle.y-7,14,14);g.strokeStyle='#fff';g.lineWidth=1.3;
+   g.beginPath();g.moveTo(middle.x-4,middle.y);g.lineTo(middle.x+4,middle.y);g.moveTo(middle.x,middle.y-4);g.lineTo(middle.x,middle.y+4);g.stroke();
+   const center=visibleWallCenter(selectedWall);if(center)tag(center.x+(horizontal?0:20),center.y+(horizontal?-20:0),lengthText(horizontal?selectedWall.x2-selectedWall.x1:selectedWall.y2-selectedWall.y1),'#1d4ed8',!horizontal,5,{axis:horizontal?'h':'v',line:horizontal?selectedWall.y1:selectedWall.x1,start:horizontal?selectedWall.x1:selectedWall.y1,end:horizontal?selectedWall.x2:selectedWall.y2});
   }
   if(first){
-   const color=mode==='erase'?'#dc2626':'#1675d1';
+   const color='#1675d1';
    const a=screen(first),b=screen(preview||first);g.strokeStyle=color;g.lineWidth=2.5;g.setLineDash([7,5]);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();g.setLineDash([]);
    for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,5,0,Math.PI*2);g.fill();g.stroke();}
    const length=Math.abs((preview||first).x-first.x)+Math.abs((preview||first).y-first.y);
    const center=visibleWallCenter({x1:first.x,y1:first.y,x2:(preview||first).x,y2:(preview||first).y});
-   if(length&&center)tag(center.x,center.y-20,(mode==='erase'?'Obriši ':'')+lengthText(length),color,false,5);
+   if(length&&center)tag(center.x,center.y-20,lengthText(length),color,false,5);
   }
-  paintTags();g.restore();
+  paintTags();g.restore();g.globalAlpha=1;
  }
  const xy=e=>{const r=board.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
  function pinch(){
@@ -251,10 +258,9 @@
   if(e.button!==undefined&&e.button!==0)return;e.preventDefault();board.setPointerCapture(e.pointerId);
   const p=xy(e);pointers.set(e.pointerId,p);resetClear();
   if(pointers.size>1){pinch();return;}
-  if(mode==='erase'){gesture={type:'erase-select',id:e.pointerId,start:p,wall:hitWall(p.x,p.y),moved:false};return;}
   const endpoint=mode==='edit'?hitHandle(p.x,p.y):null;
   if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
-  const label=mode!=='erase'&&dimensionHits.find(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom);
+  const label=mode==='edit'&&dimensionHits.find(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom);
   if(label){gesture={type:'dimension',id:e.pointerId,start:p,dimension:label.dimension,wall:mode==='edit'?hitWall(p.x,p.y):null};return;}
   if(mode==='edit'){
    const wall=hitWall(p.x,p.y);selectedWall=wall;
@@ -270,12 +276,12 @@
    }
    status();draw();
   }
-  if((mode==='draw'||mode==='erase')&&first){const q=second(p.x,p.y),raw=point(p.x,p.y);gesture={type:'preview',id:e.pointerId,start:p,base:q,axis:Math.abs(raw.x-first.x)>=Math.abs(raw.y-first.y)?'h':'v',dragMode:null};preview=q;schedule();return;}
+  if(mode==='draw'&&first){const q=second(p.x,p.y),raw=point(p.x,p.y);gesture={type:'preview',id:e.pointerId,start:p,base:q,axis:Math.abs(raw.x-first.x)>=Math.abs(raw.y-first.y)?'h':'v',dragMode:null};preview=q;schedule();return;}
   gesture={type:'single',id:e.pointerId,start:p,ox,oy,moved:false};
  });
  board.addEventListener('pointermove',e=>{
   const p=xy(e);
-  if(!pointers.has(e.pointerId)){if((mode==='draw'||mode==='erase')&&first){preview=second(p.x,p.y);schedule();}return;}
+  if(!pointers.has(e.pointerId)){if(mode==='draw'&&first){preview=second(p.x,p.y);schedule();}return;}
   e.preventDefault();pointers.set(e.pointerId,p);
   if(pointers.size>1){
    if(gesture?.type!=='pinch')pinch();const [a,b]=[...pointers.values()],mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
@@ -288,8 +294,7 @@
     baseSegments:session?session.baseSegments:copy(segments),baseWall:session?session.baseWall:wall,currentOffset:session?session.offset:0};
    selectedWall=wall;
   }
-  if(gesture.type==='erase-select'){if(Math.hypot(p.x-gesture.start.x,p.y-gesture.start.y)>9)gesture.moved=true;}
-  else if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
+  if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
   else if(gesture.type==='wall-move'){updateWall(p,gesture);}
   else if(gesture.type==='wall-resize'){updateWallLength(p,gesture);}
   else if(gesture.type==='room-move'){updateRoom(p,gesture);}
@@ -303,14 +308,6 @@
   const p=xy(e),last=gesture,wasMulti=last?.type==='pinch'||pointers.size>1;pointers.delete(e.pointerId);
   if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
   if(wasMulti||last?.type==='remaining'){status();draw();return;}
-  if(last?.type==='erase-select'){
-   if(cancelled||last.moved||Math.hypot(p.x-last.start.x,p.y-last.start.y)>9){status();draw();return;}
-   const wall=last.wall;
-   if(wall&&selectedWall&&['x1','y1','x2','y2'].every(k=>wall[k]===selectedWall[k])){
-    const before=copy(segments);segments=GridGeometry.eraseLine(segments,wall);selectedWall=null;commit(before);
-   }else{selectedWall=wall;status();draw();}
-   return;
-  }
   if(last?.type==='dimension'){
    if(!cancelled&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)openDimension(last.dimension);
    return;
@@ -331,12 +328,12 @@
    else{
     const q=snap(p.x,p.y);
     // Ponovljeni dodir zadnje točke završava niz i na dodirnom zaslonu.
-    if(mode==='draw'&&!last.dragMode&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9&&q.x===first.x&&q.y===first.y)cancelInteraction();
+    if(mode==='draw'&&!last.dragMode&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9&&q.x===first.x&&q.y===first.y)changeMode('edit');
     else add(adjust(p,last));
    }
   }
   else if(last?.type==='single'&&!last.moved&&!cancelled){
-   if(mode==='draw'||mode==='erase'){first=snap(p.x,p.y);preview=first;status();draw();}
+   if(mode==='draw'){first=snap(p.x,p.y);preview=first;status();draw();}
    else{const raw=point(p.x,p.y);selected=model().rooms.find(r=>raw.x>=r.x&&raw.x<=r.x+r.width&&raw.y>=r.y&&raw.y<=r.y+r.height)?.roomKey??null;status();draw();}
   }
  }
@@ -348,10 +345,16 @@
  function closeMenu(){$('topMenu').open=false;}
  document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))closeMenu();});
  function changeMode(next){closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;resetClear();status();draw();}
- $('drawMode').addEventListener('click',()=>changeMode('draw'));$('eraseMode').addEventListener('click',()=>changeMode('erase'));$('editMode').addEventListener('click',()=>changeMode('edit'));
+ $('drawMode').addEventListener('click',()=>changeMode('draw'));$('editMode').addEventListener('click',()=>changeMode('edit'));
  $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
- $('cancel').addEventListener('click',cancelInteraction);
+ $('cancel').addEventListener('click',()=>changeMode('edit'));
+ function deselectWall(){selectedWall=null;wallSession=null;status();draw();}
+ $('wallDeselect').addEventListener('click',deselectWall);
+ function selectedDimension(){if(!selectedWall)return null;const h=selectedWall.y1===selectedWall.y2;return {axis:h?'h':'v',line:h?selectedWall.y1:selectedWall.x1,start:h?selectedWall.x1:selectedWall.y1,end:h?selectedWall.x2:selectedWall.y2};}
+ $('wallLength').addEventListener('click',()=>{const dimension=selectedDimension();if(dimension)openDimension(dimension);});
+ $('wallThickness').addEventListener('click',()=>{const dimension=selectedDimension();if(dimension){openDimension(dimension);$('dimensionThickness').focus();$('dimensionThickness').select();}});
+ $('wallDelete').addEventListener('click',()=>{if(mode!=='edit'||!selectedWall)return;const before=copy(segments);segments=GridGeometry.eraseLine(segments,selectedWall);selectedWall=null;commit(before);});
  $('clearAll').addEventListener('click',()=>{
   if(!segments.length)return;
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
@@ -360,7 +363,7 @@
  function openDimension(dimension){
   cancelInteraction();editingDimension={...dimension};
   $('dimensionValue').value=String(Math.round((dimension.end-dimension.start)*1000)/1000).replace('.',',');
-  const wall=GridGeometry.wallForDimension(segments,dimension).wall;
+  const wall=GridGeometry.wallForDimension(segments,dimension).wall;selectedWall=wall;status();draw();
   $('dimensionThickness').value=String(wall.thickness??RoomGeometry.defaultThickness(model().rooms,wall)).replace('.',',');
   $('dimensionError').textContent='';$('dimensionDialog').showModal();$('dimensionValue').focus();$('dimensionValue').select();
  }
@@ -388,7 +391,8 @@
     updated=GridGeometry.resizeDimension(updated,dimension,value,MIN,WIDTH,height);
    }
    GridGeometry.detectWithDoors(updated);
-   const before=copy(segments);segments=updated;commit(before);
+   const h=wall.y1===wall.y2,selection=GridGeometry.wallForDimension(updated,{axis:h?'h':'v',line:h?wall.y1:wall.x1,start:h?wall.x1:wall.y1,end:h?wall.x2:wall.y2}).wall;
+   const before=copy(segments);segments=updated;commit(before);selectedWall=selection;status();draw();
    editingDimension=null;$('dimensionDialog').close();status('Mjere zida su promijenjene');
   }catch(error){$('dimensionError').textContent=error.message;}
  });
@@ -429,7 +433,7 @@
  window.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}
   else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
-  else if(e.key==='Escape')cancelInteraction();
+  else if(e.key==='Escape'){if(mode==='draw')changeMode('edit');else{cancelInteraction();deselectWall();}}
  });
  restore();status();new ResizeObserver(resize).observe(board);resize();
 })();

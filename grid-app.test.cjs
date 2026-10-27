@@ -59,7 +59,8 @@ assert.ok(api.segments.some(s=>s.y1===150&&s.y2===150&&s.x1===200),'Spušteni se
 api.undo();api.undo();
 const beforeRoomMove=JSON.stringify(api.segments),beforeRoomCamera={scale:api.view.scale,ox:api.view.ox,oy:api.view.oy};drag(150,175,125,200);
 assert.equal(JSON.stringify(api.segments),beforeRoomMove,'Povlačenje unutrašnjosti ne pomiče prostoriju');
-assert.equal(api.model().faces.length,2);assert.deepEqual({scale:api.view.scale,ox:api.view.ox,oy:api.view.oy},beforeRoomCamera,'Povlačenje praznog prostora ne pomiče ni prikaz');
+assert.equal(api.model().faces.length,2);assert.deepEqual({scale:api.view.scale,ox:api.view.ox,oy:api.view.oy},{...beforeRoomCamera,ox:beforeRoomCamera.ox-25,oy:beforeRoomCamera.oy+25},'Povlačenje praznog prostora pomiče samo prikaz');
+api.fit();
 // Neprekinuti niz: svaki novi dodir dodaje segment i zadržava kraj za nastavak.
 el('clearAll').click();el('clearAll').click();startDrawing();
 click(100,100);click(300,100);click(300,250);click(100,250);
@@ -475,3 +476,10 @@ api.addObject('chair');const deleteButtonBefore=JSON.stringify(api.objects);el('
 // Delete is also available in the selected wall editor, with two clicks.
 el('clearAll').click();el('clearAll').click();line(100,100,300,100);enterEdit();click(200,100);
 const beforeEditDelete=JSON.stringify(api.segments);el('wallDelete').click();assert.equal(JSON.stringify(api.segments),beforeEditDelete);assert.equal(el('wallDelete').textContent,'Potvrdi brisanje');el('wallDelete').click();assert.equal(api.segments.length,0);api.undo();assert.equal(JSON.stringify(api.segments),beforeEditDelete);
+
+// Pan on blank canvas never edits geometry, scales, or adds an undo entry.
+el('clearAll').click();el('clearAll').click();api.fit();enterEdit();
+const panBefore={...api.view},panScene=JSON.stringify(api.segments);drag(500,500,580,560);
+assert.equal(api.view.ox,panBefore.ox+80);assert.equal(api.view.oy,panBefore.oy+60);assert.equal(api.view.scale,panBefore.scale);assert.equal(JSON.stringify(api.segments),panScene);
+const afterPan={...api.view};click(500,500);assert.deepEqual({...api.view},afterPan,'Tap does not pan');
+el('eraseMode').click();drag(500,500,470,460);assert.equal(api.mode,'erase');assert.equal(api.view.ox,afterPan.ox-30);assert.equal(api.view.oy,afterPan.oy-40);click(500,500);assert.equal(api.mode,'edit');

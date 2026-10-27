@@ -1,0 +1,150 @@
+/* Mreža ortogonalnih poteza. Prostorije su zatvorene plohe mreže. */
+globalThis.GridGeometry=(()=>{
+ function normalize(input){
+  const lines=new Map();
+  for(const s of input){
+   if(!['x1','y1','x2','y2'].every(k=>Number.isFinite(s[k])))continue;
+   const h=s.y1===s.y2;if(!h&&s.x1!==s.x2)continue;
+   const line=h?s.y1:s.x1,start=h?Math.min(s.x1,s.x2):Math.min(s.y1,s.y2),end=h?Math.max(s.x1,s.x2):Math.max(s.y1,s.y2);
+   if(start===end)continue;
+   const key=(h?'h':'v')+':'+line;if(!lines.has(key))lines.set(key,{h,line,spans:[]});lines.get(key).spans.push([start,end]);
+  }
+  const merged=[];
+  for(const {h,line,spans} of lines.values()){
+   spans.sort((a,b)=>a[0]-b[0]);let span=null;
+   for(const q of spans){if(span&&q[0]<=span[1])span[1]=Math.max(span[1],q[1]);else{span=[...q];merged.push({h,line,span});}}
+  }
+  return merged.map(s=>s.h?{x1:s.span[0],y1:s.line,x2:s.span[1],y2:s.line}:{x1:s.line,y1:s.span[0],x2:s.line,y2:s.span[1]});
+ }
+ function erase(input,index,start,end){
+  const result=[];
+  input.forEach((s,i)=>{
+   if(i!==index){result.push(s);return;}
+   const h=s.y1===s.y2,a=h?s.x1:s.y1,b=h?s.x2:s.y2;
+   if(start>a)result.push(h?{...s,x2:Math.min(start,b)}:{...s,y2:Math.min(start,b)});
+   if(end<b)result.push(h?{...s,x1:Math.max(end,a)}:{...s,y1:Math.max(end,a)});
+  });return normalize(result);
+ }
+ function detect(input){
+  const segments=normalize(input);if(!segments.length)return {rooms:[],faces:[]};
+  const xs=[...new Set(segments.flatMap(s=>[s.x1,s.x2]))].sort((a,b)=>a-b);
+  const ys=[...new Set(segments.flatMap(s=>[s.y1,s.y2]))].sort((a,b)=>a-b);
+  xs.unshift(xs[0]-50);xs.push(xs[xs.length-1]+50);ys.unshift(ys[0]-50);ys.push(ys[ys.length-1]+50);
+  const nx=xs.length-1,ny=ys.length-1;
+  if(nx*ny>250000)throw new Error('Mreža ima previše detalja');
+  const horizontal=new Map(),vertical=new Map();
+  for(const s of segments){const h=s.y1===s.y2,map=h?horizontal:vertical,line=h?s.y1:s.x1;if(!map.has(line))map.set(line,[]);map.get(line).push(h?[s.x1,s.x2]:[s.y1,s.y2]);}
+  const blocked=(map,line,start,end)=>(map.get(line)||[]).some(s=>s[0]<=start&&s[1]>=end);
+  const visited=new Uint8Array(nx*ny),faces=[],rooms=[];let id=1;
+  for(let seed=0;seed<visited.length;seed++){
+   if(visited[seed])continue;
+   const queue=[seed],cells=[];let outside=false;visited[seed]=1;
+   for(let cursor=0;cursor<queue.length;cursor++){
+    const key=queue[cursor],i=key%nx,j=Math.floor(key/nx);cells.push([i,j]);
+    if(i===0||j===0||i===nx-1||j===ny-1)outside=true;
+    const visit=(ii,jj,wall)=>{if(ii<0||jj<0||ii>=nx||jj>=ny||wall)return;const key=jj*nx+ii;if(!visited[key]){visited[key]=1;queue.push(key);}};
+    visit(i-1,j,blocked(vertical,xs[i],ys[j],ys[j+1]));visit(i+1,j,blocked(vertical,xs[i+1],ys[j],ys[j+1]));
+    visit(i,j-1,blocked(horizontal,ys[j],xs[i],xs[i+1]));visit(i,j+1,blocked(horizontal,ys[j+1],xs[i],xs[i+1]));
+   }
+   if(outside)continue;
+   const rects=[];cells.sort((a,b)=>a[1]-b[1]||a[0]-b[0]);let previous=null;
+   for(const [i,j] of cells){
+    const x=xs[i],y=ys[j],width=xs[i+1]-x,height=ys[j+1]-y;
+    if(previous&&previous.y===y&&previous.height===height&&previous.x+previous.width===x)previous.width+=width;
+    else{previous={id:rooms.length+rects.length+1,roomKey:id,x,y,width,height};rects.push(previous);}
+   }
+   const area=rects.reduce((a,r)=>a+r.width*r.height,0);faces.push({id,rects,area});rooms.push(...rects);id++;
+  }
+  return {rooms,faces};
+ }
+ function atomic(input){
+  const lines=normalize(input),result=[];
+  for(const s of lines){
+   const h=s.y1===s.y2,start=h?s.x1:s.y1,end=h?s.x2:s.y2,cuts=new Set([start,end]);
+   for(const other of lines){
+    if(h===(other.y1===other.y2))continue;
+    const along=h?other.x1:other.y1,line=h?s.y1:s.x1;
+    const low=h?other.y1:other.x1,high=h?other.y2:other.x2;
+    if(along>start&&along<end&&line>=low&&line<=high)cuts.add(along);
+   }
+   const sorted=[...cuts].sort((a,b)=>a-b);
+   for(let i=0;i<sorted.length-1;i++)result.push(h?{x1:sorted[i],y1:s.y1,x2:sorted[i+1],y2:s.y1}:{x1:s.x1,y1:sorted[i],x2:s.x1,y2:sorted[i+1]});
+  }
+  return result;
+ }
+ function eraseLine(input,stroke){
+  const h=stroke.y1===stroke.y2,line=h?stroke.y1:stroke.x1;
+  const start=h?Math.min(stroke.x1,stroke.x2):Math.min(stroke.y1,stroke.y2),end=h?Math.max(stroke.x1,stroke.x2):Math.max(stroke.y1,stroke.y2);
+  const result=[];
+  for(const s of normalize(input)){
+   if(h!==(s.y1===s.y2)||(h?s.y1:s.x1)!==line){result.push(s);continue;}
+   const a=h?s.x1:s.y1,b=h?s.x2:s.y2;
+   if(end<=a||start>=b){result.push(s);continue;}
+   if(start>a)result.push(h?{...s,x2:start}:{...s,y2:start});
+   if(end<b)result.push(h?{...s,x1:end}:{...s,y1:end});
+  }
+  return normalize(result);
+ }
+ function moveWall(input,wall,requested,min=5,width=2000,height=2000){
+  const lines=atomic(input),horizontal=wall.y1===wall.y2,axis=horizontal?'y':'x';
+  const matches=s=>['x1','y1','x2','y2'].every(k=>s[k]===wall[k]);
+  if(!lines.some(matches))return {segments:normalize(input),wall,delta:0};
+  const endpoints=[{x:wall.x1,y:wall.y1},{x:wall.x2,y:wall.y2}],at=p=>endpoints.some(e=>e.x===p.x&&e.y===p.y);
+  const coordinate=horizontal?wall.y1:wall.x1;
+  let low=-coordinate,high=(horizontal?height:width)-coordinate;
+  let safeLow=low,safeHigh=high;
+  for(const s of lines){
+   if(matches(s)||horizontal===(s.y1===s.y2))continue;
+   for(const [a,b] of [[1,2],[2,1]]){
+    const p={x:s['x'+a],y:s['y'+a]};if(!at(p))continue;
+    const fixed=s[axis+b];
+    const branching=lines.some(other=>other!==s&&!matches(other)&&horizontal!==(other.y1===other.y2)&&
+     ((other.x1===p.x&&other.y1===p.y)||(other.x2===p.x&&other.y2===p.y)));
+    const gap=branching?0:min;
+    if(fixed>coordinate){high=Math.min(high,fixed-coordinate-gap);safeHigh=Math.min(safeHigh,fixed-coordinate-min);}
+    else{low=Math.max(low,fixed-coordinate+gap);safeLow=Math.max(safeLow,fixed-coordinate+min);}
+   }
+  }
+  function build(delta){
+  const result=[],connectors=[];
+  for(const s of lines){
+   const next={...s};
+   if(matches(s)){next[axis+'1']+=delta;next[axis+'2']+=delta;result.push(next);continue;}
+   for(const n of [1,2]){
+    const p={x:s['x'+n],y:s['y'+n]};if(!at(p))continue;
+    if(horizontal!==(s.y1===s.y2))next[axis+n]+=delta;
+    else{const q={...p};q[axis]+=delta;connectors.push({x1:p.x,y1:p.y,x2:q.x,y2:q.y});}
+   }
+   result.push(next);
+  }
+  const moved={...wall};moved[axis+'1']+=delta;moved[axis+'2']+=delta;
+  return {segments:normalize([...result,...connectors]),wall:moved,delta};
+  }
+  const delta=Math.max(low,Math.min(high,requested)),candidate=build(delta);
+  // Povrat kratkog spoja na ravninu je dopušten, ali cijela prostorija ne smije kolabirati.
+  if((delta<safeLow||delta>safeHigh)&&detect(candidate.segments).faces.length<detect(input).faces.length)
+   return build(Math.max(safeLow,Math.min(safeHigh,requested)));
+  return candidate;
+ }
+ function moveRoom(input,rects,dx,dy,width=2000,height=2000){
+  if(!rects.length)return {segments:normalize(input),dx:0,dy:0};
+  const left=Math.min(...rects.map(r=>r.x)),right=Math.max(...rects.map(r=>r.x+r.width));
+  const top=Math.min(...rects.map(r=>r.y)),bottom=Math.max(...rects.map(r=>r.y+r.height));
+  dx=Math.max(-left,Math.min(width-right,dx));dy=Math.max(-top,Math.min(height-bottom,dy));
+  const inside=p=>rects.some(r=>p.x>=r.x&&p.x<=r.x+r.width&&p.y>=r.y&&p.y<=r.y+r.height);
+  const result=[];
+  for(const s of atomic(input)){
+   const a={x:s.x1,y:s.y1},b={x:s.x2,y:s.y2},moveA=inside(a),moveB=inside(b);
+   const p={x:a.x+(moveA?dx:0),y:a.y+(moveA?dy:0)},q={x:b.x+(moveB?dx:0),y:b.y+(moveB?dy:0)};
+   if(p.x===q.x||p.y===q.y)result.push({x1:p.x,y1:p.y,x2:q.x,y2:q.y});
+   else{
+    // Udaljeni kraj susjednog zida ostaje na mjestu, a spoj dobiva ortogonalni pregib.
+    const horizontal=s.y1===s.y2;
+    const elbow=moveA?(horizontal?{x:p.x,y:q.y}:{x:q.x,y:p.y}):(horizontal?{x:q.x,y:p.y}:{x:p.x,y:q.y});
+    result.push({x1:p.x,y1:p.y,x2:elbow.x,y2:elbow.y},{x1:elbow.x,y1:elbow.y,x2:q.x,y2:q.y});
+   }
+  }
+  return {segments:normalize(result),dx,dy};
+ }
+ return {normalize,erase,detect,atomic,eraseLine,moveWall,moveRoom};
+})();

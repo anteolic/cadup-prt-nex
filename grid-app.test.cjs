@@ -1,0 +1,49 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const nodes=new Map(),labels=[],memory=new Map();
+const canvas=new Proxy({measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text)},{get:(o,k)=>o[k]||(()=>{})});
+function el(id){
+ if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},setAttribute(){},addEventListener(type,fn){this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
+ return nodes.get(id);
+}
+const context=vm.createContext({console,document:{getElementById:el,documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
+for(const file of ['room-geometry.js','grid-geometry.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
+let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
+source=source.replace('restore();status();',`globalThis.api={model,undo,redo,draw,snap,step,point,get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+vm.runInContext(source,context);
+const {api}=context,board=el('board');
+const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
+function click(x,y){board.pointerdown(event(x,y));board.pointerup(event(x,y));}
+function line(x1,y1,x2,y2){click(x1,y1);click(x2,y2);}
+line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);
+assert.equal(api.model().faces.length,0);line(100,250,100,100);
+assert.equal(api.model().faces.length,1);assert.equal(api.model().faces[0].area,120000);
+assert.ok(labels.includes('Prostorija 1'));assert.ok(labels.some(t=>t.includes('m²')));
+line(200,100,200,250);assert.equal(api.model().faces.length,2);assert.equal(api.model().layout.inner[0].width,10);
+el('toggleWalls').click();assert.equal(api.visible,false);assert.equal(api.model().faces.length,2);
+el('eraseMode').click();line(200,150,200,200);assert.equal(api.model().faces.length,1);
+api.undo();assert.equal(api.model().faces.length,2);api.redo();assert.equal(api.model().faces.length,1);
+// Gumica otvara obris i undo ga zatvara.
+line(150,100,175,100);assert.equal(api.model().faces.length,0);api.undo();assert.equal(api.model().faces.length,1);
+// Otkazivanje gumice ne mijenja spremljeni tlocrt.
+const count=JSON.stringify(api.segments);board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),count);
+// Isti stari način podešavanja: klizanje gore-dolje mijenja duljinu vodoravnog poteza.
+el('drawMode').click();click(350,300);board.pointerdown(event(450,300));board.pointermove(event(450,275));
+api.draw();assert.ok(labels.includes('2,50 m'));board.pointerup(event(450,275));
+assert.ok(api.segments.some(s=>s.x1===700&&s.x2===950&&s.y1===600&&s.y2===600));
+// Klik izvan čvora sjeda na običnu mrežu.
+const snapped=api.snap(413,333);assert.equal(snapped.x%api.step(),0);assert.equal(snapped.y%api.step(),0);
+el('clearAll').click();el('clearAll').click();assert.equal(api.segments.length,0);api.undo();assert.ok(api.segments.length);
+assert.ok(JSON.parse(memory.get('infoa_grid_loops_v1')).segments.length);
+el('clearAll').click();el('clearAll').click();el('drawMode').click();
+line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);line(200,100,200,250);
+el('editMode').click();
+function drag(x1,y1,x2,y2){board.pointerdown(event(x1,y1));board.pointermove(event(x2,y2));board.pointerup(event(x2,y2));}
+drag(150,100,150,125);assert.equal(api.model().faces.length,2);
+assert.ok(api.segments.some(s=>s.y1===250&&s.y2===250&&s.x1===200));
+drag(150,125,150,75);assert.equal(api.model().faces.length,2);
+assert.ok(api.segments.some(s=>s.y1===150&&s.y2===150&&s.x1===200),'Spušteni segment podiže se iznad početne ravnine');
+api.undo();api.undo();
+const beforeRoomMove=JSON.stringify(api.segments);drag(150,175,125,200);
+assert.notEqual(JSON.stringify(api.segments),beforeRoomMove,'Povlačenje unutrašnjosti pomiče prostoriju');
+assert.equal(api.model().faces.length,2);api.undo();assert.equal(JSON.stringify(api.segments),beforeRoomMove);
+console.log('PASS: crtanje na dvije točke, podešavanje duljine, automatske prostorije, žive dimenzije, gumica, zidovi, snap, undo/redo i spremanje.');

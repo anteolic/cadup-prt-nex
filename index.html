@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="hr">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f8fafc">
+<title>INFOA Tlocrt</title>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#162335;background:#f8fafc;font-synthesis:none}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+body{display:flex;flex-direction:column;height:100dvh;min-height:0}button{font:inherit;touch-action:manipulation;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+button:disabled{opacity:.3;cursor:default}button[hidden]{display:none!important}
+header{flex:0 0 auto;padding:max(8px,env(safe-area-inset-top)) 12px 8px;display:flex;align-items:center;gap:8px;background:#fff;border-bottom:1px solid #dde4ec}
+.brand{min-width:0;flex:1;line-height:1.16}.brand strong{display:block;font-size:16px;letter-spacing:-.4px}.brand span{display:block;color:#68788d;font-size:11px;margin-top:3px}
+.small{height:38px;min-width:39px;border:1px solid #dde4ec;border-radius:11px;background:#f8fafc;color:#24354c;font-size:20px;font-weight:600}
+canvas{display:block;flex:1;min-height:0;width:100%;background:#e9eef3;touch-action:none;outline:none;cursor:crosshair}
+footer{background:#fff;border-top:1px solid #dde4ec;padding:10px 12px max(11px,env(safe-area-inset-bottom));flex:0 0 auto}
+.mode-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:9px}
+.tool{height:42px;border:1px solid #cbd5e1;border-radius:11px;color:#37516c;background:#f2f6fa;font-size:14px;font-weight:650}
+.tool.active{background:#dbeafe;border-color:#2563eb;color:#164c91;box-shadow:inset 0 0 0 1px #2563eb}
+.statusline{min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:7px}
+.status{font-size:12px;font-weight:600;color:#2e4c6c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.secondary{font-size:12px;color:#66788e;margin-bottom:7px}.cancel{border:0;color:#1d5da5;background:#eff6ff;border-radius:8px;padding:7px 9px;font-size:12px;font-weight:650;white-space:nowrap}
+.controls{display:flex;gap:6px}.controls button{height:40px;border:1px solid #dbe2eb;border-radius:10px;background:#f2f6fb;color:#1a456d;font-size:12px;font-weight:650;padding:0 12px}
+#toggleWalls{margin-right:auto}#minus,#plus{font-size:21px;min-width:40px;padding:0}#clearAll{color:#a52835;background:#fff1f2}#clearAll.armed{color:#fff;background:#b91c1c}
+@media(max-width:360px){header{padding-inline:8px}.brand span{font-size:9px}footer{padding-inline:8px}.controls{gap:4px}.controls button{padding-inline:8px}.tool{font-size:12px}}
+</style>
+</head>
+<body>
+<header>
+ <div class="brand"><strong>INFOA Tlocrt</strong><span>Vanjski zid 30 cm · unutarnji zid 10 cm</span></div>
+ <button id="undo" class="small" title="Poništi" aria-label="Poništi">↶</button>
+ <button id="redo" class="small" title="Vrati" aria-label="Vrati">↷</button>
+ <button id="fullscreen" class="small" title="Cijeli zaslon" aria-label="Cijeli zaslon">⛶</button>
+</header>
+<canvas id="board" aria-label="Mreža za crtanje obrisa prostorija"></canvas>
+<footer>
+ <div class="mode-row"><button id="drawMode" class="tool active" aria-pressed="true">✎ Crtaj</button><button id="eraseMode" class="tool" aria-pressed="false">Gumica</button><button id="editMode" class="tool" aria-pressed="false">Uredi</button></div>
+ <div id="roomArea" class="secondary"></div>
+ <div class="statusline"><span id="status" class="status">1. Dodirni početak linije</span><button id="cancel" class="cancel" hidden>Odustani ✕</button></div>
+ <div class="controls"><button id="toggleWalls">Sakrij zidove</button><button id="clearAll">Obriši sve</button><button id="minus" aria-label="Smanji zoom">−</button><button id="plus" aria-label="Povećaj zoom">+</button><button id="fit">Cijelo</button></div>
+</footer>
+<script src="room-geometry.js"></script>
+<script src="grid-geometry.js"></script>
+<script src="grid-app.js"></script>
+</body>
+</html>

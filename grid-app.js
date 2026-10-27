@@ -1,0 +1,310 @@
+'use strict';
+(()=>{
+ const $=id=>document.getElementById(id),board=$('board'),g=board.getContext('2d');
+ const KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
+ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ let segments=[],past=[],future=[],first=null,preview=null,mode='draw',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
+ let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false;
+ let cachedKey=null,cached=null,pendingTags=[];
+ const pointers=new Map();
+ const copy=a=>a.map(s=>({...s}));
+ function save(){try{localStorage.setItem(KEY,JSON.stringify({segments,wallsVisible}));}catch(_){}}
+ function restore(){
+  try{
+   const saved=localStorage.getItem(KEY);
+   if(saved){const data=JSON.parse(saved);segments=GridGeometry.normalize(Array.isArray(data.segments)?data.segments:[]);wallsVisible=data.wallsVisible!==false;}
+   else{
+    // Zadržavaju se obrisi spremljenih prostorija; stari ručno crtani zidovi se ne učitavaju.
+    const old=JSON.parse(localStorage.getItem('infoa_tlocrt_minimal_v1')||'null');
+    if(old&&Array.isArray(old.rooms)){
+     const rects=old.rooms.filter(r=>['x','y','width','height'].every(k=>Number.isFinite(r[k]))&&r.width>0&&r.height>0);
+     const edges=[];
+     for(const group of RoomGeometry.groups(rects))for(const e of RoomGeometry.union(group.rects).edges){
+      edges.push(e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]});
+     }segments=GridGeometry.normalize(edges);
+    }
+   }
+  }catch(_){segments=[];}
+ }
+ function model(){
+  const key=JSON.stringify(segments);
+  if(cachedKey!==key){const detected=GridGeometry.detect(segments);cached={...detected,layout:RoomGeometry.layout(detected.rooms)};cachedKey=key;}
+  return cached;
+ }
+ const point=(x,y)=>({x:(x-ox)/scale,y:(y-oy)/scale});
+ const screen=p=>({x:ox+p.x*scale,y:oy+p.y*scale});
+ function step(){for(const s of [5,10,20,50,100,200,500,1000,2000])if(s*scale>=19)return s;return 2000;}
+ function snap(x,y){
+  const raw=point(x,y),unit=step();
+  let q={x:clamp(Math.round(raw.x/unit)*unit,0,WIDTH),y:clamp(Math.round(raw.y/unit)*unit,0,height)},distance=14;
+  for(const s of segments)for(const p of [{x:s.x1,y:s.y1},{x:s.x2,y:s.y2}]){
+   const d=Math.hypot(raw.x-p.x,raw.y-p.y)*scale;if(d<distance){distance=d;q={...p};}
+  }
+  // Spoj na postojeći potez zadržava točnu koordinatu i kad se razina mreže promijeni.
+  for(const s of segments){
+   if(s.y1===s.y2&&q.x>=s.x1&&q.x<=s.x2&&Math.abs(raw.y-s.y1)*scale<9)q.y=s.y1;
+   if(s.x1===s.x2&&q.y>=s.y1&&q.y<=s.y2&&Math.abs(raw.x-s.x1)*scale<9)q.x=s.x1;
+  }
+  return q;
+ }
+ function second(x,y,axis=null){
+  const raw=point(x,y),q=snap(x,y),horizontal=axis?axis==='h':Math.abs(raw.x-first.x)>=Math.abs(raw.y-first.y);
+  return horizontal?{x:q.x,y:first.y}:{x:first.x,y:q.y};
+ }
+ const lengthText=cm=>cm>=100?(cm/100).toLocaleString('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m':cm.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm';
+ const areaText=cm=> (cm/10000).toLocaleString('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m²';
+ function resetClear(){clearArmed=false;$('clearAll').textContent='Obriši sve';$('clearAll').classList.remove('armed');}
+ function status(message){
+  const current=model();
+  $('status').textContent=message||(mode==='edit'?(selectedWall?'Povuci zid unutra ili van':'Povuci unutrašnjost prostorije ili odaberi zid'):first?(mode==='erase'?'2. Dodirni kraj brisanja · povuci za duljinu':'2. Dodirni kraj · povuci za duljinu'):(mode==='erase'?'1. Dodirni početak brisanja':'1. Dodirni početak linije'));
+  $('roomArea').textContent=current.faces.length?current.faces.length+' prostorija · ukupno '+areaText(current.layout.area):'Zatvori obris da nastane prostorija';
+  for(const [id,value] of [['drawMode','draw'],['eraseMode','erase'],['editMode','edit']]){
+   $(id).classList.toggle('active',mode===value);$(id).setAttribute('aria-pressed',String(mode===value));
+  }
+  $('toggleWalls').textContent=wallsVisible?'Sakrij zidove':'Prikaži zidove';
+  $('cancel').hidden=!first;$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
+ }
+ function commit(before){
+  if(JSON.stringify(before)===JSON.stringify(segments)){status();draw();return;}
+  past.push(before);if(past.length>HISTORY)past.shift();future=[];selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
+ }
+ function add(end){
+  if(!first)return;
+  if(first.x===end.x&&first.y===end.y){status('Odaberi drugu točku linije');return;}
+  const before=copy(segments),stroke={x1:first.x,y1:first.y,x2:end.x,y2:end.y};
+  segments=mode==='erase'?GridGeometry.eraseLine(segments,stroke):GridGeometry.normalize([...segments,stroke]);
+  first=null;preview=null;commit(before);
+ }
+ function undo(){
+  if(gesture?.type==='wall-move'||gesture?.type==='room-move'){cancelInteraction();return;}
+  if(first){first=null;preview=null;status();draw();return;}
+  if(!past.length)return;future.push(copy(segments));segments=past.pop();selected=null;selectedWall=null;wallSession=null;save();resetClear();status();draw();
+ }
+ function redo(){if(!future.length)return;past.push(copy(segments));segments=future.pop();selected=null;selectedWall=null;wallSession=null;save();status();draw();}
+ function hitWall(x,y){
+  const raw=point(x,y);let best=null,distance=wallsVisible?Math.max(15,30*scale+3):15;
+  for(const wall of GridGeometry.atomic(segments)){
+   const horizontal=wall.y1===wall.y2,along=horizontal?raw.x:raw.y;
+   const d=Math.hypot((horizontal?raw.y:raw.x)-(horizontal?wall.y1:wall.x1),along-clamp(along,horizontal?wall.x1:wall.y1,horizontal?wall.x2:wall.y2))*scale;
+   if(d<distance){distance=d;best=wall;}
+  }return best;
+ }
+ function updateWall(p,drag){
+  const horizontal=drag.wall.y1===drag.wall.y2;
+  const raw=(horizontal?p.y-drag.start.y:p.x-drag.start.x)/scale;
+  const old=horizontal?drag.wall.y1:drag.wall.x1;
+  const target=Math.round((old+raw)/step())*step();
+  const base=horizontal?drag.baseWall.y1:drag.baseWall.x1;
+  const moved=GridGeometry.moveWall(drag.baseSegments,drag.baseWall,target-base,MIN,WIDTH,height);
+  segments=moved.segments;selectedWall=moved.wall;drag.currentWall=moved.wall;drag.currentOffset=moved.delta;schedule();
+ }
+ function updateRoom(p,drag){
+  const dx=Math.round((p.x-drag.start.x)/scale/step())*step(),dy=Math.round((p.y-drag.start.y)/scale/step())*step();
+  const moved=GridGeometry.moveRoom(drag.before,drag.face.rects,dx,dy,WIDTH,height);
+  const detected=GridGeometry.detect(moved.segments);
+  if(detected.faces.length!==drag.faceCount)return;
+  segments=moved.segments;drag.dx=moved.dx;drag.dy=moved.dy;
+  const cell=drag.face.rects.reduce((a,b)=>a.width*a.height>=b.width*b.height?a:b);
+  const x=cell.x+cell.width/2+moved.dx,y=cell.y+cell.height/2+moved.dy;
+  selected=detected.rooms.find(r=>x>=r.x&&x<=r.x+r.width&&y>=r.y&&y<=r.y+r.height)?.roomKey??null;schedule();
+ }
+ function cancelInteraction(){
+  if(gesture?.type==='wall-move'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
+  if(gesture?.type==='room-move'){segments=gesture.before;selected=gesture.face.id;}
+  gesture=null;pointers.clear();first=null;preview=null;status();draw();
+ }
+ function limitPan(){ox=clamp(ox,w-WIDTH*scale,0);oy=clamp(oy,h-height*scale,0);}
+ function zoomAt(factor,x=w/2,y=h/2){
+  const anchor=point(x,y);scale=clamp(scale*factor,w/WIDTH,w/WIDTH*25);ox=x-anchor.x*scale;oy=y-anchor.y*scale;limitPan();status();draw();
+ }
+ function fit(){scale=w/WIDTH;ox=0;oy=0;draw();}
+ function resize(){
+  const width=board.clientWidth,boardHeight=board.clientHeight;if(!width||!boardHeight)return;
+  const oldFit=w/WIDTH,center=w?point(w/2,h/2):{x:WIDTH/2,y:1000},factor=oldFit?scale/oldFit:1;
+  w=width;h=boardHeight;dpr=Math.min(window.devicePixelRatio||1,3);board.width=w*dpr;board.height=h*dpr;
+  // Model ne ovisi o visini prozora: rotacija uređaja ne mijenja prostorije.
+  height=2000;scale=w/WIDTH*Math.max(1,h/w)*factor;
+  ox=oldFit?w/2-center.x*scale:0;oy=oldFit?h/2-center.y*scale:0;limitPan();draw();
+ }
+ function schedule(){if(frame)return;frame=true;requestAnimationFrame(()=>{frame=false;status();draw();});}
+ function tag(x,y,text,color='#24557e',vertical=false,priority=1){pendingTags.push({x,y,text,color,vertical,priority});}
+ function paintTags(){
+  const occupied=[];
+  for(const {x:rawX,y:rawY,text,color,vertical} of pendingTags.sort((a,b)=>b.priority-a.priority)){
+  let x=rawX,y=rawY;
+  const size=clamp(12+Math.log2(Math.max(1,scale/(w/WIDTH))),12,17),boxHeight=size+10;
+  g.save();g.font='600 '+size+'px system-ui';
+  const width=g.measureText(text).width+16,halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
+  x=clamp(x,Math.max(0,ox)+halfX+3,Math.min(w,ox+WIDTH*scale)-halfX-3);
+  y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
+  const bounds={left:x-halfX-3,right:x+halfX+3,top:y-halfY-2,bottom:y+halfY+2};
+  if(occupied.some(r=>r.left<bounds.right&&r.right>bounds.left&&r.top<bounds.bottom&&r.bottom>bounds.top)){g.restore();continue;}
+  occupied.push(bounds);g.translate(x,y);if(vertical)g.rotate(-Math.PI/2);
+  g.fillStyle='rgba(255,255,255,.96)';g.fillRect(-width/2,-boxHeight/2,width,boxHeight);
+  g.fillStyle=color;g.textAlign='center';g.textBaseline='middle';g.fillText(text,0,0);g.restore();
+  }
+ }
+ function visibleWallCenter(s,padding=24){
+  const a=screen({x:s.x1,y:s.y1}),b=screen({x:s.x2,y:s.y2}),horizontal=s.y1===s.y2;
+  if(horizontal){
+   if(a.y < -padding||a.y>h+padding||Math.max(a.x,b.x)<0||Math.min(a.x,b.x)>w)return null;
+   return {x:(Math.max(0,Math.min(a.x,b.x))+Math.min(w,Math.max(a.x,b.x)))/2,y:a.y};
+  }
+  if(a.x < -padding||a.x>w+padding||Math.max(a.y,b.y)<0||Math.min(a.y,b.y)>h)return null;
+  return {x:a.x,y:(Math.max(0,Math.min(a.y,b.y))+Math.min(h,Math.max(a.y,b.y)))/2};
+ }
+ function draw(){
+  if(!w||!h)return;
+  const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
+  g.save();g.beginPath();g.rect(ox,oy,WIDTH*scale,height*scale);g.clip();g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
+  const unit=step(),left=clamp(-ox/scale,0,WIDTH),right=clamp((w-ox)/scale,0,WIDTH),top=clamp(-oy/scale,0,height),bottom=clamp((h-oy)/scale,0,height);
+  g.lineWidth=1;
+  for(let i=Math.ceil(left/unit);i<=Math.floor(right/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,oy);g.lineTo(x,oy+height*scale);g.stroke();}
+  for(let i=Math.ceil(top/unit);i<=Math.floor(bottom/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(ox,y);g.lineTo(ox+WIDTH*scale,y);g.stroke();}
+  current.faces.forEach(face=>{
+   g.beginPath();for(const r of face.rects)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
+   g.fillStyle=face.id===selected?'rgba(22,117,209,.16)':'rgba(22,117,209,.045)';g.fill();
+  });
+  if(wallsVisible){
+   const boxes=[...current.layout.outer,...current.layout.inner];
+   g.fillStyle='#1e2329';for(const r of boxes)g.fillRect(ox+r.x*scale-1,oy+r.y*scale-1,r.width*scale+2,r.height*scale+2);
+   g.fillStyle='#bfc3c8';for(const r of boxes)g.fillRect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
+  }
+  g.strokeStyle=wallsVisible?'rgba(22,117,209,.6)':'#1675d1';g.lineWidth=2;g.beginPath();
+  for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();
+  const dimensionKeys=new Set();
+  for(const face of current.faces){
+   const net=current.layout.net.find(r=>r.id===face.id);
+   const visible=face.rects.map(r=>({x:Math.max(r.x,left),y:Math.max(r.y,top),right:Math.min(r.x+r.width,right),bottom:Math.min(r.y+r.height,bottom)})).filter(r=>r.right>r.x&&r.bottom>r.y);
+   const label=visible.sort((a,b)=>(b.right-b.x)*(b.bottom-b.y)-(a.right-a.x)*(a.bottom-a.y))[0];
+   if(label&&face.area>=10000&&net.width>=20&&net.height>=20){
+    const center=screen({x:(label.x+label.right)/2,y:(label.y+label.bottom)/2});
+    const gap=clamp(27+Math.log2(Math.max(1,scale/(w/WIDTH))),27,32);
+    tag(center.x,center.y-gap,'Prostorija '+face.id,'#24557e',false,3);
+    if(RoomGeometry.union(face.rects).edges.length===4)tag(center.x,center.y,lengthText(net.width)+' × '+lengthText(net.height),'#24557e',false,3);
+    tag(center.x,center.y+gap,areaText(net.area),'#24557e',false,3);
+   }
+   for(const e of RoomGeometry.union(face.rects).edges){
+    const wall=e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]};
+    const key=JSON.stringify(wall),length=e.span[1]-e.span[0];
+    if(dimensionKeys.has(key)||length<20)continue;dimensionKeys.add(key);
+    const p=visibleWallCenter(wall);if(!p)continue;
+    const visibleLength=e.axis==='h'?Math.min(w,ox+wall.x2*scale)-Math.max(0,ox+wall.x1*scale):Math.min(h,oy+wall.y2*scale)-Math.max(0,oy+wall.y1*scale);
+    if(visibleLength<80)continue;
+    tag(p.x+(e.axis==='v'?e.side*18:0),p.y+(e.axis==='h'?e.side*18:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v');
+   }
+  }
+  if(selectedWall){
+   const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});
+   const horizontal=selectedWall.y1===selectedWall.y2;
+   g.strokeStyle='#1675d1';g.lineWidth=5;g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+   for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,6,0,Math.PI*2);g.fill();g.stroke();}
+   const center=visibleWallCenter(selectedWall);if(center)tag(center.x,center.y,horizontal?'↕':'↔','#1675d1',false,5);
+  }
+  if(first){
+   const color=mode==='erase'?'#dc2626':'#1675d1';
+   const a=screen(first),b=screen(preview||first);g.strokeStyle=color;g.lineWidth=2.5;g.setLineDash([7,5]);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();g.setLineDash([]);
+   for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,5,0,Math.PI*2);g.fill();g.stroke();}
+   const length=Math.abs((preview||first).x-first.x)+Math.abs((preview||first).y-first.y);
+   const center=visibleWallCenter({x1:first.x,y1:first.y,x2:(preview||first).x,y2:(preview||first).y});
+   if(length&&center)tag(center.x,center.y-20,(mode==='erase'?'Obriši ':'')+lengthText(length),color,false,5);
+  }
+  paintTags();g.restore();
+ }
+ const xy=e=>{const r=board.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
+ function pinch(){
+  const [a,b]=[...pointers.values()];if(!b)return;
+  if(gesture?.type==='wall-move'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
+  if(gesture?.type==='room-move'){segments=gesture.before;selected=gesture.face.id;}
+  const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};gesture={type:'pinch',distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),scale,anchor:point(mid.x,mid.y)};
+ }
+ function adjust(p,drag){
+  if(drag.axis!=='h')return second(p.x,p.y,drag.axis);
+  const dx=p.x-drag.start.x,dy=p.y-drag.start.y;
+  if(!drag.dragMode&&Math.hypot(dx,dy)>9)drag.dragMode=Math.abs(dy)>Math.abs(dx)*1.15?'vertical-length':'direct';
+  if(drag.dragMode!=='vertical-length')return second(p.x,p.y,drag.axis);
+  const direction=Math.sign(drag.base.x-first.x)||1;
+  const length=Math.max(0,Math.round((Math.abs(drag.base.x-first.x)-dy/scale)/step())*step());
+  return {x:clamp(first.x+direction*length,0,WIDTH),y:first.y};
+ }
+ board.addEventListener('pointerdown',e=>{
+  if(e.button!==undefined&&e.button!==0)return;e.preventDefault();board.setPointerCapture(e.pointerId);
+  const p=xy(e);pointers.set(e.pointerId,p);resetClear();
+  if(pointers.size>1){pinch();return;}
+  if(mode==='edit'){
+   const wall=hitWall(p.x,p.y);selectedWall=wall;
+   if(wall){
+    const session=wallSession&&['x1','y1','x2','y2'].every(k=>wallSession.current[k]===wall[k])?wallSession:null;
+    gesture={type:'wall-move',id:e.pointerId,start:p,wall,before:copy(segments),currentWall:wall,beforeSession:wallSession,
+     baseSegments:session?session.baseSegments:copy(segments),baseWall:session?session.baseWall:wall,currentOffset:session?session.offset:0};status();draw();return;
+   }
+   const raw=point(p.x,p.y),room=model().rooms.find(r=>raw.x>r.x&&raw.x<r.x+r.width&&raw.y>r.y&&raw.y<r.y+r.height);
+   if(room){
+    const face=model().faces.find(f=>f.id===room.roomKey);selected=face.id;wallSession=null;
+    gesture={type:'room-move',id:e.pointerId,start:p,face,faceCount:model().faces.length,before:copy(segments),dx:0,dy:0};status();draw();return;
+   }
+   status();draw();
+  }
+  if((mode==='draw'||mode==='erase')&&first){const q=second(p.x,p.y),raw=point(p.x,p.y);gesture={type:'preview',id:e.pointerId,start:p,base:q,axis:Math.abs(raw.x-first.x)>=Math.abs(raw.y-first.y)?'h':'v',dragMode:null};preview=q;schedule();return;}
+  gesture={type:'single',id:e.pointerId,start:p,ox,oy,moved:false};
+ });
+ board.addEventListener('pointermove',e=>{
+  const p=xy(e);
+  if(!pointers.has(e.pointerId)){if((mode==='draw'||mode==='erase')&&first){preview=second(p.x,p.y);schedule();}return;}
+  e.preventDefault();pointers.set(e.pointerId,p);
+  if(pointers.size>1){
+   if(gesture?.type!=='pinch')pinch();const [a,b]=[...pointers.values()],mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+   scale=clamp(gesture.scale*Math.hypot(a.x-b.x,a.y-b.y)/gesture.distance,w/WIDTH,w/WIDTH*25);ox=mid.x-gesture.anchor.x*scale;oy=mid.y-gesture.anchor.y*scale;limitPan();schedule();return;
+  }
+  if(!gesture||gesture.id!==e.pointerId)return;
+  if(gesture.type==='preview'){preview=adjust(p,gesture);schedule();}
+  else if(gesture.type==='wall-move'){updateWall(p,gesture);}
+  else if(gesture.type==='room-move'){updateRoom(p,gesture);}
+  else if(gesture.type==='single'){
+   const dx=p.x-gesture.start.x,dy=p.y-gesture.start.y;if(Math.hypot(dx,dy)>9)gesture.moved=true;
+   if(gesture.moved){ox=gesture.ox+dx;oy=gesture.oy+dy;limitPan();schedule();}
+  }
+ });
+ function release(e,cancelled){
+  if(!pointers.has(e.pointerId))return;
+  const p=xy(e),last=gesture,wasMulti=last?.type==='pinch'||pointers.size>1;pointers.delete(e.pointerId);
+  if(pointers.size){gesture={type:'remaining'};return;}gesture=null;
+  if(wasMulti||last?.type==='remaining'){status();draw();return;}
+  if(last?.type==='room-move'){
+   if(cancelled){segments=last.before;selected=last.face.id;status();draw();}
+   else {const selection=selected;commit(last.before);selected=selection;status();draw();}
+  }else if(last?.type==='wall-move'){
+   if(cancelled){segments=last.before;selectedWall=last.wall;wallSession=last.beforeSession;status();draw();}
+   else{const wall=last.currentWall;commit(last.before);selectedWall=wall;
+    wallSession={baseSegments:last.baseSegments,baseWall:last.baseWall,offset:last.currentOffset,current:wall};status();draw();}
+  }
+  else if(last?.type==='preview'&&first){if(!cancelled)add(adjust(p,last));else{preview=first;status();draw();}}
+  else if(last?.type==='single'&&!last.moved&&!cancelled){
+   if(mode==='draw'||mode==='erase'){first=snap(p.x,p.y);preview=first;status();draw();}
+   else{const raw=point(p.x,p.y);selected=model().rooms.find(r=>raw.x>=r.x&&raw.x<=r.x+r.width&&raw.y>=r.y&&raw.y<=r.y+r.height)?.roomKey??null;status();draw();}
+  }
+ }
+ board.addEventListener('pointerup',e=>{e.preventDefault();release(e,false);});
+ board.addEventListener('pointercancel',e=>release(e,true));
+ board.addEventListener('lostpointercapture',e=>{if(pointers.has(e.pointerId))release(e,true);});
+ board.addEventListener('contextmenu',e=>e.preventDefault());
+ board.addEventListener('wheel',e=>{e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
+ function changeMode(next){cancelInteraction();mode=next;selectedWall=null;wallSession=null;resetClear();status();draw();}
+ $('drawMode').addEventListener('click',()=>changeMode('draw'));$('eraseMode').addEventListener('click',()=>changeMode('erase'));$('editMode').addEventListener('click',()=>changeMode('edit'));
+ $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
+ $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
+ $('cancel').addEventListener('click',cancelInteraction);
+ $('clearAll').addEventListener('click',()=>{
+  if(!segments.length)return;
+  if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
+  const before=copy(segments);segments=[];first=null;preview=null;commit(before);
+ });
+ $('plus').addEventListener('click',()=>zoomAt(1.16));$('minus').addEventListener('click',()=>zoomAt(1/1.16));$('fit').addEventListener('click',fit);
+ $('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen?.();}catch(_){}});
+ window.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}
+  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
+  else if(e.key==='Escape')cancelInteraction();
+ });
+ restore();status();new ResizeObserver(resize).observe(board);resize();
+})();

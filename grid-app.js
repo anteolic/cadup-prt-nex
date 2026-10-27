@@ -287,7 +287,7 @@
   draw();
  }
  function schedule(){if(frame)return;frame=true;requestAnimationFrame(()=>{frame=false;status();draw();});}
- function tag(x,y,text,color='#24557e',vertical=false,priority=1,dimension=null){if(!showMeasures)return;pendingTags.push({x,y,text,color,vertical,priority,dimension});}
+ function tag(x,y,text,color='#24557e',vertical=false,priority=1,dimension=null,force=false){if(!showMeasures&&!force)return;pendingTags.push({x,y,text,color,vertical,priority,dimension});}
  function paintTags(){
   const occupied=[];dimensionHits=[];
   for(const {x:rawX,y:rawY,text,color,vertical:sourceVertical,priority,dimension} of pendingTags.sort((a,b)=>b.priority-a.priority)){
@@ -376,6 +376,10 @@
    const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});
    const horizontal=selectedWall.y1===selectedWall.y2;
    const dimension=selectedDimension();
+   if(!showMeasures){
+    const measured=horizontal?{x1:dimension.start,y1:dimension.line,x2:dimension.end,y2:dimension.line}:{x1:dimension.line,y1:dimension.start,x2:dimension.line,y2:dimension.end},center=visibleWallCenter(measured),side=dimension.side??1;
+    if(center)tag(center.x+(horizontal?0:side*12),center.y+(horizontal?side*12:0),lengthText(dimension.end-dimension.start),'#24557e',!horizontal,1,dimension,true);
+   }
    const visibleWall=horizontal?{...selectedWall,x1:dimension.start,x2:dimension.end}:{...selectedWall,y1:dimension.start,y2:dimension.end};
    const boxes=RoomGeometry.wallSelection(current.rooms,segments,visibleWall,current.layout).map(r=>horizontal?{...r,x:Math.max(r.x,dimension.start),width:Math.min(r.x+r.width,dimension.end)-Math.max(r.x,dimension.start)}:{...r,y:Math.max(r.y,dimension.start),height:Math.min(r.y+r.height,dimension.end)-Math.max(r.y,dimension.start)}).filter(r=>r.width>0&&r.height>0);
    g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);

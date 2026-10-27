@@ -542,3 +542,9 @@ for(let turn=1;turn<=4;turn++){
 el('clearAll').click();el('clearAll').click();api.fit();api.addObject('drawer-cabinet');drag(500,400,600,400);const rotatedObject=JSON.parse(JSON.stringify(api.objects[0]));deselect();el('viewportRotate').click();
 const projectedObject=api.displayPoint({x:api.view.ox+rotatedObject.x*api.view.scale,y:api.view.oy+rotatedObject.y*api.view.scale});click(projectedObject.x,projectedObject.y);assert.equal(api.objectIds[0],rotatedObject.id);
 const rotatedDragCamera={...api.view};drag(projectedObject.x,projectedObject.y,projectedObject.x+40,projectedObject.y);assert.equal(api.objects[0].x,rotatedObject.x);assert.ok(api.objects[0].y<rotatedObject.y);assert.deepEqual({...api.view},rotatedDragCamera);
+
+// Hidden dimensions appear temporarily for the selected wall only.
+while(api.viewportTurns)el('viewportRotate').click();el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);line(100,300,250,300);enterEdit();
+el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);
+click(200,100);labels.length=0;api.draw();assert.ok(labels.includes('400 cm'));assert.ok(!labels.includes('300 cm'));assert.equal(el('showMeasures').checked,false);assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).measures,false);
+deselect();labels.length=0;api.draw();assert.equal(labels.length,0);

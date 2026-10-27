@@ -344,7 +344,7 @@
    for(const e of current.wallOutline.edges){
     if(e.axis==='h'){g.moveTo(ox+e.span[0]*scale,oy+e.line*scale);g.lineTo(ox+e.span[1]*scale,oy+e.line*scale);}
     else{g.moveTo(ox+e.line*scale,oy+e.span[0]*scale);g.lineTo(ox+e.line*scale,oy+e.span[1]*scale);}
-   }if(current.layout.disconnectedOverlap){g.strokeStyle='#fff';g.lineWidth=4;g.stroke();g.strokeStyle='#1e2329';g.lineWidth=1.5;}g.stroke();
+   }g.stroke();
    if(current.layout.unjoinedCaps.length){g.beginPath();for(const cap of current.layout.unjoinedCaps){g.moveTo(ox+cap.x1*scale,oy+cap.y1*scale);g.lineTo(ox+cap.x2*scale,oy+cap.y2*scale);}g.strokeStyle='#fff';g.lineWidth=4;g.stroke();g.strokeStyle='#1e2329';g.lineWidth=1.5;g.stroke();}
   }
   if(!wallsVisible){g.strokeStyle='#1675d1';g.lineWidth=2;g.beginPath();

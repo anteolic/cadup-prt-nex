@@ -48,7 +48,7 @@ assert.throws(()=>C.createTemplate(grouped,grouped.map(item=>item.id),' '));asse
 for(const angle of [0,90,180,270]){
  const a={...C.create('door',500,500),rotation:angle},b={...C.create('desk',800,650),rotation:90};
  const input=[a,b],ids=input.map(o=>o.id),mirrored=C.mirror(input,ids),box=C.selectionBounds(input);
- assert.equal(mirrored[0].x,2*box.x-a.x);assert.equal(mirrored[0].rotation,((360-angle)%360));assert.equal(mirrored[0].mirrored,true);
+ assert.equal(mirrored[0].x,a.x);assert.equal(mirrored[0].y,2*box.y-a.y);assert.equal(mirrored[0].rotation,((540-angle)%360));assert.equal(mirrored[0].mirrored,true);
  assert.deepEqual(C.selectionBounds(mirrored),box);assert.deepEqual(C.mirror(mirrored,ids),input);
  assert.deepEqual(C.validate(JSON.parse(JSON.stringify(mirrored))),mirrored);
  assert.equal(C.duplicate(mirrored,ids).items[2].mirrored,true);

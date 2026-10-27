@@ -80,13 +80,13 @@ globalThis.CadObjects=(()=>{
   const turned=constrain(group.map(item=>({...item,x:center.x-(item.y-center.y),y:center.y+(item.x-center.x),rotation:rotation(item.rotation+90)})));
   const map=new Map(turned.map(item=>[item.id,item]));return items.map(item=>map.get(item.id)||{...item});
  }
- // Reflect across the vertical axis of the selection, including each CAD symbol.
+ // Reflect across the horizontal axis of the selection, including each CAD symbol.
  function mirror(items,ids){
   const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);
   const center=group.length===1?group[0]:selectionBounds(group);
   return items.map(item=>{
    if(!selected.has(item.id))return {...item};
-   const reflected={...item,x:2*center.x-item.x,rotation:rotation(-item.rotation)};
+   const reflected={...item,y:2*center.y-item.y,rotation:rotation(180-item.rotation)};
    if(item.mirrored)delete reflected.mirrored;else reflected.mirrored=true;
    return reflected;
   });

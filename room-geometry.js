@@ -125,7 +125,8 @@ globalThis.RoomGeometry = (() => {
     const cuts=[...new Set([start,end,...(h?xs:ys).filter(v=>v>start&&v<end)])].sort((a,b)=>a-b);
     for(let i=1;i<cuts.length;i++){
      const mid=(cuts[i-1]+cuts[i])/2,x=h?mid:line,y=h?line:mid;
-     if(covered(x-(h?0:.001),y-(h?.001:0))&&covered(x+(h?0:.001),y+(h?.001:0)))
+     // Samo rub zatvorene prostorije već ima vanjski zid; ostali potezi moraju biti vidljivi.
+     if(covered(x-(h?0:.001),y-(h?.001:0))===covered(x+(h?0:.001),y+(h?.001:0)))
       segments.push({axis:h?'h':'v',line,start:cuts[i-1],end:cuts[i]});
     }
    }

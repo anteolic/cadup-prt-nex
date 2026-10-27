@@ -110,6 +110,15 @@ globalThis.GridGeometry=(()=>{
   }
   return normalize(result);
  }
+ function resizeWall(input,wall,endpoint,position,min=5,width=2000,height=2000){
+  const lines=atomic(input),index=lines.findIndex(s=>['x1','y1','x2','y2'].every(k=>s[k]===wall[k]));
+  if(index<0||![1,2].includes(endpoint)||!Number.isFinite(position))return {segments:normalize(input),wall};
+  const horizontal=wall.y1===wall.y2,axis=horizontal?'x':'y',limit=horizontal?width:height;
+  const low=endpoint===1?0:wall[axis+'1']+min,high=endpoint===1?wall[axis+'2']-min:limit;
+  if(low>high)return {segments:normalize(input),wall};
+  const resized={...wall,[axis+endpoint]:Math.max(low,Math.min(high,position))};
+  lines[index]=resized;return {segments:normalize(lines),wall:resized};
+ }
  function moveWall(input,wall,requested,min=5,width=2000,height=2000){
   const lines=atomic(input),horizontal=wall.y1===wall.y2,axis=horizontal?'y':'x';
   const matches=s=>['x1','y1','x2','y2'].every(k=>s[k]===wall[k]);
@@ -171,5 +180,5 @@ globalThis.GridGeometry=(()=>{
   }
   return {segments:normalize(result),dx,dy};
  }
- return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,moveWall,moveRoom};
+ return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,resizeWall,moveWall,moveRoom};
 })();

@@ -89,3 +89,18 @@ const largeGap=[...outline,line(300,100,300,105),line(300,390,300,400)];
 result=GridGeometry.detectWithDoors(largeGap);assert.equal(result.faces.length,1);
 assert.equal(RoomGeometry.layout(result.rooms,largeGap).inner.length,2,'Kratki dijelovi se prikazuju i kad otvor ne odvaja prostorije');
 console.log('PASS: otvor kraći od punog zida, tri prostorije, fizički otvori, široki prolazi i slijepe pregrade.');
+
+const openWalls=outline.slice(0,3);
+result=GridGeometry.detectWithDoors(openWalls);
+assert.equal(result.faces.length,0);
+assert.equal(RoomGeometry.layout(result.rooms,openWalls).inner.length,3,'Nepotpuni obris prikazuje svaki nacrtani zid');
+assert.equal(RoomGeometry.layout([], [line(100,100,105,100)]).inner[0].height,10,'Samostalan kratki potez ima debljinu zida');
+let resized=GridGeometry.resizeWall(divided,middle,2,280);
+assert.equal(resized.wall.y2,280);
+assert.ok(resized.segments.some(s=>s.x1===100&&s.y1===400&&s.x2===500),'Promjena duljine pregrade ne pomiče vanjski zid');
+resized=GridGeometry.resizeWall(resized.segments,resized.wall,2,400);
+assert.equal(GridGeometry.detect(resized.segments).faces.length,2,'Produženje do ruba zatvara pregradu');
+resized=GridGeometry.resizeWall(divided,middle,1,9999);
+assert.equal(resized.wall.y1,395,'Ručke ne mogu prijeći suprotni kraj');
+resized=GridGeometry.resizeWall(outline,top,2,350);
+assert.equal(resized.wall.x2,350,'Vodoravna ručka mijenja x koordinatu');

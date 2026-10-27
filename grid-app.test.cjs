@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const nodes=new Map(),labels=[],memory=new Map();
 const canvas=new Proxy({measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text)},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
- if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},setAttribute(){},addEventListener(type,fn){this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
+ if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
 }
 const context=vm.createContext({console,document:{getElementById:el,documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
@@ -67,3 +67,33 @@ assert.equal(api.first,null);const extended=JSON.stringify(api.segments);
 assert.notEqual(extended,closed);api.undo();assert.notEqual(JSON.stringify(api.segments),extended);
 api.redo();assert.equal(JSON.stringify(api.segments),extended);
 console.log('PASS: continuous line, ponovljeni dodir za završetak i otkazivanje početka; crtanje na dvije točke, podešavanje duljine, automatske prostorije, žive dimenzije, gumica, zidovi, snap, undo/redo i spremanje.');
+
+// Pregrada: odabir sredine, skraćivanje ručkom, otkazivanje i undo/redo.
+el('clearAll').click();el('clearAll').click();el('drawMode').click();
+line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);line(200,100,200,250);
+el('editMode').click();click(200,175);
+const beforeResize=JSON.stringify(api.segments);
+drag(200,250,200,225);
+assert.ok(api.segments.some(s=>s.x1===400&&s.x2===400&&s.y2===450),'Donja ručka skraćuje pregradu');
+assert.ok(!api.model().layout.inner.some(r=>r.x===395&&r.y<500&&r.y+r.height>450),'Otvor ostaje prazan');
+const shortWall=JSON.stringify(api.segments);
+board.pointerdown(event(200,225));board.pointermove(event(200,200));board.pointercancel(event(200,200));
+assert.equal(JSON.stringify(api.segments),shortWall,'Otkazivanje vraća duljinu');
+api.undo();assert.equal(JSON.stringify(api.segments),beforeResize);
+api.redo();assert.equal(JSON.stringify(api.segments),shortWall);
+click(200,175);drag(200,225,200,250);
+assert.equal(JSON.stringify(api.segments),beforeResize,'Produženje ručkom ponovno spaja zid');
+// I nezatvoren, samostalan zid mora biti nacrtan debljinom.
+el('clearAll').click();el('clearAll').click();el('drawMode').click();line(100,100,200,100);
+assert.equal(api.model().faces.length,0);assert.equal(api.model().layout.inner.length,1);
+el('editMode').click();click(150,100);drag(200,100,250,100);
+assert.ok(api.segments.some(s=>s.x2===500&&s.y2===200),'Ručka produžuje nepotpuni vodoravni zid');
+
+assert.equal(el('toggleWalls').attributes['aria-pressed'],String(api.visible));
+el('toggleWalls').click();assert.equal(el('toggleWalls').attributes['aria-pressed'],String(api.visible));
+assert.equal(el('toggleWalls').attributes['aria-label'],api.visible?'Sakrij zidove':'Prikaži zidove');
+// Tri uzastopna dodira moraju dati dva povezana poteza, bez novog početka.
+el('clearAll').click();el('clearAll').click();el('drawMode').click();
+click(100,100);click(250,100);click(250,200);
+assert.equal(api.segments.length,2);assert.equal(api.first.x,500);assert.equal(api.first.y,400);
+click(250,200);assert.equal(api.first,null);assert.equal(api.segments.length,2);

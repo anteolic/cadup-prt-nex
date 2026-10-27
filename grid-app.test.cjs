@@ -10,7 +10,7 @@ function el(id){
 const context=vm.createContext({console,Blob,URL:{createObjectURL(blob){downloadedBlob=blob;return 'blob:test';},revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -267,3 +267,13 @@ api.fit();const oneWall=api.segments[0],toolView=api.view;
 click(toolView.ox+(oneWall.x1+oneWall.x2)/2*toolView.scale,toolView.oy+(oneWall.y1+oneWall.y2)/2*toolView.scale);
 assert.ok(api.selection);assert.equal(el('wallActions').hidden,false);assert.equal(el('mainTools').hidden,true);
 el('wallDeselect').click();assert.equal(el('wallActions').hidden,true);assert.equal(el('mainTools').hidden,false);
+
+// Veće ručke i njihove dodirne površine prate približavanje.
+el('editMode').click();api.fit();const gripWall=api.segments[0];
+click((gripWall.x1+gripWall.x2)/2*api.view.scale,(gripWall.y1+gripWall.y2)/2*api.view.scale);
+assert.ok(api.selection);const baseGrip=api.handleScale();
+api.zoomAt(4,200,150);assert.ok(api.handleScale()>baseGrip);
+const handleWall=api.selection,handleView=api.view;
+assert.ok(api.hitHandle(handleView.ox+handleWall.x1*handleView.scale+25,handleView.oy+handleWall.y1*handleView.scale));
+const midX=handleView.ox+(handleWall.x1+handleWall.x2)/2*handleView.scale,midY=handleView.oy+(handleWall.y1+handleWall.y2)/2*handleView.scale;
+assert.ok(api.hitMoveHandle(midX+18,midY+20));

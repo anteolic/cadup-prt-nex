@@ -57,16 +57,15 @@
   $('status').textContent=message||'';
   $('status').hidden=!message;
   $('roomArea').textContent='';
-  for(const [id,value] of [['drawMode','draw'],['editMode','edit']]){
-   $(id).classList.toggle('active',mode===value);$(id).setAttribute('aria-pressed',String(mode===value));
-  }
+  $('drawMode').classList.toggle('active',mode==='draw');$('drawMode').setAttribute('aria-pressed',String(mode==='draw'));
+  $('drawMode').setAttribute('title',mode==='draw'?'Završi crtanje i uredi':'Crtaj');
+  $('drawMode').setAttribute('aria-label',mode==='draw'?'Završi crtanje i uredi':'Crtaj');
   $('toggleWalls').setAttribute('aria-pressed',String(wallsVisible));
   $('toggleWalls').setAttribute('aria-label',wallsVisible?'Sakrij zidove':'Prikaži zidove');
   $('toggleWalls').setAttribute('title',wallsVisible?'Zidovi uključeni':'Zidovi isključeni');
-  $('cancel').hidden=!first;
   const editingWall=mode==='edit'&&!!selectedWall;
   $('wallActions').hidden=!editingWall;
-  $('mainTools').hidden=editingWall;
+  $('mainTools').hidden=false;
   syncDimensionEditor();$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
  }
  function commit(before){
@@ -349,10 +348,9 @@
  function closeMenu(){$('topMenu').open=false;}
  document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))closeMenu();});
  function changeMode(next){closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;resetClear();status();draw();}
- $('drawMode').addEventListener('click',()=>changeMode('draw'));$('editMode').addEventListener('click',()=>changeMode('edit'));
+ $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
- $('cancel').addEventListener('click',()=>changeMode('edit'));
  function deselectWall(){selectedWall=null;wallSession=null;status();draw();}
  function selectedDimension(){if(!selectedWall)return null;const h=selectedWall.y1===selectedWall.y2;return {axis:h?'h':'v',line:h?selectedWall.y1:selectedWall.x1,start:h?selectedWall.x1:selectedWall.y1,end:h?selectedWall.x2:selectedWall.y2};}
  $('wallDelete').addEventListener('click',()=>{if(mode!=='edit'||!selectedWall)return;const before=copy(segments);segments=GridGeometry.eraseLine(segments,selectedWall);selectedWall=null;commit(before);});

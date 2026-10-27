@@ -58,7 +58,7 @@ globalThis.GridGeometry=(()=>{
   return {rooms,faces};
  }
  // Otvori se zatvaraju samo za prepoznavanje prostorija, nikad u nacrtanim potezima.
- function detectWithDoors(input,maxWidth=100){
+ function detectWithDoors(input){
   const lines=normalize(input),enclosed=detect(lines),doors=[];
   // Rubovi ćelija mogu prolaziti kroz unutrašnjost; uključujemo susjedne ćelije.
   const interior=(x,y)=>{
@@ -72,7 +72,9 @@ globalThis.GridGeometry=(()=>{
    spans.sort((a,b)=>(h?a.x1-b.x1:a.y1-b.y1));
    for(let i=1;i<spans.length;i++){
     const a=spans[i-1],b=spans[i],start=h?a.x2:a.y2,end=h?b.x1:b.y1,line=h?a.y1:a.x1;
-    if(end-start>maxWidth)continue;
+    const solidLength=h?(a.x2-a.x1)+(b.x2-b.x1):(a.y2-a.y1)+(b.y2-b.y1);
+    // Dvije prostorije kad je otvor kraći od susjednih punih dijelova pregrade.
+    if(end-start>=solidLength)continue;
     const cuts=[start,end,...enclosed.rooms.flatMap(r=>h?[r.x,r.x+r.width]:[r.y,r.y+r.height]).filter(v=>v>start&&v<end)].sort((a,b)=>a-b);
     if(!cuts.slice(1).every((v,j)=>v===cuts[j]||interior(h?(v+cuts[j])/2:line,h?line:(v+cuts[j])/2)))continue;
     doors.push(h?{x1:start,y1:line,x2:end,y2:line}:{x1:line,y1:start,x2:line,y2:end});

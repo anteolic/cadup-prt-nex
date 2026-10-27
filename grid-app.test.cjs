@@ -520,9 +520,9 @@ timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1000);assert.equal(el('objectEdit
 timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1700);timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1900);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
 timedTap(990,790,2500);assert.equal(el('objectEditGroup').textContent,'Uredi grupu');assert.equal(api.objectIds.length,2);assert.equal(memory.get('infoa_grid_loops_v1'),doubleGroupScene);assert.deepEqual({...api.view},doubleGroupView);
 
-// Double tap an object to expose exactly two resize grips; plain selection has none.
-el('clearAll').click();el('clearAll').click();api.fit();api.addObject('drawer-cabinet');let gripObject=api.objects[0],gripView={...api.view};assert.equal(api.objectHandles().length,0);
-timedTap(gripView.ox+gripObject.x*gripView.scale,gripView.oy+gripObject.y*gripView.scale,4000);timedTap(gripView.ox+gripObject.x*gripView.scale,gripView.oy+gripObject.y*gripView.scale,4200);assert.equal(api.objectHandles().length,2);
+// A single selection exposes exactly two resize grips; no double tap is needed.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('drawer-cabinet');let gripObject=api.objects[0],gripView={...api.view};deselect();assert.equal(api.objectHandles().length,0);
+timedTap(gripView.ox+gripObject.x*gripView.scale,gripView.oy+gripObject.y*gripView.scale,4000);assert.equal(api.objectHandles().length,2);
 let objectWidthGrip=api.objectHandles().find(h=>h.axis==='width');drag(objectWidthGrip.x,objectWidthGrip.y,objectWidthGrip.x+20,objectWidthGrip.y);assert.equal(api.objects[0].width,100);assert.equal(api.objects[0].depth,60);assert.deepEqual({...api.view},gripView);
 let objectDepthGrip=api.objectHandles().find(h=>h.axis==='depth');drag(objectDepthGrip.x,objectDepthGrip.y,objectDepthGrip.x,objectDepthGrip.y+15);assert.equal(api.objects[0].depth,90);assert.equal(api.objects[0].width,100);api.undo();assert.equal(api.objects[0].depth,60);assert.equal(api.objectHandles().length,2);api.undo();assert.equal(api.objects[0].width,60);assert.equal(api.objects[0].depth,60);deselect();assert.equal(api.objectHandles().length,0);
 

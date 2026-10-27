@@ -513,21 +513,12 @@
  });
  function handleGroupDoubleTap(e,p,last,cancelled){
   if(mode!=='edit'||cancelled||objectMulti||e.shiftKey||!Number.isFinite(e.timeStamp)||!last||last.moved||!['pick-pan','pan','object-move'].includes(last.type)||Math.hypot(p.x-last.start.x,p.y-last.start.y)>9){lastGroupTap=null;return false;}
-  const raw=point(p.x,p.y);let key=null,group=null,object=null;
-  if(editingGroup){
-   const box=CadObjects.selectionBounds(objects.filter(item=>item.group===editingGroup));
-   if(box&&raw.x>=box.left&&raw.x<=box.right&&raw.y>=box.top&&raw.y<=box.bottom){object=CadObjects.hit(objects.filter(item=>item.group===editingGroup),raw.x,raw.y);if(object)key='object:'+object.id;}
-  }else{
-   object=CadObjects.hit(objects,raw.x,raw.y);group=object?.group;
-   if(group)key='open:'+group;else if(object)key='object:'+object.id;
-  }
-  if(!key){lastGroupTap=null;return false;}
-  const previous=lastGroupTap;lastGroupTap={key,time:e.timeStamp,x:p.x,y:p.y};
+  if(editingGroup){lastGroupTap=null;return false;}
+  const raw=point(p.x,p.y),group=CadObjects.hit(objects,raw.x,raw.y)?.group;
+  if(!group){lastGroupTap=null;return false;}
+  const key='open:'+group,previous=lastGroupTap;lastGroupTap={key,time:e.timeStamp,x:p.x,y:p.y};
   if(!previous||previous.key!==key||e.timeStamp-previous.time<0||e.timeStamp-previous.time>380||Math.hypot(p.x-previous.x,p.y-previous.y)>22)return false;
-  lastGroupTap=null;
-  if(key.startsWith('open:'))openGroupEditor(group);
-  else{editingObjectId=object.id;objectIds=new Set([object.id]);objectMulti=false;selectedWall=null;wallSession=null;objectEditorKey=null;status();draw();}
-  return true;
+  lastGroupTap=null;openGroupEditor(group);return true;
  }
  function release(e,cancelled){
   if(!pointers.has(e.pointerId))return;
@@ -735,6 +726,7 @@
  }
  function syncObjectEditor(){
   const items=objects.filter(item=>objectIds.has(item.id)),count=items.length;
+  editingObjectId=count===1&&(!items[0].group||items[0].group===editingGroup)?items[0].id:null;
   $('objectMulti').setAttribute('aria-pressed',String(objectMulti));$('objectMulti').classList.toggle('active',objectMulti);
   $('objectGroup').disabled=!!editingGroup||count<2;$('objectUngroup').disabled=!!editingGroup||!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;
   const group=items[0]?.group,canEditGroup=!!group&&items.every(item=>item.group===group);

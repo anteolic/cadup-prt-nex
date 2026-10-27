@@ -96,6 +96,10 @@
    if(axis==='x'){g.moveTo(pixel,0);g.lineTo(pixel,h);}else{g.moveTo(0,pixel);g.lineTo(w,pixel);}g.stroke();
   }}g.restore();
  }
+ function drawWallAxes(){
+  g.strokeStyle='#dc2626';g.lineWidth=1.5;g.setLineDash([7,5]);g.beginPath();
+  for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();g.setLineDash([]);
+ }
  function snap(x,y){
   const raw=point(x,y),unit=step();
   let q=snapAlignment(raw,{x:clamp(Math.round(raw.x/unit)*unit,0,WIDTH),y:clamp(Math.round(raw.y/unit)*unit,0,height)}),distance=14;
@@ -272,14 +276,14 @@
    tag(center.x+(e.axis==='v'?e.side*12:0),center.y+(e.axis==='h'?e.side*12:0),lengthText(e.span[1]-e.span[0]),'#24557e',e.axis==='v',1,{axis:e.axis,line:e.line,start:e.span[0],end:e.span[1],side:e.side});
   }
   g.globalAlpha=1;
+  if(mode==='draw')drawWallAxes();
   if(mode==='edit'&&selectedWall){
    const a=screen({x:selectedWall.x1,y:selectedWall.y1}),b=screen({x:selectedWall.x2,y:selectedWall.y2});
    const horizontal=selectedWall.y1===selectedWall.y2;
    const boxes=RoomGeometry.wallSelection(current.rooms,segments,selectedWall,current.layout);
    g.beginPath();for(const r of boxes)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);
    g.fillStyle='#93c5fd';g.fill();g.strokeStyle='#2563eb';g.lineWidth=2;
-   g.strokeStyle='#dc2626';g.lineWidth=1.5;g.setLineDash([7,5]);
-   g.beginPath();for(const s of segments){g.moveTo(ox+s.x1*scale,oy+s.y1*scale);g.lineTo(ox+s.x2*scale,oy+s.y2*scale);}g.stroke();g.setLineDash([]);
+   drawWallAxes();
    g.strokeStyle='#dc2626';const gripScale=handleScale();
    if(mode==='edit')for(const [index,p] of [a,b].entries()){
     if(gesture?.type==='wall-resize'&&gesture.endpoint===index+1)continue;
@@ -288,7 +292,7 @@
 
   }
   if(first){
-   const color='#1675d1';
+   const color='#dc2626';
    const a=screen(first),b=screen(preview||first);g.strokeStyle=color;g.lineWidth=2.5;g.setLineDash([7,5]);g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();g.setLineDash([]);
    for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,5,0,Math.PI*2);g.fill();g.stroke();}
    const length=Math.abs((preview||first).x-first.x)+Math.abs((preview||first).y-first.y);

@@ -1,10 +1,10 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const nodes=new Map(),labels=[],memory=new Map();
-let downloadedBlob=null,downloadName=null;
+let downloadedBlob=null,downloadName=null,redStrokes=0;
 const updateRequests=[];let updateFailure=null;
 const publishedHtml=fs.readFileSync(__dirname+'/CADup.html','utf8');
 const gridLines=[],paintCalls=[],gripCircles=[];let gridStart=null;
-const canvas=new Proxy({arc(x,y,r){if(r>=11&&this.strokeStyle==='#dc2626')gripCircles.push({x,y,r});},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
+const canvas=new Proxy({stroke(){if(this.strokeStyle==='#dc2626')redStrokes++;},arc(x,y,r){if(r>=11&&this.strokeStyle==='#dc2626')gripCircles.push({x,y,r});},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
  if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
@@ -424,3 +424,6 @@ click(100,300);assert.ok(api.guideAxes().x.includes(533));assert.ok(api.guideAxe
 click(guideView.ox+541*guideView.scale,guideView.oy+600*guideView.scale);
 assert.ok(api.segments.some(s=>s.y1===600&&s.y2===600&&s.x2===533));assert.equal(api.model().faces.length,0,'Pomoćna linija ne postaje stvarni zid');
 finishDrawing();
+
+// Crvene osnovne linije vide se i tijekom crtanja; plave pomoćne osi ostaju dostupne.
+startDrawing();redStrokes=0;api.draw();assert.ok(redStrokes>0,'Osnovne linije su crvene i u načinu Crtaj');assert.ok(api.guideAxes().x.length>0);finishDrawing();

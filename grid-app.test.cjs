@@ -161,3 +161,11 @@ const beforeCancel=JSON.stringify(api.segments);
 el('editMode').click();const another=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
 click((another.left+another.right)/2,(another.top+another.bottom)/2);el('dimensionCancel').click();
 assert.equal(JSON.stringify(api.segments),beforeCancel);assert.equal(el('dimensionDialog').open,false);
+
+// Ručni unos izravno dodirom kote, bez uključivanja načina Uredi.
+el('drawMode').click();const directDimension=api.dimensions.find(r=>r.dimension.axis==='h'&&r.dimension.line===170);
+click((directDimension.left+directDimension.right)/2,(directDimension.top+directDimension.bottom)/2);
+assert.equal(el('dimensionDialog').open,true);
+el('dimensionValue').value='5.2';el('dimensionForm').submit({preventDefault(){}});
+assert.equal(el('dimensionDialog').open,false);assert.equal(api.model().faces.length,1);
+assert.ok(api.segments.some(s=>s.x1===660&&s.x2===660));

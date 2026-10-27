@@ -246,11 +246,11 @@
   if(e.button!==undefined&&e.button!==0)return;e.preventDefault();board.setPointerCapture(e.pointerId);
   const p=xy(e);pointers.set(e.pointerId,p);resetClear();
   if(pointers.size>1){pinch();return;}
+  const endpoint=mode==='edit'?hitHandle(p.x,p.y):null;
+  if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
+  const label=mode!=='erase'&&dimensionHits.find(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom);
+  if(label){gesture={type:'dimension',id:e.pointerId,start:p,dimension:label.dimension,wall:mode==='edit'?hitWall(p.x,p.y):null};return;}
   if(mode==='edit'){
-   const endpoint=hitHandle(p.x,p.y);
-   if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
-   const label=dimensionHits.find(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom);
-   if(label){gesture={type:'dimension',id:e.pointerId,start:p,dimension:label.dimension,wall:hitWall(p.x,p.y)};return;}
    const wall=hitWall(p.x,p.y);selectedWall=wall;
    if(wall){
     const session=wallSession&&['x1','y1','x2','y2'].every(k=>wallSession.current[k]===wall[k])?wallSession:null;

@@ -1,11 +1,12 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const nodes=new Map(),labels=[],memory=new Map();
+let downloadedBlob=null,downloadName=null;
 const canvas=new Proxy({measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text)},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
  if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
 }
-const context=vm.createContext({console,document:{getElementById:el,documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
+const context=vm.createContext({console,Blob,URL:{createObjectURL(blob){downloadedBlob=blob;return 'blob:test';},revokeObjectURL(){}},setTimeout:fn=>fn(),document:{getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
 source=source.replace('restore();status();',`globalThis.api={model,undo,redo,draw,snap,step,point,get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
@@ -97,3 +98,23 @@ el('clearAll').click();el('clearAll').click();el('drawMode').click();
 click(100,100);click(250,100);click(250,200);
 assert.equal(api.segments.length,2);assert.equal(api.first.x,500);assert.equal(api.first.y,400);
 click(250,200);assert.equal(api.first,null);assert.equal(api.segments.length,2);
+
+(async()=>{
+ const original=JSON.stringify(api.segments);
+ el('saveJson').click();assert.ok(downloadedBlob,'Spremi izrađuje JSON datoteku');
+ const exported=await downloadedBlob.text(),data=JSON.parse(exported);
+ assert.equal(data.format,'infoa-tlocrt');assert.equal(data.unit,'cm');
+ assert.equal(JSON.stringify(data.segments),original);assert.ok(downloadName.endsWith('.json'));
+ const load=async text=>{const input={files:[{size:text.length,text:async()=>text}],value:'selected'};await el('jsonFile').change({target:input});assert.equal(input.value,'');};
+ el('clearAll').click();el('clearAll').click();assert.equal(api.segments.length,0);
+ await load(exported);assert.equal(JSON.stringify(api.segments),original,'JSON izvoz i uvoz vraća isti tlocrt');
+ assert.equal(api.visible,data.wallsVisible);
+ api.undo();assert.equal(api.segments.length,0,'Uvoz se može poništiti');api.redo();
+ const intact=JSON.stringify(api.segments);
+ for(const text of ['{bad',JSON.stringify({segments:[{x1:1,y1:1,x2:2,y2:2}]}),JSON.stringify({version:999,segments:[]}),JSON.stringify({segments:[{x1:0,y1:0,x2:3000,y2:0}]})]){
+  await load(text);assert.equal(JSON.stringify(api.segments),intact,'Neispravan uvoz ne briše tlocrt');
+  assert.ok(el('status').textContent.startsWith('Uvoz nije uspio:'));
+ }
+ await load(JSON.stringify({segments:[]}));assert.equal(api.segments.length,0,'Valjan prazan tlocrt se može uvesti');
+ console.log('PASS: JSON preuzimanje, povratni uvoz, undo/redo i zaštita od neispravnog uvoza.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

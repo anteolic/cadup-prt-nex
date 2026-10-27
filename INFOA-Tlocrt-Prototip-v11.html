@@ -29,6 +29,7 @@ footer{background:#fff;border-top:1px solid #dde4ec;padding:10px 12px max(11px,e
 #toggleWalls[aria-pressed="false"]{color:#94a3b8;background:#f1f5f9;border-color:#ef4444}
 #toggleWalls[aria-pressed="false"] .wall-off{display:block;stroke:#dc2626}#minus,#plus{font-size:21px;min-width:40px;padding:0}#clearAll{color:#a52835;background:#fff1f2}#clearAll.armed{color:#fff;background:#b91c1c}
 @media(max-width:360px){header{padding-inline:8px}.brand span{font-size:9px}footer{padding-inline:8px}.controls{gap:4px}.controls button{padding-inline:8px}.tool{font-size:12px}}
+header{flex-wrap:wrap}.file-actions{flex-basis:100%;display:flex;gap:7px}.file-action{flex:1;min-height:38px;padding:6px 9px;border:1px solid #cbd5e1;border-radius:9px;background:#f2f6fb;color:#1a456d;font-size:12px;font-weight:650}
 </style>
 </head>
 <body>
@@ -37,16 +38,18 @@ footer{background:#fff;border-top:1px solid #dde4ec;padding:10px 12px max(11px,e
  <button id="undo" class="small" title="Poništi" aria-label="Poništi">↶</button>
  <button id="redo" class="small" title="Vrati" aria-label="Vrati">↷</button>
  <button id="fullscreen" class="small" title="Cijeli zaslon" aria-label="Cijeli zaslon">⛶</button>
+ <div class="file-actions"><button id="clearAll" class="file-action">Briši</button><button id="saveJson" class="file-action">Spremi JSON</button><button id="importJson" class="file-action">Uvezi JSON</button></div>
+ <input id="jsonFile" type="file" accept=".json,application/json" hidden>
 </header>
 <canvas id="board" aria-label="Mreža za crtanje obrisa prostorija"></canvas>
 <footer>
  <div class="mode-row"><button id="drawMode" class="tool active" aria-pressed="true">✎ Crtaj</button><button id="eraseMode" class="tool" aria-pressed="false">Gumica</button><button id="editMode" class="tool" aria-pressed="false">Uredi</button></div>
  <div id="roomArea" class="secondary"></div>
  <div class="statusline"><span id="status" class="status">1. Dodirni početak linije</span><button id="cancel" class="cancel" hidden>Odustani ✕</button></div>
- <div class="controls"><button id="toggleWalls" aria-label="Sakrij zidove" aria-pressed="true" title="Zidovi uključeni"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4 24V4h20v20h-7v-4h3V8H8v12h4v4H4Z" fill="currentColor"/><path d="M14 8v5h6M8 16h6v4" stroke="currentColor" stroke-width="3"/><path class="wall-off" d="M3 3l22 22" stroke-width="2.5" stroke-linecap="round"/></svg></button><button id="clearAll">Obriši sve</button><button id="minus" aria-label="Smanji zoom">−</button><button id="plus" aria-label="Povećaj zoom">+</button><button id="fit">Cijelo</button></div>
+ <div class="controls"><button id="toggleWalls" aria-label="Sakrij zidove" aria-pressed="true" title="Zidovi uključeni"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M4 24V4h20v20h-7v-4h3V8H8v12h4v4H4Z" fill="currentColor"/><path d="M14 8v5h6M8 16h6v4" stroke="currentColor" stroke-width="3"/><path class="wall-off" d="M3 3l22 22" stroke-width="2.5" stroke-linecap="round"/></svg></button><button id="minus" aria-label="Smanji zoom">−</button><button id="plus" aria-label="Povećaj zoom">+</button><button id="fit">Cijelo</button></div>
 </footer>
-<script src="room-geometry.js?v=20261027-4"></script>
-<script src="grid-geometry.js?v=20261027-4"></script>
-<script src="grid-app.js?v=20261027-4"></script>
+<script src="room-geometry.js?v=20261027-5"></script>
+<script src="grid-geometry.js?v=20261027-5"></script>
+<script src="grid-app.js?v=20261027-5"></script>
 </body>
 </html>

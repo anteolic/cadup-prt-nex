@@ -53,7 +53,7 @@
  }
  const lengthText=cm=>cm>=100?(cm/100).toLocaleString('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m':cm.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm';
  const areaText=cm=> (cm/10000).toLocaleString('hr-HR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m²';
- function resetClear(){clearArmed=false;$('clearAll').textContent='Obriši sve';$('clearAll').classList.remove('armed');}
+ function resetClear(){clearArmed=false;$('clearAll').textContent='Briši';$('clearAll').classList.remove('armed');}
  function status(message){
   const current=model();
   $('status').textContent=message||(mode==='edit'?(selectedWall?'Povuci ručke za duljinu · sredinu za pomak':'Povuci unutrašnjost prostorije ili odaberi zid'):first?(mode==='erase'?'2. Dodirni kraj brisanja · povuci za duljinu':'Dodirni sljedeću točku · dvostruki dodir završava'):(mode==='erase'?'1. Dodirni početak brisanja':'1. Dodirni početak linije'));
@@ -327,6 +327,35 @@
   if(!segments.length)return;
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
   const before=copy(segments);segments=[];first=null;preview=null;commit(before);
+ });
+ $('saveJson').addEventListener('click',()=>{
+  try{
+   const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),wallsVisible};
+   const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+   const link=document.createElement('a');link.href=url;link.download='infoa-tlocrt-'+new Date().toISOString().slice(0,10)+'.json';link.click();
+   setTimeout(()=>URL.revokeObjectURL(url),1000);status('JSON datoteka je spremna za preuzimanje');
+  }catch(_){status('Spremanje nije uspjelo. Pokušaj ponovno.');}
+ });
+ $('importJson').addEventListener('click',()=>$('jsonFile').click());
+ $('jsonFile').addEventListener('change',async e=>{
+  const input=e.target,file=input.files?.[0];if(!file)return;
+  try{
+   if(file.size>1000000)throw new Error('Datoteka je prevelika (najviše 1 MB).');
+   const data=JSON.parse(await file.text());
+   if(!data||!Array.isArray(data.segments)||data.segments.length>2000||
+    (data.format!==undefined&&data.format!=='infoa-tlocrt')||
+    (data.version!==undefined&&data.version!==1)||(data.unit!==undefined&&data.unit!=='cm')||
+    (data.wallsVisible!==undefined&&typeof data.wallsVisible!=='boolean'))throw new Error('Neispravan format tlocrta.');
+   const valid=data.segments.every(s=>s&&['x1','y1','x2','y2'].every(k=>Number.isFinite(s[k])&&s[k]>=0&&s[k]<=2000)&&
+    (s.x1===s.x2||s.y1===s.y2)&&(s.x1!==s.x2||s.y1!==s.y2));
+   if(!valid)throw new Error('JSON sadrži neispravne zidove.');
+   const imported=GridGeometry.normalize(data.segments);
+   GridGeometry.detectWithDoors(imported); // Provjeri složenost prije zamjene crteža.
+   cancelInteraction();const before=copy(segments);segments=imported;
+   wallsVisible=data.wallsVisible!==false;selected=null;selectedWall=null;wallSession=null;
+   commit(before);save();resetClear();fit();status('Tlocrt je uvezen · Poništi vraća prethodni crtež');
+  }catch(error){status('Uvoz nije uspio: '+(error instanceof SyntaxError?'Datoteka nije valjan JSON.':error.message));}
+  finally{input.value='';}
  });
  $('plus').addEventListener('click',()=>zoomAt(1.16));$('minus').addEventListener('click',()=>zoomAt(1/1.16));$('fit').addEventListener('click',fit);
  $('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen?.();}catch(_){}});

@@ -5,7 +5,7 @@
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false;
- let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null;
+ let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null,editorSelectionKey=null;
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
  function save(){try{localStorage.setItem(KEY,JSON.stringify({segments,wallsVisible}));}catch(_){}}
@@ -65,7 +65,7 @@
   $('toggleWalls').setAttribute('title',wallsVisible?'Zidovi uključeni':'Zidovi isključeni');
   $('cancel').hidden=!first;
   $('wallActions').hidden=mode!=='edit'||!selectedWall;
-  if(selectedWall){const t=selectedWall.thickness??RoomGeometry.defaultThickness(model().rooms,selectedWall);$('wallLength').textContent='Duljina '+lengthText(Math.abs(selectedWall.x2-selectedWall.x1)+Math.abs(selectedWall.y2-selectedWall.y1));$('wallThickness').textContent='Debljina '+lengthText(t);}$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
+  syncDimensionEditor();$('undo').disabled=!past.length&&!first;$('redo').disabled=!future.length;
  }
  function commit(before){
   if(JSON.stringify(before)===JSON.stringify(segments)){status();draw();return;}
@@ -352,20 +352,26 @@
  function deselectWall(){selectedWall=null;wallSession=null;status();draw();}
  $('wallDeselect').addEventListener('click',deselectWall);
  function selectedDimension(){if(!selectedWall)return null;const h=selectedWall.y1===selectedWall.y2;return {axis:h?'h':'v',line:h?selectedWall.y1:selectedWall.x1,start:h?selectedWall.x1:selectedWall.y1,end:h?selectedWall.x2:selectedWall.y2};}
- $('wallLength').addEventListener('click',()=>{const dimension=selectedDimension();if(dimension)openDimension(dimension);});
- $('wallThickness').addEventListener('click',()=>{const dimension=selectedDimension();if(dimension){openDimension(dimension);$('dimensionThickness').focus();$('dimensionThickness').select();}});
  $('wallDelete').addEventListener('click',()=>{if(mode!=='edit'||!selectedWall)return;const before=copy(segments);segments=GridGeometry.eraseLine(segments,selectedWall);selectedWall=null;commit(before);});
  $('clearAll').addEventListener('click',()=>{
   if(!segments.length)return;
   if(!clearArmed){clearArmed=true;$('clearAll').textContent='Potvrdi';$('clearAll').classList.add('armed');status('Ponovno dodirni za brisanje tlocrta');return;}
   const before=copy(segments);segments=[];first=null;preview=null;commit(before);
  });
+ function syncDimensionEditor(){
+  if(mode!=='edit'||!selectedWall){editorSelectionKey=null;editingDimension=null;$('dimensionError').textContent='';return;}
+  const key=JSON.stringify(selectedWall);if(editorSelectionKey===key)return;
+  editorSelectionKey=key;editingDimension=selectedDimension();
+  $('dimensionValue').value=String(Math.round((editingDimension.end-editingDimension.start)*1000)/1000).replace('.',',');
+  $('dimensionThickness').value=String(selectedWall.thickness??RoomGeometry.defaultThickness(model().rooms,selectedWall)).replace('.',',');
+  $('dimensionError').textContent='';
+ }
  function openDimension(dimension){
-  cancelInteraction();editingDimension={...dimension};
+  cancelInteraction();const wall=GridGeometry.wallForDimension(segments,dimension).wall;selectedWall=wall;status();draw();
+  editingDimension={...dimension};editorSelectionKey=JSON.stringify(wall);
   $('dimensionValue').value=String(Math.round((dimension.end-dimension.start)*1000)/1000).replace('.',',');
-  const wall=GridGeometry.wallForDimension(segments,dimension).wall;selectedWall=wall;status();draw();
   $('dimensionThickness').value=String(wall.thickness??RoomGeometry.defaultThickness(model().rooms,wall)).replace('.',',');
-  $('dimensionError').textContent='';$('dimensionDialog').showModal();$('dimensionValue').focus();$('dimensionValue').select();
+  $('dimensionError').textContent='';$('dimensionValue').focus();$('dimensionValue').select();
  }
  $('dimensionForm').addEventListener('submit',e=>{
   e.preventDefault();if(!editingDimension)return;
@@ -393,11 +399,9 @@
    GridGeometry.detectWithDoors(updated);
    const h=wall.y1===wall.y2,selection=GridGeometry.wallForDimension(updated,{axis:h?'h':'v',line:h?wall.y1:wall.x1,start:h?wall.x1:wall.y1,end:h?wall.x2:wall.y2}).wall;
    const before=copy(segments);segments=updated;commit(before);selectedWall=selection;status();draw();
-   editingDimension=null;$('dimensionDialog').close();status('Mjere zida su promijenjene');
+   $('dimensionError').textContent='';status('Mjere zida su promijenjene');
   }catch(error){$('dimensionError').textContent=error.message;}
  });
- $('dimensionCancel').addEventListener('click',()=>{editingDimension=null;$('dimensionDialog').close();});
- $('dimensionDialog').addEventListener('close',()=>{editingDimension=null;});
  $('saveJson').addEventListener('click',()=>{
   try{
    const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),wallsVisible};

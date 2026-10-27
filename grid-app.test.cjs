@@ -12,7 +12,7 @@ function el(id){
 const context=vm.createContext({console,Blob,fetch:async(url,options)=>{updateRequests.push({url,options});if(updateFailure==='network')throw new Error('Offline');return {ok:updateFailure!=='http'&&!(updateFailure==='script'&&url.includes('grid-app.js')),status:updateFailure==='http'||(updateFailure==='script'&&url.includes('grid-app.js'))?503:200,text:async()=>url.includes('CADup.html')?(updateFailure==='incomplete'?'<html></html>':publishedHtml):'/* verified script response */'};},URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js','cad-objects.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={objectResizeHandles,addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -361,3 +361,21 @@ el('undo').click();assert.equal(context.api.segments.length,0);assert.equal(el('
 vm.runInContext(source,context);assert.equal(el('redo').disabled,false);el('redo').click();assert.equal(context.api.segments.length,1);
 
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
+// Povlačenje ručke u viewportu mijenja dimenzije, čuva suprotni kut i podržava undo.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('sofa');
+const resizeBefore=JSON.stringify(api.objects),resizeBox=context.CadObjects.selectionBounds(api.objects);
+let objectHandle=api.objectResizeHandles().find(h=>h.handle==='se');assert.ok(objectHandle);
+drag(objectHandle.x,objectHandle.y,objectHandle.x+50,objectHandle.y+30);
+let resizeAfter=context.CadObjects.selectionBounds(api.objects);
+assert.equal(resizeAfter.left,resizeBox.left);assert.equal(resizeAfter.top,resizeBox.top);assert.equal(api.objects[0].width,320);assert.equal(api.objects[0].depth,150);
+assert.equal(el('objectWidth').value,'320');assert.equal(el('objectDepth').value,'150');
+const resizedObjectState=JSON.stringify(api.objects);objectHandle=api.objectResizeHandles().find(h=>h.handle==='se');
+board.pointerdown(event(objectHandle.x,objectHandle.y));board.pointermove(event(objectHandle.x+20,objectHandle.y+20));board.pointercancel(event(objectHandle.x+20,objectHandle.y+20));
+assert.equal(JSON.stringify(api.objects),resizedObjectState,'Prekid povlačenja vraća dimenzije');
+api.undo();assert.equal(JSON.stringify(api.objects),resizeBefore);api.redo();assert.equal(JSON.stringify(api.objects),resizedObjectState);
+// Glavni meniji i podmeniji međusobno zatvaraju prethodni odabir.
+el('topMenu').open=true;el('objectMenu').open=true;el('objectMenu').toggle();assert.equal(el('topMenu').open,false);
+el('topMenu').open=true;el('topMenu').toggle();assert.equal(el('objectMenu').open,false);
+const menuSibling={tagName:'DETAILS',open:true},menuTarget={tagName:'DETAILS',open:true,parentElement:{children:[]}};menuTarget.parentElement.children=[menuTarget,menuSibling];
+el('objectLibrary').toggle({target:menuTarget});assert.equal(menuSibling.open,false);

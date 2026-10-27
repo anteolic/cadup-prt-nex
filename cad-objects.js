@@ -5,10 +5,10 @@ globalThis.CadObjects=(()=>{
   ['bed','Namještaj','Spavaća soba','Bračni krevet',180,210],['single-bed','Namještaj','Spavaća soba','Jednostruki krevet',100,210],['wardrobe','Namještaj','Spavaća soba','Ormar',180,60],
   ['table','Namještaj','Blagovaonica','Blagovaonski stol',180,100],['round-table','Namještaj','Blagovaonica','Okrugli stol',110,110],['chair','Namještaj','Blagovaonica','Stolica',50,50],
   ['desk','Namještaj','Radna soba','Radni stol',140,70],['shelf','Namještaj','Radna soba','Polica',120,35],
-  ['kitchen','Kuhinja','Elementi','Kuhinjski niz',240,60],['fridge','Kuhinja','Uređaji','Hladnjak',60,65],['cooker','Kuhinja','Uređaji','Štednjak',60,60],
+  ['base-cabinet','Kuhinja','Donji elementi','Donji element',60,60],['drawer-cabinet','Kuhinja','Donji elementi','Ladičar',60,60],['corner-cabinet','Kuhinja','Donji elementi','Kutni element',90,90],['sink-cabinet','Kuhinja','Donji elementi','Element sa sudoperom',80,60],['island','Kuhinja','Donji elementi','Kuhinjski otok',160,90],['wall-cabinet','Kuhinja','Gornji elementi','Gornji element',60,35],['tall-cabinet','Kuhinja','Visoki elementi','Visoki ormar',60,60],['oven','Kuhinja','Uređaji','Pećnica',60,60],['dishwasher','Kuhinja','Uređaji','Perilica posuđa',60,60],['kitchen','Kuhinja','Elementi','Kuhinjski niz',240,60],['fridge','Kuhinja','Uređaji','Hladnjak',60,65],['cooker','Kuhinja','Uređaji','Štednjak',60,60],
   ['bath','Kupaonica','Sanitarije','Kada',170,75],['shower','Kupaonica','Sanitarije','Tuš',90,90],['toilet','Kupaonica','Sanitarije','WC',40,70],['sink','Kupaonica','Sanitarije','Umivaonik',60,50],['washer','Kupaonica','Uređaji','Perilica',60,60],
   ['door','Otvori','Vrata','Jednokrilna vrata',90,90],['double-door','Otvori','Vrata','Dvokrilna vrata',160,80],['window','Otvori','Prozori','Prozor',120,20],['stairs','Konstrukcija','Stepenice','Ravne stepenice',100,300]
- ].map(([kind,category,subcategory,name,width,depth])=>({kind,category,subcategory,name,width,depth}));
+ ].map(([kind,category,subcategory,name,width,depth])=>({kind,category,subcategory,name,width,depth,hidden:kind==='kitchen'}));
  const definition=kind=>catalog.find(item=>item.kind===kind);
  let serial=0;const id=()=> 'o-'+Date.now().toString(36)+'-'+(++serial).toString(36);
  const clone=items=>items.map(item=>({...item}));
@@ -54,6 +54,17 @@ globalThis.CadObjects=(()=>{
   if(resized.some(item=>item.width<5||item.depth<5))throw new Error('Pojedini element postaje manji od 5 cm.');
   const fitted=constrain(resized),map=new Map(fitted.map(item=>[item.id,item]));return items.map(item=>map.get(item.id)||{...item});
  }
+ function resizeHandle(items,ids,handle,dx,dy){
+  const selected=new Set(ids),group=items.filter(item=>selected.has(item.id)),b=selectionBounds(group);if(!b)return clone(items);
+  const minX=b.width*Math.max(...group.map(item=>5/(item.rotation%180?item.depth:item.width))),minY=b.depth*Math.max(...group.map(item=>5/(item.rotation%180?item.width:item.depth)));
+  let {left,right,top,bottom}=b;
+  if(handle.includes('w'))left=Math.max(0,Math.min(right-minX,left+dx));if(handle.includes('e'))right=Math.min(2000,Math.max(left+minX,right+dx));
+  if(handle.includes('n'))top=Math.max(0,Math.min(bottom-minY,top+dy));if(handle.includes('s'))bottom=Math.min(2000,Math.max(top+minY,bottom+dy));
+  const sx=(right-left)/b.width,sy=(bottom-top)/b.depth;
+  return items.map(item=>{if(!selected.has(item.id))return {...item};const swap=item.rotation%180!==0;
+   return {...item,x:left+(item.x-b.left)*sx,y:top+(item.y-b.top)*sy,width:item.width*(swap?sy:sx),depth:item.depth*(swap?sx:sy)};
+  });
+ }
  function rotate(items,ids){
   const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);
   const center=group.length===1?group[0]:selectionBounds(group);
@@ -98,6 +109,13 @@ globalThis.CadObjects=(()=>{
    case 'desk':line(-50,-20,50,-20);rect(-45,-15,25,60);break;
    case 'coffee':rect(-42,-40,84,80);break;
    case 'kitchen':for(let i=1;i<4;i++)line(-50+i*25,-50,-50+i*25,50);ellipse(-12,0,9,27);break;
+   case 'base-cabinet':case 'wall-cabinet':case 'tall-cabinet':line(0,-50,0,50);line(-10,0,-4,0);line(4,0,10,0);if(item.kind==='wall-cabinet'){line(-45,-40,45,40);}break;
+   case 'drawer-cabinet':for(const y of [-16,16])line(-50,y,50,y);for(const y of [-34,0,34])line(-8,y,8,y);break;
+   case 'corner-cabinet':line(0,-50,0,0);line(0,0,50,0);line(-45,45,0,0);break;
+   case 'sink-cabinet':line(-45,-35,45,-35);ellipse(-18,4,22,29);ellipse(24,4,14,29);break;
+   case 'island':rect(-42,-40,84,80);line(-42,5,42,5);line(0,5,0,40);break;
+   case 'oven':rect(-38,-25,76,65);line(-50,-35,50,-35);line(-22,-14,22,-14);break;
+   case 'dishwasher':rect(-40,-20,80,60);line(-50,-35,50,-35);line(-18,-27,18,-27);break;
    case 'fridge':line(-50,-12,50,-12);line(30,0,30,30);break;
    case 'cooker':for(const x of [-24,24])for(const y of [-24,24])ellipse(x,y,16,16);break;
    case 'bath':g.beginPath();g.roundRect(-42,-42,84,84,22);g.stroke();ellipse(0,-25,4,4);break;
@@ -113,5 +131,5 @@ globalThis.CadObjects=(()=>{
   if(selected){g.setLineDash([5/Math.max(fx,fy),3/Math.max(fx,fy)]);g.strokeRect(-50,['door','double-door'].includes(item.kind)?-100:-50,100,100);}
   g.restore();
  }
- return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,duplicate,group,ungroup,attach,draw};
+ return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,resizeHandle,rotate,duplicate,group,ungroup,attach,draw};
 })();

@@ -387,8 +387,8 @@
    g.strokeStyle='#dc2626';const gripScale=handleScale();
    if(mode==='edit')for(const [index,p] of [a,b].entries()){
     if(gesture?.type==='wall-resize'&&gesture.endpoint===index+1)continue;
-    g.save();g.translate(p.x,p.y);g.rotate(horizontal?0:Math.PI/2);g.scale(gripScale,gripScale);g.lineWidth=1.8;g.lineCap='round';g.lineJoin='round';
-    g.beginPath();g.moveTo(-6,-4);g.lineTo(-11,0);g.lineTo(-6,4);g.moveTo(6,-4);g.lineTo(11,0);g.lineTo(6,4);g.stroke();g.restore();
+    g.save();g.translate(p.x,p.y);g.rotate(horizontal?0:Math.PI/2);g.scale(gripScale,gripScale);g.lineWidth=1.4;g.beginPath();g.arc(0,0,12,0,Math.PI*2);g.stroke();
+    g.lineWidth=1.8;g.lineCap='round';g.lineJoin='round';g.beginPath();g.moveTo(-4.5,-4);g.lineTo(-8.5,0);g.lineTo(-4.5,4);g.moveTo(4.5,-4);g.lineTo(8.5,0);g.lineTo(4.5,4);g.stroke();g.restore();
    }
 
   }

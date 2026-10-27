@@ -496,7 +496,7 @@ click(990,790);assert.equal(el('objectEditGroup').textContent,'Uredi grupu');ass
 const viewSettingsCamera={...api.view},viewSettingsScene=JSON.stringify(api.segments);
 el('showGrid').checked=false;el('showGrid').change();gridLines.length=0;api.draw();assert.equal(gridLines.length,0);
 el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);assert.equal(api.dimensions.length,0);
-assert.deepEqual(JSON.parse(memory.get('cadup_view_settings_v1')),{grid:false,measures:false});assert.deepEqual({...api.view},viewSettingsCamera);assert.equal(JSON.stringify(api.segments),viewSettingsScene);
+assert.deepEqual(JSON.parse(memory.get('cadup_view_settings_v1')),{grid:false,measures:false,rotation:0,autoFullscreen:true});assert.deepEqual({...api.view},viewSettingsCamera);assert.equal(JSON.stringify(api.segments),viewSettingsScene);
 el('showGrid').checked=true;el('showGrid').change();gridLines.length=0;api.draw();assert.ok(gridLines.length);
 el('showMeasures').checked=true;el('showMeasures').change();
 
@@ -548,3 +548,8 @@ while(api.viewportTurns)el('viewportRotate').click();el('clearAll').click();el('
 el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);
 click(200,100);labels.length=0;api.draw();assert.ok(labels.includes('400 cm'));assert.ok(!labels.includes('300 cm'));assert.equal(el('showMeasures').checked,false);assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).measures,false);
 deselect();labels.length=0;api.draw();assert.equal(labels.length,0);
+
+// Rotation and fullscreen preferences survive other setting changes; viewport changes are not scene edits.
+const rememberedScene=memory.get('infoa_grid_loops_v1');el('viewportRotate').click();assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).rotation,1);
+el('showGrid').checked=false;el('showGrid').change();assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).rotation,1);
+el('autoFullscreen').checked=false;el('autoFullscreen').change();assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).autoFullscreen,false);assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).rotation,1);assert.equal(memory.get('infoa_grid_loops_v1'),rememberedScene);

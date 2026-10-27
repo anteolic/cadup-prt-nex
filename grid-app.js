@@ -4,7 +4,7 @@
  const CUSTOM_KEY='cadup_custom_library_v1',KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  const VIEW_KEY='cadup_view_settings_v1';
- let showGrid=true,showMeasures=true,viewportTurns=0;
+ let showGrid=true,showMeasures=true,viewportTurns=0,autoFullscreen=true,fullscreenPending=true;
  let customLibrary=[],customNaming=false;
  let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null,editingObjectId=null,lastGroupTap=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
@@ -593,16 +593,30 @@
   if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
  },true);
  function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;editingGroup=null;editingObjectId=null;lastGroupTap=null;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
- function restoreViewSettings(){
-  try{const saved=JSON.parse(localStorage.getItem(VIEW_KEY)||'{}');showGrid=saved.grid!==false;showMeasures=saved.measures!==false;}catch(_){}
-  $('showGrid').checked=showGrid;$('showMeasures').checked=showMeasures;
+ function saveViewSettings(){
+  try{localStorage.setItem(VIEW_KEY,JSON.stringify({grid:showGrid,measures:showMeasures,rotation:viewportTurns,autoFullscreen}));}catch(_){}
  }
+ function restoreViewSettings(){
+  try{const saved=JSON.parse(localStorage.getItem(VIEW_KEY)||'{}');showGrid=saved.grid!==false;showMeasures=saved.measures!==false;autoFullscreen=saved.autoFullscreen!==false;viewportTurns=Number.isInteger(saved.rotation)&&saved.rotation>=0&&saved.rotation<4?saved.rotation:0;}catch(_){}
+  fullscreenPending=autoFullscreen;$('showGrid').checked=showGrid;$('showMeasures').checked=showMeasures;$('autoFullscreen').checked=autoFullscreen;
+ }
+ async function enterAutoFullscreen(){
+  if(!autoFullscreen||!fullscreenPending)return;
+  fullscreenPending=false;const root=document.documentElement,request=root.requestFullscreen||root.webkitRequestFullscreen;
+  if(document.fullscreenElement||document.webkitFullscreenElement||!request)return;
+  try{await request.call(root);}catch(_){}
+ }
+ document.addEventListener('pointerup',()=>{void enterAutoFullscreen();},true);
+ document.addEventListener('keydown',e=>{if(e.key!=='Escape')void enterAutoFullscreen();},true);
  for(const id of ['showGrid','showMeasures'])$(id).addEventListener('change',()=>{
-  showGrid=$('showGrid').checked;showMeasures=$('showMeasures').checked;
-  try{localStorage.setItem(VIEW_KEY,JSON.stringify({grid:showGrid,measures:showMeasures}));}catch(_){}
-  draw();
+  showGrid=$('showGrid').checked;showMeasures=$('showMeasures').checked;saveViewSettings();draw();
  });
- $('viewportRotate').addEventListener('click',()=>{finishMeasureInput();closeMenu();if(gesture)cancelInteraction();viewportTurns=(viewportTurns+1)%4;lastGroupTap=null;status();draw();});
+ $('autoFullscreen').addEventListener('change',async()=>{
+  autoFullscreen=$('autoFullscreen').checked;fullscreenPending=autoFullscreen;saveViewSettings();
+  if(autoFullscreen)await enterAutoFullscreen();
+  else if(document.fullscreenElement||document.webkitFullscreenElement){try{await (document.exitFullscreen||document.webkitExitFullscreen)?.call(document);}catch(_){}}
+ });
+ $('viewportRotate').addEventListener('click',()=>{finishMeasureInput();closeMenu();if(gesture)cancelInteraction();viewportTurns=(viewportTurns+1)%4;saveViewSettings();lastGroupTap=null;status();draw();});
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('eraseMode').addEventListener('click',()=>changeMode(mode==='erase'?'edit':'erase'));
  $('reloadApp').addEventListener('click',async()=>{
@@ -705,7 +719,6 @@
   finally{input.value='';}
  });
  $('plus').addEventListener('click',()=>zoomAt(1.16));$('minus').addEventListener('click',()=>zoomAt(1/1.16));$('fit').addEventListener('click',fit);
- $('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen?.();}catch(_){}});
  window.addEventListener('keydown',e=>{
   if(e.key!=='Escape'&&(e.target?.isContentEditable||['INPUT','SELECT','TEXTAREA'].includes(e.target?.tagName)))return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}

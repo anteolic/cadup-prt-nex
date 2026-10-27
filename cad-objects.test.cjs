@@ -75,3 +75,21 @@ for(const rotation of [0,90,180,270])for(const mirrored of [false,true])for(cons
  assert.ok(Math.abs((resized.x*nx+resized.y*ny-resized[axis]/2)-(item.x*nx+item.y*ny-item[axis]/2))<1e-7);
 }
 const handleDoor=C.create('door',500,500),deepDoor=C.resizeFromHandle([handleDoor],handleDoor.id,'depth',-20)[0];assert.equal(deepDoor.depth,handleDoor.depth+20);assert.equal(deepDoor.x,handleDoor.x);assert.equal(deepDoor.y,handleDoor.y);
+
+// Attached openings follow their supporting wall; furniture and unrelated openings stay put.
+{
+ const top={x1:100,y1:100,x2:700,y2:100},right={x1:700,y1:100,x2:700,y2:700},bottom={x1:100,y1:700,x2:700,y2:700},left={x1:100,y1:100,x2:100,y2:700},separate={x1:1000,y1:1000,x2:1000,y2:1500};
+ const door={...C.create('door',300,100)},window={...C.create('window',700,400),rotation:90},remote={...C.create('window',1000,1200),rotation:90},furniture=C.create('drawer-cabinet',400,400),free={...door,id:'free-opening',y:110};
+ const items=[door,window,remote,furniture,free],before=[top,right,bottom,left,separate],movedTop={...top,y1:200,y2:200},movedWalls=[movedTop,{...right,y1:200},bottom,{...left,y1:200},separate];
+ const moved=C.followWallOpenings(items,before,movedWalls,{from:top,to:movedTop});assert.equal(moved[0].y,200);assert.equal(moved[0].x,door.x);assert.deepEqual(moved.slice(1),items.slice(1));
+ const longerTop={...top,x2:900},longer=[longerTop,{...right,x1:900,x2:900},{...bottom,x2:900},left,separate];
+ const lengthened=C.followWallOpenings(items,before,longer,{from:top,to:longerTop,shift:{axis:'x',cut:700,delta:200}});assert.equal(lengthened[1].x,900);assert.equal(lengthened[1].y,window.y);assert.deepEqual(lengthened[2],remote);assert.deepEqual(lengthened[3],furniture);
+ const nearEnd={...door,x:600},shortTop={...top,x2:500},short=C.followWallOpenings([nearEnd],before,[shortTop,right,bottom,left,separate],{from:top,to:shortTop});assert.equal(short[0].x,455);assert.equal(short[0].width,90);
+ assert.throws(()=>C.followWallOpenings([door],before,[{...top,x2:150}],{from:top,to:{...top,x2:150}}),/prekratak/);
+}
+
+// Following a wall at the canvas edge keeps openings valid for save/reload.
+{
+ const oldWall={x1:100,y1:100,x2:700,y2:100},edgeWall={...oldWall,y1:0,y2:0},door=C.create('door',300,100);
+ const followed=C.followWallOpenings([door],[oldWall],[edgeWall],{from:oldWall,to:edgeWall});assert.equal(followed[0].y,0);assert.equal(followed[0].rotation,180);assert.equal(C.validate(followed).length,1);
+}

@@ -4,7 +4,7 @@
  const CUSTOM_KEY='cadup_custom_library_v1',KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  const VIEW_KEY='cadup_view_settings_v1';
- let showGrid=true,showMeasures=true,viewportTurns=0,autoFullscreen=true,fullscreenPending=true;
+ let showGrid=true,showMeasures=true,viewportTurns=0,autoFullscreen=true,fullscreenPending=true,continuousDrawing=true;
  let customLibrary=[],customNaming=false;
  let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null,editingObjectId=null,lastGroupTap=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
@@ -163,15 +163,16 @@
  }
  function commit(before,keepWall=false){
   eraseHover=null;eraseObjectIds=[];
-  if(JSON.stringify(before)===JSON.stringify(segments)){status();draw();return;}
-  recordChange(Array.isArray(before)?{segments:before,objects:copy(objects)}:before);selected=null;if(!keepWall)selectedWall=null;wallSession=null;save();resetClear();status();draw();
+  const state=Array.isArray(before)?{segments:before,objects:copy(objects)}:before;
+  if(JSON.stringify(state)===JSON.stringify(snapshot())){status();draw();return;}
+  recordChange(state);selected=null;if(!keepWall)selectedWall=null;wallSession=null;save();resetClear();status();draw();
  }
  function add(end){
   if(!first)return;
   if(first.x===end.x&&first.y===end.y){status('Odaberi drugu točku linije');return;}
   const before=copy(segments),stroke={x1:first.x,y1:first.y,x2:end.x,y2:end.y};
   segments=GridGeometry.normalize([...segments,stroke]);
-  first=mode==='draw'?{...end}:null;preview=first;commit(before);
+  first=mode==='draw'&&continuousDrawing?{...end}:null;preview=first;if(!continuousDrawing)mode='edit';commit(before);
  }
  function undo(){
   liveEdit=null;
@@ -252,7 +253,8 @@
   const delta=(h?p.x-drag.start.x:p.y-drag.start.y)/scale;
   const target=snapWallCoordinate(drag.wall[axis+drag.endpoint]+delta,axis,drag.before,drag.wall);
   const resized=GridGeometry.resizeWall(drag.before,drag.wall,drag.endpoint,target,MIN,WIDTH,height);
-  segments=resized.segments;selectedWall=resized.wall;drag.currentWall=resized.wall;schedule();
+  let followed;try{followed=CadObjects.followWallOpenings(drag.beforeObjects,drag.before,resized.segments,{from:drag.wall,to:resized.wall});}catch(_){return;}
+  objects=followed;segments=resized.segments;selectedWall=resized.wall;drag.currentWall=resized.wall;schedule();
  }
  function updateWall(p,drag){
   const horizontal=drag.wall.y1===drag.wall.y2;
@@ -261,11 +263,12 @@
   const target=snapWallCoordinate(old+raw,horizontal?'y':'x',drag.before,drag.wall);
   const base=horizontal?drag.baseWall.y1:drag.baseWall.x1;
   const moved=GridGeometry.moveWall(drag.baseSegments,drag.baseWall,target-base,MIN,WIDTH,height);
-  segments=moved.segments;selectedWall=moved.wall;drag.currentWall=moved.wall;drag.currentOffset=moved.delta;schedule();
+  let followed;try{followed=CadObjects.followWallOpenings(drag.baseObjects,drag.baseSegments,moved.segments,{from:drag.baseWall,to:moved.wall});}catch(_){return;}
+  objects=followed;segments=moved.segments;selectedWall=moved.wall;drag.currentWall=moved.wall;drag.currentOffset=moved.delta;schedule();
  }
  function cancelInteraction(){
   if((gesture?.type==='object-move'||gesture?.type==='object-resize'))restoreSnapshot(gesture.before);
-  if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
+  if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;objects=copy(gesture.beforeObjects);selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
   gesture=null;pointers.clear();first=null;preview=null;status();draw();
  }
  function limitPan(){
@@ -428,7 +431,7 @@
  const xy=e=>{const r=board.getBoundingClientRect();return displayPoint({x:e.clientX-r.left,y:e.clientY-r.top},true);};
  function pinch(){
   const [a,b]=[...pointers.values()];if(!b)return;
-  if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
+  if(gesture?.type==='wall-move'||gesture?.type==='wall-resize'){segments=gesture.before;objects=copy(gesture.beforeObjects);selectedWall=gesture.wall;wallSession=gesture.beforeSession;}
   if((gesture?.type==='object-move'||gesture?.type==='object-resize')){const ids=gesture.ids;restoreSnapshot(gesture.before);objectIds=new Set(ids);}
   const mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};gesture={type:'pinch',distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y)),scale,anchor:point(mid.x,mid.y)};
  }
@@ -461,7 +464,7 @@
   }
   if(mode==='edit'&&editingGroup){gesture={type:'pan',id:e.pointerId,start:p,ox,oy,moved:false};status();draw();return;}
   const endpoint=mode==='edit'?hitHandle(p.x,p.y):null;
-  if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
+  if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),beforeObjects:copy(objects),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
   if(mode==='edit'&&dimensionHits.some(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom)){gesture={type:'pan',id:e.pointerId,start:p,ox,oy,moved:false};return;}
   if(mode==='edit'){
    const wall=hitWall(p.x,p.y);
@@ -469,8 +472,8 @@
    selectedWall=wall;
    if(wall){
     const session=wallSession&&['x1','y1','x2','y2'].every(k=>wallSession.current[k]===wall[k])?wallSession:null;
-    gesture={type:'wall-move',id:e.pointerId,start:p,wall,before:copy(segments),currentWall:wall,beforeSession:wallSession,
-     baseSegments:session?session.baseSegments:copy(segments),baseWall:session?session.baseWall:wall,currentOffset:session?session.offset:0};status();draw();return;
+    gesture={type:'wall-move',id:e.pointerId,start:p,wall,before:copy(segments),beforeObjects:copy(objects),currentWall:wall,beforeSession:wallSession,
+     baseObjects:session?session.baseObjects:copy(objects),baseSegments:session?session.baseSegments:copy(segments),baseWall:session?session.baseWall:wall,currentOffset:session?session.offset:0};status();draw();return;
    }
    selected=null;gesture={type:'pan',id:e.pointerId,start:p,ox,oy,moved:false};status();draw();return;
   }
@@ -556,12 +559,12 @@
    return;
   }
   if(last?.type==='wall-resize'){
-   if(cancelled){segments=last.before;selectedWall=last.wall;wallSession=last.beforeSession;status();draw();}
-   else{const wall=last.currentWall;commit(last.before);selectedWall=wall;wallSession=null;status();draw();}
+   if(cancelled){segments=last.before;objects=copy(last.beforeObjects);selectedWall=last.wall;wallSession=last.beforeSession;status();draw();}
+   else{const wall=last.currentWall;commit({segments:last.before,objects:last.beforeObjects});selectedWall=wall;wallSession=null;status();draw();}
   }else if(last?.type==='wall-move'){
-   if(cancelled){segments=last.before;selectedWall=last.wall;wallSession=last.beforeSession;status();draw();}
-   else{const wall=last.currentWall;commit(last.before);selectedWall=wall;
-    wallSession={baseSegments:last.baseSegments,baseWall:last.baseWall,offset:last.currentOffset,current:wall};status();draw();}
+   if(cancelled){segments=last.before;objects=copy(last.beforeObjects);selectedWall=last.wall;wallSession=last.beforeSession;status();draw();}
+   else{const wall=last.currentWall;commit({segments:last.before,objects:last.beforeObjects});selectedWall=wall;
+    wallSession={baseObjects:last.baseObjects,baseSegments:last.baseSegments,baseWall:last.baseWall,offset:last.currentOffset,current:wall};status();draw();}
   }
   else if(last?.type==='preview'&&first){
    if(cancelled){preview=first;status();draw();}
@@ -591,11 +594,11 @@
  },true);
  function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;editingGroup=null;editingObjectId=null;lastGroupTap=null;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
  function saveViewSettings(){
-  try{localStorage.setItem(VIEW_KEY,JSON.stringify({grid:showGrid,measures:showMeasures,rotation:viewportTurns,autoFullscreen}));}catch(_){}
+  try{localStorage.setItem(VIEW_KEY,JSON.stringify({grid:showGrid,measures:showMeasures,rotation:viewportTurns,autoFullscreen,continuousDrawing}));}catch(_){}
  }
  function restoreViewSettings(){
-  try{const saved=JSON.parse(localStorage.getItem(VIEW_KEY)||'{}');showGrid=saved.grid!==false;showMeasures=saved.measures!==false;autoFullscreen=saved.autoFullscreen!==false;viewportTurns=Number.isInteger(saved.rotation)&&saved.rotation>=0&&saved.rotation<4?saved.rotation:0;}catch(_){}
-  fullscreenPending=autoFullscreen;$('showGrid').checked=showGrid;$('showMeasures').checked=showMeasures;$('autoFullscreen').checked=autoFullscreen;
+  try{const saved=JSON.parse(localStorage.getItem(VIEW_KEY)||'{}');showGrid=saved.grid!==false;showMeasures=saved.measures!==false;autoFullscreen=saved.autoFullscreen!==false;continuousDrawing=saved.continuousDrawing!==false;viewportTurns=Number.isInteger(saved.rotation)&&saved.rotation>=0&&saved.rotation<4?saved.rotation:0;}catch(_){}
+  fullscreenPending=autoFullscreen;$('showGrid').checked=showGrid;$('showMeasures').checked=showMeasures;$('autoFullscreen').checked=autoFullscreen;$('continuousDrawing').checked=continuousDrawing;
  }
  async function enterAutoFullscreen(){
   if(!autoFullscreen||!fullscreenPending)return;
@@ -605,8 +608,8 @@
  }
  document.addEventListener('pointerup',()=>{void enterAutoFullscreen();},true);
  document.addEventListener('keydown',e=>{if(e.key!=='Escape')void enterAutoFullscreen();},true);
- for(const id of ['showGrid','showMeasures'])$(id).addEventListener('change',()=>{
-  showGrid=$('showGrid').checked;showMeasures=$('showMeasures').checked;saveViewSettings();draw();
+ for(const id of ['showGrid','showMeasures','continuousDrawing'])$(id).addEventListener('change',()=>{
+  showGrid=$('showGrid').checked;showMeasures=$('showMeasures').checked;continuousDrawing=$('continuousDrawing').checked;saveViewSettings();draw();
  });
  $('autoFullscreen').addEventListener('change',async()=>{
   autoFullscreen=$('autoFullscreen').checked;fullscreenPending=autoFullscreen;saveViewSettings();
@@ -677,7 +680,7 @@
    }
    GridGeometry.detectWithDoors(updated);
    const h=wall.y1===wall.y2,selection=GridGeometry.wallForDimension(updated,{axis:h?'h':'v',line:h?wall.y1:wall.x1,start:h?wall.x1:wall.y1,end:h?wall.x2:wall.y2}).wall;
-   const before=copy(segments);segments=updated;selectedWall=selection;commit(before,true);status();draw();
+   const before=snapshot(),axis=h?'x':'y',followed=CadObjects.followWallOpenings(objects,segments,updated,{from:wall,to:selection,shift:{axis,cut:wall[axis+'2'],delta:selection[axis+'2']-wall[axis+'2']}});segments=updated;objects=followed;selectedWall=selection;commit(before,true);status();draw();
    $('dimensionError').textContent='';status();
   }catch(error){$('dimensionError').textContent=error.message;}
  }

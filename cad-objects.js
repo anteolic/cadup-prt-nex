@@ -128,6 +128,42 @@ globalThis.CadObjects=(()=>{
   const valid=validateTemplates([template])[0],copies=duplicate(valid.items,valid.items.map(item=>item.id)),items=copies.items.filter(item=>copies.ids.includes(item.id)),b=selectionBounds(items);
   const moved=move(items,copies.ids,x-b.x,y-b.y);return {items:group(moved,copies.ids),ids:copies.ids};
  }
+ function followWallOpenings(items,before,after,options={}){
+  const horizontal=wall=>wall.y1===wall.y2,range=wall=>horizontal(wall)?[wall.x1,wall.x2]:[wall.y1,wall.y2],normal=wall=>horizontal(wall)?wall.y1:wall.x1;
+  const matches=(wall,h,line)=>horizontal(wall)===h&&Math.abs(normal(wall)-line)<.01;
+  const same=(a,b)=>['x1','y1','x2','y2'].every(k=>Math.abs(a[k]-b[k])<.01);
+  return items.map(item=>{
+   if(!['door','double-door','window'].includes(item.kind))return {...item};
+   const h=item.rotation%180===0,along=h?item.x:item.y,line=h?item.y:item.x;
+   const support=before.find(wall=>matches(wall,h,line)&&along-item.width/2>=range(wall)[0]-.01&&along+item.width/2<=range(wall)[1]+.01);
+   if(!support)return {...item};
+   let target=null,nextAlong=along,nextLine=line;
+   const from=options.from,to=options.to;
+   if(from&&to&&matches(from,h,line)&&along>=range(from)[0]&&along<=range(from)[1]){
+    target=to;nextLine=normal(to);
+    const a=range(from),b=range(to);if(Math.abs((b[0]-a[0])-(b[1]-a[1]))<.01)nextAlong+=b[0]-a[0];
+   }else{
+    const unchanged=after.find(wall=>same(wall,support));
+    if(unchanged)target=unchanged;
+    else{
+     const shift=options.shift;
+     if(shift&&shift.delta){
+      const p={x:item.x,y:item.y};if(p[shift.axis]>=shift.cut-.001)p[shift.axis]+=shift.delta;
+      nextAlong=h?p.x:p.y;nextLine=h?p.y:p.x;
+     }
+     const candidates=after.filter(wall=>matches(wall,h,nextLine));
+     candidates.sort((a,b)=>Math.max(range(a)[0]-nextAlong,0,nextAlong-range(a)[1])-Math.max(range(b)[0]-nextAlong,0,nextAlong-range(b)[1]));
+     target=candidates[0];
+    }
+   }
+   if(!target)return {...item};
+   const [start,end]=range(target);if(end-start<item.width-.001)throw new Error('Zid je prekratak za vrata ili prozor.');
+   nextAlong=Math.max(start+item.width/2,Math.min(end-item.width/2,nextAlong));nextLine=normal(target);
+   const next=attach({...item,x:h?nextAlong:nextLine,y:h?nextLine:nextAlong},[target]),box=bounds(next);
+   if(box.left<-.001||box.top<-.001||box.right>2000.001||box.bottom>2000.001)throw new Error('Otvor prelazi rub tlocrta.');
+   return next;
+  });
+ }
  function snapToWalls(items,ids,walls,rooms=[],tolerance=20){
   const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);
   if(group.length===1&&['door','double-door','window'].includes(group[0].kind))return items.map(item=>selected.has(item.id)?attach(item,walls):{...item});
@@ -215,5 +251,5 @@ globalThis.CadObjects=(()=>{
   }
   g.restore();
  }
- return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,moveOnGrid,resizeFromHandle,resize,rotate,mirror,duplicate,group,ungroup,attach,createTemplate,validateTemplates,instantiate,snapToWalls,draw};
+ return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,moveOnGrid,resizeFromHandle,resize,rotate,mirror,duplicate,group,ungroup,attach,createTemplate,validateTemplates,instantiate,followWallOpenings,snapToWalls,draw};
 })();

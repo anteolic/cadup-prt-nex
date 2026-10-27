@@ -496,7 +496,7 @@ click(990,790);assert.equal(el('objectEditGroup').textContent,'Uredi grupu');ass
 const viewSettingsCamera={...api.view},viewSettingsScene=JSON.stringify(api.segments);
 el('showGrid').checked=false;el('showGrid').change();gridLines.length=0;api.draw();assert.equal(gridLines.length,0);
 el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);assert.equal(api.dimensions.length,0);
-assert.deepEqual(JSON.parse(memory.get('cadup_view_settings_v1')),{grid:false,measures:false,rotation:0,autoFullscreen:true});assert.deepEqual({...api.view},viewSettingsCamera);assert.equal(JSON.stringify(api.segments),viewSettingsScene);
+assert.deepEqual(JSON.parse(memory.get('cadup_view_settings_v1')),{grid:false,measures:false,rotation:0,autoFullscreen:true,continuousDrawing:true});assert.deepEqual({...api.view},viewSettingsCamera);assert.equal(JSON.stringify(api.segments),viewSettingsScene);
 el('showGrid').checked=true;el('showGrid').change();gridLines.length=0;api.draw();assert.ok(gridLines.length);
 el('showMeasures').checked=true;el('showMeasures').change();
 
@@ -559,3 +559,7 @@ while(api.viewportTurns)el('viewportRotate').click();el('clearAll').click();el('
 startDrawing();click(400,300);click(500,306);assert.equal(api.mode,'draw');assert.ok(api.segments.some(s=>s.y1===600&&s.y2===600&&s.x1===800&&s.x2===1000));finishDrawing();
 // The same orthogonal rule works after rotating the viewport.
 el('viewportRotate').click();startDrawing();const startDisplay=api.displayPoint({x:200,y:200});click(startDisplay.x,startDisplay.y);const beforeRotatedOffAxis=JSON.stringify(api.segments),diagonalDisplay=api.displayPoint({x:300,y:300});click(diagonalDisplay.x,diagonalDisplay.y);assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(JSON.stringify(api.segments),beforeRotatedOffAxis);
+
+// Continuous drawing is optional: off finishes a single wall, on keeps its endpoint active.
+while(api.viewportTurns)el('viewportRotate').click();el('clearAll').click();el('clearAll').click();api.fit();el('continuousDrawing').checked=false;el('continuousDrawing').change();startDrawing();click(100,100);click(300,100);assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(api.segments.length,1);assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).continuousDrawing,false);
+el('continuousDrawing').checked=true;el('continuousDrawing').change();startDrawing();click(100,300);click(300,300);assert.equal(api.mode,'draw');assert.ok(api.first);finishDrawing();

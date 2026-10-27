@@ -3,6 +3,8 @@
  const $=id=>document.getElementById(id),board=$('board'),g=board.getContext('2d');
  const CUSTOM_KEY='cadup_custom_library_v1',KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ const VIEW_KEY='cadup_view_settings_v1';
+ let showGrid=true,showMeasures=true;
  let customLibrary=[],customNaming=false;
  let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null,editingGroup=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
@@ -254,7 +256,7 @@
   draw();
  }
  function schedule(){if(frame)return;frame=true;requestAnimationFrame(()=>{frame=false;status();draw();});}
- function tag(x,y,text,color='#24557e',vertical=false,priority=1,dimension=null){pendingTags.push({x,y,text,color,vertical,priority,dimension});}
+ function tag(x,y,text,color='#24557e',vertical=false,priority=1,dimension=null){if(!showMeasures)return;pendingTags.push({x,y,text,color,vertical,priority,dimension});}
  function paintTags(){
   const occupied=[];dimensionHits=[];
   for(const {x:rawX,y:rawY,text,color,vertical,priority,dimension} of pendingTags.sort((a,b)=>b.priority-a.priority)){
@@ -295,8 +297,8 @@
   const unit=gridUnit();
   g.lineWidth=1;
   // Mreža prekriva cijeli prikaz, uključujući rubove izvan smanjene radne plohe.
-  for(let i=Math.ceil(-ox/scale/unit);i<=Math.floor((w-ox)/scale/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
-  for(let i=Math.ceil(-oy/scale/unit);i<=Math.floor((h-oy)/scale/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
+  if(showGrid)for(let i=Math.ceil(-ox/scale/unit);i<=Math.floor((w-ox)/scale/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
+  if(showGrid)for(let i=Math.ceil(-oy/scale/unit);i<=Math.floor((h-oy)/scale/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
   g.save();g.beginPath();g.rect(ox,oy,WIDTH*scale,height*scale);g.clip();
   drawGuides();
   if(wallsVisible){
@@ -510,6 +512,15 @@
   if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
  },true);
  function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;editingGroup=null;eraseHover=null;eraseObjectIds=[];cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
+ function restoreViewSettings(){
+  try{const saved=JSON.parse(localStorage.getItem(VIEW_KEY)||'{}');showGrid=saved.grid!==false;showMeasures=saved.measures!==false;}catch(_){}
+  $('showGrid').checked=showGrid;$('showMeasures').checked=showMeasures;
+ }
+ for(const id of ['showGrid','showMeasures'])$(id).addEventListener('change',()=>{
+  showGrid=$('showGrid').checked;showMeasures=$('showMeasures').checked;
+  try{localStorage.setItem(VIEW_KEY,JSON.stringify({grid:showGrid,measures:showMeasures}));}catch(_){}
+  draw();
+ });
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('eraseMode').addEventListener('click',()=>changeMode(mode==='erase'?'edit':'erase'));
  $('reloadApp').addEventListener('click',async()=>{
@@ -720,5 +731,5 @@
   catch(error){$('objectError').textContent=error.message;}
  }
  bindLiveEditor('objectForm',applyObjectInputs);
- restore();status();new ResizeObserver(resize).observe(board);resize();
+ restoreViewSettings();restore();status();new ResizeObserver(resize).observe(board);resize();
 })();

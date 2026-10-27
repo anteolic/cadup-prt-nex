@@ -492,3 +492,11 @@ el('objectWidth').value=String(member.width+20);el('objectForm').submit({prevent
 el('objectCopy').click();assert.equal(api.objects.length,3);assert.ok(api.objects.every(o=>o.group===member.group));api.undo();assert.equal(api.objects.length,2);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
 click(990,790);assert.equal(api.objectIds.length,0);assert.equal(el('objectActions').hidden,false);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
 el('objectEditGroup').click();assert.equal(el('objectEditGroup').textContent,'Uredi grupu');assert.equal(api.objectIds.length,2);assert.deepEqual({...api.view},groupCamera);
+
+// View settings hide only the grid and labels; measures remain editable.
+const viewSettingsCamera={...api.view},viewSettingsScene=JSON.stringify(api.segments);
+el('showGrid').checked=false;el('showGrid').change();gridLines.length=0;api.draw();assert.equal(gridLines.length,0);
+el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);assert.equal(api.dimensions.length,0);
+assert.deepEqual(JSON.parse(memory.get('cadup_view_settings_v1')),{grid:false,measures:false});assert.deepEqual({...api.view},viewSettingsCamera);assert.equal(JSON.stringify(api.segments),viewSettingsScene);
+el('showGrid').checked=true;el('showGrid').change();gridLines.length=0;api.draw();assert.ok(gridLines.length);
+el('showMeasures').checked=true;el('showMeasures').change();

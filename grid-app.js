@@ -127,11 +127,15 @@
   if(gesture?.type==='room-move'){segments=gesture.before;selected=gesture.face.id;}
   gesture=null;pointers.clear();first=null;preview=null;status();draw();
  }
- function limitPan(){ox=clamp(ox,w-WIDTH*scale,0);oy=clamp(oy,h-height*scale,0);}
+ function limitPan(){
+  const availableX=w-WIDTH*scale,availableY=h-height*scale;
+  ox=availableX>0?availableX/2:clamp(ox,availableX,0);
+  oy=availableY>0?availableY/2:clamp(oy,availableY,0);
+ }
  function zoomAt(factor,x=w/2,y=h/2){
   const anchor=point(x,y);scale=clamp(scale*factor,w/WIDTH,w/WIDTH*25);ox=x-anchor.x*scale;oy=y-anchor.y*scale;limitPan();status();draw();
  }
- function fit(){scale=w/WIDTH;ox=0;oy=0;draw();}
+ function fit(){scale=w/WIDTH;ox=0;oy=0;limitPan();draw();}
  function resize(){
   const width=board.clientWidth,boardHeight=board.clientHeight;if(!width||!boardHeight)return;
   const oldFit=w/WIDTH,center=w?point(w/2,h/2):{x:WIDTH/2,y:1000},factor=oldFit?scale/oldFit:1;
@@ -171,11 +175,13 @@
  function draw(){
   if(!w||!h)return;
   const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
-  g.save();g.beginPath();g.rect(ox,oy,WIDTH*scale,height*scale);g.clip();g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
-  const unit=step(),left=clamp(-ox/scale,0,WIDTH),right=clamp((w-ox)/scale,0,WIDTH),top=clamp(-oy/scale,0,height),bottom=clamp((h-oy)/scale,0,height);
+  g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
+  const unit=scale<=w/WIDTH*(1+1e-9)?100:step();
   g.lineWidth=1;
-  for(let i=Math.ceil(left/unit);i<=Math.floor(right/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,oy);g.lineTo(x,oy+height*scale);g.stroke();}
-  for(let i=Math.ceil(top/unit);i<=Math.floor(bottom/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(ox,y);g.lineTo(ox+WIDTH*scale,y);g.stroke();}
+  // Mreža prekriva cijeli prikaz, uključujući rubove izvan smanjene radne plohe.
+  for(let i=Math.ceil(-ox/scale/unit);i<=Math.floor((w-ox)/scale/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
+  for(let i=Math.ceil(-oy/scale/unit);i<=Math.floor((h-oy)/scale/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
+  g.save();g.beginPath();g.rect(ox,oy,WIDTH*scale,height*scale);g.clip();
   if(wallsVisible){
    const boxes=[...current.layout.outer,...current.layout.inner];
    g.fillStyle='#1e2329';for(const r of boxes)g.fillRect(ox+r.x*scale-1,oy+r.y*scale-1,r.width*scale+2,r.height*scale+2);
@@ -225,6 +231,7 @@
   return {x:clamp(first.x+direction*length,0,WIDTH),y:first.y};
  }
  board.addEventListener('pointerdown',e=>{
+  closeMenu();
   if(e.button!==undefined&&e.button!==0)return;e.preventDefault();board.setPointerCapture(e.pointerId);
   const p=xy(e);pointers.set(e.pointerId,p);resetClear();
   if(pointers.size>1){pinch();return;}
@@ -299,8 +306,10 @@
  board.addEventListener('pointercancel',e=>release(e,true));
  board.addEventListener('lostpointercapture',e=>{if(pointers.has(e.pointerId))release(e,true);});
  board.addEventListener('contextmenu',e=>e.preventDefault());
- board.addEventListener('wheel',e=>{e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
- function changeMode(next){cancelInteraction();mode=next;selectedWall=null;wallSession=null;resetClear();status();draw();}
+ board.addEventListener('wheel',e=>{closeMenu();e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
+ function closeMenu(){$('topMenu').open=false;}
+ document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))closeMenu();});
+ function changeMode(next){closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode('draw'));$('eraseMode').addEventListener('click',()=>changeMode('erase'));$('editMode').addEventListener('click',()=>changeMode('edit'));
  $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);

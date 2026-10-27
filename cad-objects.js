@@ -2,10 +2,13 @@
 globalThis.CadObjects=(()=>{
  const catalog=[
   ['sofa','Namještaj','Dnevni boravak','Kauč',220,90],['armchair','Namještaj','Dnevni boravak','Fotelja',90,90],['coffee','Namještaj','Dnevni boravak','Klub stol',110,60],
+  ['sofa-seat','Namještaj','Moduli kauča','Sjedalo s naslonom',80,90],['sofa-corner','Namještaj','Moduli kauča','Kutni modul',90,90],['sofa-chaise','Namještaj','Moduli kauča','Ležaj s naslonom',80,160],['sofa-ottoman','Namještaj','Moduli kauča','Puf / sjedalo',80,60],['sofa-arm','Namještaj','Moduli kauča','Rukonaslon',20,90],['sofa-back','Namještaj','Moduli kauča','Naslon',80,20],
+  ['shape-rectangle','Geometrija','Osnovni oblici','Pravokutnik',100,60],['shape-square','Geometrija','Osnovni oblici','Kvadrat',100,100],['shape-ellipse','Geometrija','Osnovni oblici','Elipsa',100,60],['shape-circle','Geometrija','Osnovni oblici','Krug',100,100],['shape-triangle','Geometrija','Osnovni oblici','Trokut',100,100],['shape-l','Geometrija','Osnovni oblici','L-oblik',100,100],
   ['bed','Namještaj','Spavaća soba','Bračni krevet',180,210],['single-bed','Namještaj','Spavaća soba','Jednostruki krevet',100,210],['wardrobe','Namještaj','Spavaća soba','Ormar',180,60],
   ['table','Namještaj','Blagovaonica','Blagovaonski stol',180,100],['round-table','Namještaj','Blagovaonica','Okrugli stol',110,110],['chair','Namještaj','Blagovaonica','Stolica',50,50],
   ['desk','Namještaj','Radna soba','Radni stol',140,70],['shelf','Namještaj','Radna soba','Polica',120,35],
   ['base-cabinet','Kuhinja','Donji elementi','Donji element',60,60],['drawer-cabinet','Kuhinja','Donji elementi','Ladičar',60,60],['corner-cabinet','Kuhinja','Donji elementi','Kutni element',90,90],['sink-cabinet','Kuhinja','Donji elementi','Element sa sudoperom',80,60],['island','Kuhinja','Donji elementi','Kuhinjski otok',160,90],['wall-cabinet','Kuhinja','Gornji elementi','Gornji element',60,35],['tall-cabinet','Kuhinja','Visoki elementi','Visoki ormar',60,60],['oven','Kuhinja','Uređaji','Pećnica',60,60],['dishwasher','Kuhinja','Uređaji','Perilica posuđa',60,60],['kitchen','Kuhinja','Elementi','Kuhinjski niz',240,60],['fridge','Kuhinja','Uređaji','Hladnjak',60,65],['cooker','Kuhinja','Uređaji','Štednjak',60,60],
+  ['countertop','Kuhinja','Radne ploče','Radna ploča',120,60],['double-sink-cabinet','Kuhinja','Donji elementi','Dvostruki sudoper',120,60],
   ['bath','Kupaonica','Sanitarije','Kada',170,75],['shower','Kupaonica','Sanitarije','Tuš',90,90],['toilet','Kupaonica','Sanitarije','WC',40,70],['sink','Kupaonica','Sanitarije','Umivaonik',60,50],['washer','Kupaonica','Uređaji','Perilica',60,60],
   ['door','Otvori','Vrata','Jednokrilna vrata',90,90],['double-door','Otvori','Vrata','Dvokrilna vrata',160,80],['window','Otvori','Prozori','Prozor',120,20],['stairs','Konstrukcija','Stepenice','Ravne stepenice',100,300]
  ].map(([kind,category,subcategory,name,width,depth])=>({kind,category,subcategory,name,width,depth,hidden:kind==='kitchen'}));
@@ -139,10 +142,20 @@ globalThis.CadObjects=(()=>{
   const rect=(x,y,w,h)=>{g.beginPath();g.rect(x,y,w,h);g.fill();g.stroke();},line=(x,y,a,b)=>{g.beginPath();g.moveTo(x,y);g.lineTo(a,b);g.stroke();},ellipse=(x,y,rx,ry)=>{g.beginPath();g.ellipse(x,y,rx,ry,0,0,Math.PI*2);g.stroke();};
   const opening=['door','double-door','window'].includes(item.kind);
   // Include the entire ink stroke in the declared footprint, at every zoom.
-  g.beginPath();g.rect(-50,opening?-100:-50,100,100);g.clip();
+  g.beginPath();g.rect(-50,['door','double-door'].includes(item.kind)?-100:-50,100,100);g.clip();
   if(opening){if(wallThickness){g.fillStyle='#fff';g.fillRect(-50,-wallThickness/item.depth*50,100,wallThickness/item.depth*100);g.fillStyle=erase?'#fee2e2':selected?'#dbeafe':'#f8fafc';}}
-  else{const inset=Math.min(49,g.lineWidth/2);rect(-50+inset,-50+inset,100-2*inset,100-2*inset);}
+  else if(!item.kind.startsWith('shape-')&&item.kind!=='corner-cabinet'){const inset=Math.min(49,g.lineWidth/2);rect(-50+inset,-50+inset,100-2*inset,100-2*inset);}
+  const inset=Math.min(49,g.lineWidth/2),edge=50-inset;
+  const polygon=points=>{g.beginPath();points.forEach(([x,y],i)=>i?g.lineTo(x,y):g.moveTo(x,y));g.closePath();g.fill();g.stroke();};
   switch(item.kind){
+   case 'shape-rectangle':case 'shape-square':rect(-edge,-edge,2*edge,2*edge);break;
+   case 'shape-circle':case 'shape-ellipse':g.beginPath();g.ellipse(0,0,edge,edge,0,0,Math.PI*2);g.fill();g.stroke();break;
+   case 'shape-triangle':polygon([[0,-edge],[edge,edge],[-edge,edge]]);break;
+   case 'shape-l':polygon([[-edge,-edge],[0,-edge],[0,0],[edge,0],[edge,edge],[-edge,edge]]);break;
+   case 'sofa-seat':case 'sofa-chaise':rect(-45,-46,90,19);rect(-44,-22,88,67);break;
+   case 'sofa-corner':rect(-46,-46,92,19);rect(-46,-27,19,73);rect(-22,-22,67,67);break;
+   case 'sofa-ottoman':rect(-43,-40,86,80);break;
+   case 'sofa-arm':case 'sofa-back':rect(-40,-40,80,80);break;
    case 'sofa':case 'armchair':rect(-49,-48,14,96);rect(35,-48,14,96);rect(-35,-48,70,20);for(let i=0,n=item.kind==='sofa'?3:1;i<n;i++)rect(-35+i*70/n,-25,70/n,72);break;
    case 'bed':case 'single-bed':rect(-48,-48,96,15);rect(-45,-27,90,74);rect(-42,-25,item.kind==='bed'?39:84,20);if(item.kind==='bed')rect(3,-25,39,20);break;
    case 'wardrobe':case 'shelf':for(let i=1;i<4;i++)line(-50+i*25,-50,-50+i*25,50);if(item.kind==='wardrobe'){line(-48,48,48,-48);line(-48,-48,48,48);}break;
@@ -152,22 +165,30 @@ globalThis.CadObjects=(()=>{
    case 'desk':line(-50,-20,50,-20);rect(-45,-15,25,60);break;
    case 'coffee':rect(-42,-40,84,80);break;
    case 'kitchen':for(let i=1;i<4;i++)line(-50+i*25,-50,-50+i*25,50);ellipse(-12,0,9,27);break;
-   case 'base-cabinet':case 'wall-cabinet':case 'tall-cabinet':line(0,-50,0,50);line(-10,0,-4,0);line(4,0,10,0);if(item.kind==='wall-cabinet'){line(-45,-40,45,40);}break;
-   case 'drawer-cabinet':for(const y of [-16,16])line(-50,y,50,y);for(const y of [-34,0,34])line(-8,y,8,y);break;
-   case 'corner-cabinet':line(0,-50,0,0);line(0,0,50,0);line(-45,45,0,0);break;
-   case 'sink-cabinet':line(-45,-35,45,-35);ellipse(-18,4,22,29);ellipse(24,4,14,29);break;
-   case 'island':rect(-42,-40,84,80);line(-42,5,42,5);line(0,5,0,40);break;
-   case 'oven':rect(-38,-25,76,65);line(-50,-35,50,-35);line(-22,-14,22,-14);break;
-   case 'dishwasher':rect(-40,-20,80,60);line(-50,-35,50,-35);line(-18,-27,18,-27);break;
-   case 'fridge':line(-50,-12,50,-12);line(30,0,30,30);break;
-   case 'cooker':for(const x of [-24,24])for(const y of [-24,24])ellipse(x,y,16,16);break;
+   // Plan symbols: worktops, front edges, basins and appliance footprints.
+   case 'base-cabinet':line(-edge,40,edge,40);line(0,40,0,edge);line(-27,44,-9,44);line(9,44,27,44);break;
+   case 'drawer-cabinet':line(-edge,39,edge,39);line(-22,44,22,44);break;
+   case 'wall-cabinet':g.setLineDash([7,5]);line(-42,-42,42,42);line(-42,42,42,-42);g.setLineDash([]);line(-edge,40,edge,40);break;
+   case 'tall-cabinet':line(-42,-42,42,42);line(-42,42,42,-42);line(-edge,40,edge,40);break;
+   case 'corner-cabinet':polygon([[-edge,-edge],[edge,-edge],[edge,0],[0,edge],[-edge,edge]]);line(36,-4,-4,36);line(22,14,14,22);break;
+   case 'sink-cabinet':case 'double-sink-cabinet':
+    rect(-44,-35,88,69);g.beginPath();g.roundRect(-40,-29,item.kind==='sink-cabinet'?47:37,56,8);g.stroke();ellipse(-17,0,3,4);
+    if(item.kind==='double-sink-cabinet'){g.beginPath();g.roundRect(3,-29,37,56,8);g.stroke();ellipse(22,0,3,4);}
+    else for(const x of [15,21,27,33,39])line(x,-25,x,23);
+    line(-5,-35,-5,-44);line(-5,-44,5,-44);line(5,-44,5,-32);line(-edge,40,edge,40);break;
+   case 'countertop':rect(-44,-43,88,86);break;
+   case 'island':rect(-44,-43,88,86);line(-edge,35,edge,35);line(-edge,-35,edge,-35);break;
+   case 'oven':g.setLineDash([6,4]);rect(-40,-38,80,70);g.setLineDash([]);line(-edge,39,edge,39);line(-24,44,24,44);break;
+   case 'dishwasher':g.setLineDash([6,4]);rect(-40,-38,80,70);g.setLineDash([]);ellipse(0,-4,25,25);line(-edge,39,edge,39);line(-16,44,16,44);break;
+   case 'fridge':rect(-41,-40,82,76);line(-41,-14,41,-14);line(-edge,41,edge,41);line(27,43,39,43);break;
+   case 'cooker':rect(-43,-43,86,80);for(const x of [-22,22])for(const y of [-23,17]){ellipse(x,y,14,14);ellipse(x,y,6,6);}for(const x of [-18,-6,6,18])ellipse(x,43,2,2);break;
    case 'bath':g.beginPath();g.roundRect(-42,-42,84,84,22);g.stroke();ellipse(0,-25,4,4);break;
    case 'shower':line(-45,-45,45,45);line(-45,45,45,-45);ellipse(0,0,5,5);break;
    case 'toilet':rect(-40,-48,80,24);ellipse(0,10,32,35);ellipse(0,10,22,25);break;
    case 'sink':ellipse(0,3,39,30);ellipse(0,-30,5,5);break;
    case 'washer':ellipse(0,7,34,34);line(-50,-32,50,-32);break;
    case 'stairs':for(let i=0;i<=10;i++)line(-48,-48+i*9.6,48,-48+i*9.6);line(0,40,0,-35);line(0,-35,-10,-20);line(0,-35,10,-20);break;
-   case 'window':rect(-50,-75,100,50);line(-50,-50,50,-50);break;
+   case 'window':rect(-50,-25,100,50);line(-50,0,50,0);break;
    case 'door':line(-50,0,-50,-95);g.beginPath();g.arc(-50,0,95,-Math.PI/2,0);g.stroke();break;
    case 'double-door':line(-50,0,-50,-90);line(50,0,50,-90);g.beginPath();g.ellipse(-50,0,50,90,0,-Math.PI/2,0);g.stroke();g.beginPath();g.ellipse(50,0,50,90,0,Math.PI,Math.PI*1.5);g.stroke();break;
   }

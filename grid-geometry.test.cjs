@@ -137,8 +137,9 @@ assert.equal(mergedTop.x1,100);assert.equal(mergedTop.x2,500);
 const movedMerged=GridGeometry.moveWall(divided,mergedTop,-50);assert.equal(GridGeometry.detect(movedMerged.segments).faces.length,2);
 assert.ok(movedMerged.segments.some(s=>s.x1===300&&s.x2===300&&s.y1===50),'T spoj prati cijeli pomaknuti zid');
 const resizedMerged=GridGeometry.resizeWall(divided,mergedTop,2,600);assert.ok(resizedMerged.segments.some(s=>s.y1===100&&s.y2===100&&s.x1===100&&s.x2===600));
-const thickMerged=GridGeometry.setWallThickness(divided,{axis:'h',line:100,start:100,end:500},24);
-assert.ok(thickMerged.some(s=>s.y1===100&&s.y2===100&&s.x1===100&&s.x2===500&&s.thickness===24));
+const thickMerged=GridGeometry.setWallThickness(divided,{axis:'h',line:100,start:100,end:300},24);
+assert.ok(thickMerged.some(s=>s.y1===100&&s.y2===100&&s.x1===100&&s.x2===300&&s.thickness===24));
+assert.ok(thickMerged.some(s=>s.y1===100&&s.y2===100&&s.x1===300&&s.x2===500&&s.thickness===undefined),'Susjedni segment zadržava svoju debljinu');
 
 const cornerNodes=GridGeometry.junctions([line(100,100,300,100),line(300,100,300,300)]);assert.deepEqual(cornerNodes,[{x:300,y:100,degree:2}]);
 assert.deepEqual(GridGeometry.junctions([line(100,100,300,100),line(301,100,301,300)]),[],'Blizina bez dodira ne stvara potvrdu spoja');

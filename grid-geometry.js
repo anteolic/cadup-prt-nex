@@ -124,7 +124,7 @@ globalThis.GridGeometry=(()=>{
   return normalize(result);
  }
  function wallForDimension(input,dimension){
-  const h=dimension.axis==='h',lines=normalize(input),start=dimension.start,end=dimension.end;
+  const h=dimension.axis==='h',lines=atomic(input),start=dimension.start,end=dimension.end;
   let root=-1,best=Infinity;
   for(let i=0;i<lines.length;i++){
    const s=lines[i];if((s.y1===s.y2)!==h)continue;

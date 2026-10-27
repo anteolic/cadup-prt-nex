@@ -113,13 +113,13 @@ globalThis.CadObjects=(()=>{
   }
   return move(items,ids,dx,dy);
  }
- function draw(g,item,scale,ox,oy,selected=false,wallThickness=0){
+ function draw(g,item,scale,ox,oy,selected=false,wallThickness=0,erase=false){
   const fx=item.width*scale/100,fy=item.depth*scale/100;
   g.save();g.translate(ox+item.x*scale,oy+item.y*scale);g.rotate(item.rotation*Math.PI/180);g.scale(fx,fy);
-  g.lineWidth=1.2/Math.max(.1,Math.min(fx,fy));g.strokeStyle=selected?'#2563eb':'#475569';g.fillStyle=selected?'#dbeafe':'#f8fafc';
+  g.lineWidth=1.2/Math.max(.1,Math.min(fx,fy));g.strokeStyle=erase?'#dc2626':selected?'#2563eb':'#475569';g.fillStyle=erase?'#fee2e2':selected?'#dbeafe':'#f8fafc';
   const rect=(x,y,w,h)=>{g.beginPath();g.rect(x,y,w,h);g.fill();g.stroke();},line=(x,y,a,b)=>{g.beginPath();g.moveTo(x,y);g.lineTo(a,b);g.stroke();},ellipse=(x,y,rx,ry)=>{g.beginPath();g.ellipse(x,y,rx,ry,0,0,Math.PI*2);g.stroke();};
   const opening=['door','double-door','window'].includes(item.kind);
-  if(opening){if(wallThickness){g.fillStyle='#fff';g.fillRect(-50,-wallThickness/item.depth*50,100,wallThickness/item.depth*100);g.fillStyle=selected?'#dbeafe':'#f8fafc';}}
+  if(opening){if(wallThickness){g.fillStyle='#fff';g.fillRect(-50,-wallThickness/item.depth*50,100,wallThickness/item.depth*100);g.fillStyle=erase?'#fee2e2':selected?'#dbeafe':'#f8fafc';}}
   else rect(-50,-50,100,100);
   switch(item.kind){
    case 'sofa':case 'armchair':rect(-49,-48,14,96);rect(35,-48,14,96);rect(-35,-48,70,20);for(let i=0,n=item.kind==='sofa'?3:1;i<n;i++)rect(-35+i*70/n,-25,70/n,72);break;

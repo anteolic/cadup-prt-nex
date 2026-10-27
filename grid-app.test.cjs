@@ -3,8 +3,8 @@ const nodes=new Map(),labels=[],memory=new Map();
 let downloadedBlob=null,downloadName=null,redStrokes=0,blueDraftStrokes=0;
 const updateRequests=[];let updateFailure=null;
 const publishedHtml=fs.readFileSync(__dirname+'/CADup.html','utf8');
-const gridLines=[],paintCalls=[],gripCircles=[];let gridStart=null;
-const canvas=new Proxy({stroke(){if(this.strokeStyle==='#dc2626')redStrokes++;if(this.strokeStyle==='#1675d1'&&this.lineWidth===2.5)blueDraftStrokes++;},arc(x,y,r){if(r>=11&&this.strokeStyle==='#dc2626')gripCircles.push({x,y,r});},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
+const gridLines=[],paintCalls=[],wallGrips=[];let gridStart=null;
+const canvas=new Proxy({stroke(){if(this.strokeStyle==='#dc2626'&&this.lineWidth===1.8)wallGrips.push({});if(this.strokeStyle==='#dc2626')redStrokes++;if(this.strokeStyle==='#1675d1'&&this.lineWidth===2.5)blueDraftStrokes++;},arc(){},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
  if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
@@ -411,11 +411,11 @@ assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===200&&s.x2===400&&s
 
 // Uhvaćena ručka skriva se tijekom povlačenja i vraća pri puštanju.
 el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();click(200,100);
-gripCircles.length=0;paintCalls.length=0;api.draw();assert.equal(gripCircles.length,2);assert.ok(paintCalls.some(p=>p.color==='rgba(255,255,255,0.35)'),'Ručke su prozirne da se vidi crvena os');
-gripCircles.length=0;board.pointerdown(event(300,100));assert.equal(gripCircles.length,1,'Uhvaćena ručka je odmah skrivena');
-gripCircles.length=0;board.pointermove(event(350,100));assert.equal(gripCircles.length,1);assert.ok(api.segments.some(s=>s.x2===700));
-gripCircles.length=0;board.pointerup(event(350,100));assert.equal(gripCircles.length,2,'Nakon puštanja su opet vidljive obje ručke');
-gripCircles.length=0;board.pointerdown(event(350,100));board.pointercancel(event(350,100));assert.ok(gripCircles.length>=2,'Prekid također vraća ručke');
+wallGrips.length=0;paintCalls.length=0;api.draw();assert.equal(wallGrips.length,2);assert.ok(!paintCalls.some(p=>p.color==='rgba(255,255,255,0.35)'),'Vrhovi strelica nemaju kružnu podlogu koja bi prekrila čvor');
+wallGrips.length=0;board.pointerdown(event(300,100));assert.equal(wallGrips.length,1,'Uhvaćena ručka je odmah skrivena');
+wallGrips.length=0;board.pointermove(event(350,100));assert.equal(wallGrips.length,1);assert.ok(api.segments.some(s=>s.x2===700));
+wallGrips.length=0;board.pointerup(event(350,100));assert.equal(wallGrips.length,2,'Nakon puštanja su opet vidljive obje ručke');
+wallGrips.length=0;board.pointerdown(event(350,100));board.pointercancel(event(350,100));assert.ok(wallGrips.length>=2,'Prekid također vraća ručke');
 
 // Pomoćne linije hvataju i ne-mrežne koordinate preko cijelog crteža.
 el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();click(200,100);

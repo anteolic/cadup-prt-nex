@@ -12,7 +12,7 @@ function el(id){
 const context=vm.createContext({console,Blob,fetch:async(url,options)=>{updateRequests.push({url,options});if(updateFailure==='network')throw new Error('Offline');return {ok:updateFailure!=='http'&&!(updateFailure==='script'&&url.includes('grid-app.js')),status:updateFailure==='http'||(updateFailure==='script'&&url.includes('grid-app.js'))?503:200,text:async()=>url.includes('CADup.html')?(updateFailure==='incomplete'?'<html></html>':publishedHtml):'/* verified script response */'};},URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js','cad-objects.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={addCustomObject,get customLibrary(){return customLibrary},addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={addCustomObject,get customLibrary(){return customLibrary},addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -223,7 +223,8 @@ assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(el('draw
 assert.equal(el('wallActions').hidden,true);
 click(200,100);assert.ok(api.selection);assert.equal(el('wallActions').hidden,false);
 paintCalls.length=0;api.draw();assert.ok(paintCalls.some(p=>p.color==='#93c5fd'&&p.alpha===1),'Odabrani zid ima plavu ispunu');
-assert.ok(paintCalls.some(p=>p.color==='#bfc3c8'&&p.alpha===.3),'Ostatak zidova je prigušen');
+assert.ok(paintCalls.some(p=>p.color==='#bfc3c8'&&p.alpha===.7),'Ostatak zidova je blago prigušen');
+assert.ok(paintCalls.some(p=>p.color==='#f1f3f5'&&p.alpha===.9),'Oznake dimenzija ostaju čitljive');
 assert.equal(el('dimensionValue').value,'400');assert.equal(el('dimensionThickness').value,'10');
 click(200,100);assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionValue').value,'400');deselect();
 click(200,100);assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionThickness').value,'10');deselect();
@@ -236,7 +237,7 @@ const drawDimension=api.dimensions[0];assert.ok(drawDimension);
 click((drawDimension.left+drawDimension.right)/2,(drawDimension.top+drawDimension.bottom)/2);
 assert.equal(el('wallActions').hidden,true,'U crtanju nema polja uređivanja');
 finishDrawing();assert.equal(api.mode,'edit');assert.equal(api.first,null);
-// Srednja ručka pomiče zid; krajnje ručke ostaju za duljinu.
+// Tijelo zida može se povlačiti; krajnje ručke ostaju samo za duljinu.
 click(200,100);drag(200,100,200,150);
 assert.ok(api.segments.some(s=>s.y1===300&&s.y2===300));assert.equal(el('wallActions').hidden,false);
 assert.equal(canvas.globalAlpha,1,'Prigušenje ne prelazi u sljedeći kadar');
@@ -281,8 +282,7 @@ assert.ok(api.selection);const baseGrip=api.handleScale();
 api.zoomAt(4,200,150);assert.ok(api.handleScale()>baseGrip);
 const handleWall=api.selection,handleView=api.view;
 assert.ok(api.hitHandle(handleView.ox+handleWall.x1*handleView.scale+25,handleView.oy+handleWall.y1*handleView.scale));
-const midX=handleView.ox+(handleWall.x1+handleWall.x2)/2*handleView.scale,midY=handleView.oy+(handleWall.y1+handleWall.y2)/2*handleView.scale;
-assert.ok(api.hitMoveHandle(midX+18,midY+20));
+
 
 // Zatvaranje prostorije ili pregrade ne prekida crtanje; ponovni dodir zadnje točke prekida.
 el('clearAll').click();el('clearAll').click();startDrawing();api.fit();

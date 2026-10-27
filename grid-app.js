@@ -141,11 +141,6 @@
   }return solid||best;
  }
  function handleScale(){return clamp(Math.sqrt(scale/(w/WIDTH)),1,2.5);}
- function hitMoveHandle(x,y){
-  if(!selectedWall)return false;
-  const p=screen({x:(selectedWall.x1+selectedWall.x2)/2,y:(selectedWall.y1+selectedWall.y2)/2}),horizontal=selectedWall.y1===selectedWall.y2,factor=handleScale();
-  return Math.abs(x-p.x)<=(horizontal?12:16)*factor+6&&Math.abs(y-p.y)<=(horizontal?16:12)*factor+6;
- }
  function hitHandle(x,y){
   if(!selectedWall)return null;
   let endpoint=null,distance=Math.max(20,11*handleScale()+8);
@@ -199,7 +194,7 @@
   let x=rawX,y=rawY;
   const base=priority===3?7:priority===1?8:12;
   const size=clamp(base+Math.log2(Math.max(1,scale/(w/WIDTH))),base,base+2),boxHeight=size+(priority===3?4:6);
-  g.save();g.globalAlpha=(mode==='edit'&&(selectedWall||objectIds.size)&&priority<5)?0.3:1;g.font='600 '+size+'px system-ui';
+  g.save();g.globalAlpha=(mode==='edit'&&(selectedWall||objectIds.size)&&priority<5)?0.9:1;g.font='600 '+size+'px system-ui';
   const width=g.measureText(text).width+(priority===3?6:10),halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
   x=clamp(x,Math.max(0,ox)+halfX+3,Math.min(w,ox+WIDTH*scale)-halfX-3);
   y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
@@ -224,7 +219,7 @@
   if(!w||!h)return;
   const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.globalAlpha=1;g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
   g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
-  g.globalAlpha=(mode==='edit'&&(selectedWall||objectIds.size))?0.3:1;
+  g.globalAlpha=(mode==='edit'&&(selectedWall||objectIds.size))?0.7:1;
   // Blaga pastelna ispuna samo zatvorenih prostora; mreža i zidovi crtaju se iznad.
   g.fillStyle='#edf6ef';
   for(const face of current.faces){
@@ -266,12 +261,7 @@
    g.fillStyle='#93c5fd';g.fill();g.strokeStyle='#2563eb';g.lineWidth=2;
    const gripScale=handleScale();
    if(mode==='edit')for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,11*gripScale,0,Math.PI*2);g.fill();g.stroke();}
-   const middle={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
-   g.save();g.translate(middle.x,middle.y);g.scale(gripScale,gripScale);if(horizontal)g.rotate(Math.PI/2);
-   g.beginPath();g.roundRect(-16,-12,32,24,5);g.fillStyle='#2563eb';g.fill();
-   g.strokeStyle='#fff';g.lineWidth=2;g.lineCap='round';g.lineJoin='round';g.beginPath();
-   g.moveTo(-10,0);g.lineTo(10,0);g.moveTo(-5,-5);g.lineTo(-10,0);g.lineTo(-5,5);
-   g.moveTo(5,-5);g.lineTo(10,0);g.lineTo(5,5);g.stroke();g.restore();
+
   }
   if(first){
    const color='#1675d1';
@@ -282,7 +272,7 @@
    if(length&&center)tag(center.x,center.y-20,lengthText(length),color,false,5);
   }
   for(const item of objects){
-   const active=objectIds.has(item.id);g.globalAlpha=((selectedWall||objectIds.size)&&!active)?0.3:1;
+   const active=objectIds.has(item.id);g.globalAlpha=((selectedWall||objectIds.size)&&!active)?0.7:1;
    const attached=CadObjects.attach(item,segments),same=Math.abs(attached.x-item.x)<.01&&Math.abs(attached.y-item.y)<.01&&attached.rotation%180===item.rotation%180;
    const wall=same&&['door','double-door','window'].includes(item.kind)?hitWallForObject(item):null;
    if(wall){
@@ -334,10 +324,9 @@
   }
   const endpoint=mode==='edit'?hitHandle(p.x,p.y):null;
   if(endpoint){gesture={type:'wall-resize',id:e.pointerId,start:p,wall:selectedWall,endpoint,before:copy(segments),currentWall:selectedWall,beforeSession:wallSession};status();draw();return;}
-  const moveHandle=mode==='edit'&&hitMoveHandle(p.x,p.y);
-  if(!moveHandle&&mode==='edit'&&dimensionHits.some(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom)){gesture={type:'ignored',id:e.pointerId};return;}
+  if(mode==='edit'&&dimensionHits.some(r=>p.x>=r.left&&p.x<=r.right&&p.y>=r.top&&p.y<=r.bottom)){gesture={type:'ignored',id:e.pointerId};return;}
   if(mode==='edit'){
-   const wall=moveHandle?selectedWall:hitWall(p.x,p.y);selectedWall=wall;
+   const wall=hitWall(p.x,p.y);selectedWall=wall;
    if(wall){
     const session=wallSession&&['x1','y1','x2','y2'].every(k=>wallSession.current[k]===wall[k])?wallSession:null;
     gesture={type:'wall-move',id:e.pointerId,start:p,wall,before:copy(segments),currentWall:wall,beforeSession:wallSession,

@@ -358,13 +358,21 @@
    const wall=same&&['door','double-door','window'].includes(item.kind)?hitWallForObject(item):null;
    if(wall){
     const horizontal=wall.y1===wall.y2,start=(horizontal?item.x:item.y)-item.width/2,end=start+item.width;
-    const objectAlpha=g.globalAlpha;g.globalAlpha=1;g.fillStyle='#fff';
+    const objectAlpha=g.globalAlpha;g.globalAlpha=1;g.fillStyle='#fff';const caps=[];
     for(const box of RoomGeometry.wallSelection(current.rooms,segments,wall,current.layout)){
      const a=Math.max(start,horizontal?box.x:box.y),b=Math.min(end,horizontal?box.x+box.width:box.y+box.height);if(b<=a)continue;
-     if(horizontal)g.fillRect(ox+a*scale,oy+box.y*scale,(b-a)*scale,box.height*scale);
-     else g.fillRect(ox+box.x*scale,oy+a*scale,box.width*scale,(b-a)*scale);
+     if(horizontal)g.fillRect(ox+a*scale,oy+box.y*scale-1,(b-a)*scale,box.height*scale+2);
+     else g.fillRect(ox+box.x*scale-1,oy+a*scale,box.width*scale+2,(b-a)*scale);
+     if(horizontal){
+      if(Math.abs(a-start)<.001)caps.push({x1:a,y1:box.y,x2:a,y2:box.y+box.height});
+      if(Math.abs(b-end)<.001)caps.push({x1:b,y1:box.y,x2:b,y2:box.y+box.height});
+     }else{
+      if(Math.abs(a-start)<.001)caps.push({x1:box.x,y1:a,x2:box.x+box.width,y2:a});
+      if(Math.abs(b-end)<.001)caps.push({x1:box.x,y1:b,x2:box.x+box.width,y2:b});
+     }
     }
-    g.globalAlpha=objectAlpha;
+    g.globalAlpha=objectAlpha;g.strokeStyle='#1e2329';g.lineWidth=1.5;g.beginPath();
+    for(const cap of caps){g.moveTo(ox+cap.x1*scale,oy+cap.y1*scale);g.lineTo(ox+cap.x2*scale,oy+cap.y2*scale);}g.stroke();
    }
    const eraseIds=eraseObjectIds;
    CadObjects.draw(g,item,scale,ox,oy,active,0,mode==='erase'&&eraseIds.includes(item.id));

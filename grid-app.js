@@ -6,7 +6,7 @@
  let customLibrary=[],customNaming=false;
  let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
- let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false;
+ let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false,cursor=null;
  let cachedKey=null,cached=null,pendingTags=[],dimensionHits=[],editingDimension=null,editorSelectionKey=null;
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
@@ -75,9 +75,30 @@
  const point=(x,y)=>({x:(x-ox)/scale,y:(y-oy)/scale});
  const screen=p=>({x:ox+p.x*scale,y:oy+p.y*scale});
  function step(){for(const s of [5,10,20,50,100,200,500,1000,2000])if(s*scale>=19)return s;return 2000;}
+ function guideAxes(){
+  const xs=new Set(),ys=new Set();
+  for(const s of segments){xs.add(s.x1);xs.add(s.x2);ys.add(s.y1);ys.add(s.y2);}
+  if(first){xs.add(first.x);ys.add(first.y);}
+  return {x:[...xs].sort((a,b)=>a-b),y:[...ys].sort((a,b)=>a-b)};
+ }
+ function snapAlignment(raw,q){
+  if(mode!=='draw')return q;const axes=guideAxes();
+  for(const axis of ['x','y']){let distance=8;for(const value of axes[axis]){const d=Math.abs(raw[axis]-value)*scale;if(d<distance){distance=d;q[axis]=value;}}}
+  return q;
+ }
+ function drawGuides(){
+  if(mode!=='draw')return;const axes=guideAxes(),target=first?(preview||first):cursor?snap(cursor.x,cursor.y):null;
+  g.save();g.setLineDash([4,5]);
+  for(const axis of ['x','y']){let previous=-Infinity;for(const value of axes[axis]){
+   const pixel=(axis==='x'?ox:oy)+value*scale,limit=axis==='x'?w:h,active=target&&Math.abs(target[axis]-value)<.001;
+   if(pixel<0||pixel>limit||(!active&&pixel-previous<5))continue;previous=pixel;
+   g.globalAlpha=active?0.85:0.4;g.strokeStyle=active?'#2563eb':'#93b4d5';g.lineWidth=active?1.25:.75;g.beginPath();
+   if(axis==='x'){g.moveTo(pixel,0);g.lineTo(pixel,h);}else{g.moveTo(0,pixel);g.lineTo(w,pixel);}g.stroke();
+  }}g.restore();
+ }
  function snap(x,y){
   const raw=point(x,y),unit=step();
-  let q={x:clamp(Math.round(raw.x/unit)*unit,0,WIDTH),y:clamp(Math.round(raw.y/unit)*unit,0,height)},distance=14;
+  let q=snapAlignment(raw,{x:clamp(Math.round(raw.x/unit)*unit,0,WIDTH),y:clamp(Math.round(raw.y/unit)*unit,0,height)}),distance=14;
   for(const s of segments)for(const p of [{x:s.x1,y:s.y1},{x:s.x2,y:s.y2}]){
    const d=Math.hypot(raw.x-p.x,raw.y-p.y)*scale;if(d<distance){distance=d;q={...p};}
   }
@@ -228,6 +249,7 @@
   for(let i=Math.ceil(-ox/scale/unit);i<=Math.floor((w-ox)/scale/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
   for(let i=Math.ceil(-oy/scale/unit);i<=Math.floor((h-oy)/scale/unit);i++){const y=oy+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(0,y);g.lineTo(w,y);g.stroke();}
   g.save();g.beginPath();g.rect(ox,oy,WIDTH*scale,height*scale);g.clip();
+  drawGuides();
   if(wallsVisible){
    const boxes=[...current.layout.outer,...current.layout.inner];
    // Jedinstvena ispuna i samo vanjski rub unije: nema šavova na spojevima.
@@ -307,12 +329,12 @@
   if(drag.dragMode!=='vertical-length')return second(p.x,p.y,drag.axis);
   const direction=Math.sign(drag.base.x-first.x)||1;
   const length=Math.max(0,Math.round((Math.abs(drag.base.x-first.x)-dy/scale)/step())*step());
-  return {x:clamp(first.x+direction*length,0,WIDTH),y:first.y};
+  const end={x:clamp(first.x+direction*length,0,WIDTH),y:first.y};return snapAlignment(end,{...end});
  }
  board.addEventListener('pointerdown',e=>{
   closeMenu();
   if(e.button!==undefined&&e.button!==0)return;e.preventDefault();board.setPointerCapture(e.pointerId);
-  const p=xy(e);pointers.set(e.pointerId,p);resetClear();
+  const p=xy(e);cursor=p;pointers.set(e.pointerId,p);resetClear();
   if(pointers.size>1){pinch();return;}
   if(mode==='edit'){
    const raw=point(p.x,p.y),item=CadObjects.hit(objects,raw.x,raw.y);
@@ -340,8 +362,8 @@
   gesture={type:'single',id:e.pointerId,start:p,ox,oy,moved:false};
  });
  board.addEventListener('pointermove',e=>{
-  const p=xy(e);
-  if(!pointers.has(e.pointerId)){if(mode==='draw'&&first){preview=second(p.x,p.y);schedule();}return;}
+  const p=xy(e);cursor=p;
+  if(!pointers.has(e.pointerId)){if(mode==='draw'){if(first)preview=second(p.x,p.y);schedule();}return;}
   e.preventDefault();pointers.set(e.pointerId,p);
   if(pointers.size>1){
    if(gesture?.type!=='pinch')pinch();const [a,b]=[...pointers.values()],mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
@@ -404,7 +426,7 @@
   if(liveEdit&&e.target!==liveEdit.input){const input=liveEdit.input;finishMeasureInput();input.blur?.();}
   if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
  },true);
- function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
+ function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;cursor=null;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('reloadApp').addEventListener('click',async()=>{
   const button=$('reloadApp');if(button.disabled)return;

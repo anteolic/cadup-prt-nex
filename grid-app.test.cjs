@@ -12,7 +12,7 @@ function el(id){
 const context=vm.createContext({console,Blob,fetch:async(url,options)=>{updateRequests.push({url,options});if(updateFailure==='network')throw new Error('Offline');return {ok:updateFailure!=='http'&&!(updateFailure==='script'&&url.includes('grid-app.js')),status:updateFailure==='http'||(updateFailure==='script'&&url.includes('grid-app.js'))?503:200,text:async()=>url.includes('CADup.html')?(updateFailure==='incomplete'?'<html></html>':publishedHtml):'/* verified script response */'};},URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js','cad-objects.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={addCustomObject,get customLibrary(){return customLibrary},addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={guideAxes,addCustomObject,get customLibrary(){return customLibrary},addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -414,3 +414,13 @@ gripCircles.length=0;board.pointerdown(event(300,100));assert.equal(gripCircles.
 gripCircles.length=0;board.pointermove(event(350,100));assert.equal(gripCircles.length,1);assert.ok(api.segments.some(s=>s.x2===700));
 gripCircles.length=0;board.pointerup(event(350,100));assert.equal(gripCircles.length,2,'Nakon puštanja su opet vidljive obje ručke');
 gripCircles.length=0;board.pointerdown(event(350,100));board.pointercancel(event(350,100));assert.ok(gripCircles.length>=2,'Prekid također vraća ručke');
+
+// Pomoćne linije hvataju i ne-mrežne koordinate preko cijelog crteža.
+el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();click(200,100);
+el('dimensionValue').value='333';el('dimensionForm').submit({preventDefault(){}});assert.ok(api.segments.some(s=>s.x2===533));
+startDrawing();const guideView=api.view,aligned=api.snap(guideView.ox+541*guideView.scale,guideView.oy+800*guideView.scale);
+assert.equal(aligned.x,533,'Snap na produžetak krajnje točke mimo osnovne mreže');
+click(100,300);assert.ok(api.guideAxes().x.includes(533));assert.ok(api.guideAxes().y.includes(600));
+click(guideView.ox+541*guideView.scale,guideView.oy+600*guideView.scale);
+assert.ok(api.segments.some(s=>s.y1===600&&s.y2===600&&s.x2===533));assert.equal(api.model().faces.length,0,'Pomoćna linija ne postaje stvarni zid');
+finishDrawing();

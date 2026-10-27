@@ -543,13 +543,19 @@ el('clearAll').click();el('clearAll').click();api.fit();api.addObject('drawer-ca
 const projectedObject=api.displayPoint({x:api.view.ox+rotatedObject.x*api.view.scale,y:api.view.oy+rotatedObject.y*api.view.scale});click(projectedObject.x,projectedObject.y);assert.equal(api.objectIds[0],rotatedObject.id);
 const rotatedDragCamera={...api.view};drag(projectedObject.x,projectedObject.y,projectedObject.x+40,projectedObject.y);assert.equal(api.objects[0].x,rotatedObject.x);assert.ok(api.objects[0].y<rotatedObject.y);assert.deepEqual({...api.view},rotatedDragCamera);
 
-// Hidden dimensions appear temporarily for the selected wall only.
+// All hidden dimensions appear temporarily while editing a wall.
 while(api.viewportTurns)el('viewportRotate').click();el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);line(100,300,250,300);enterEdit();
 el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);
-click(200,100);labels.length=0;api.draw();assert.ok(labels.includes('400 cm'));assert.ok(!labels.includes('300 cm'));assert.equal(el('showMeasures').checked,false);assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).measures,false);
+click(200,100);labels.length=0;api.draw();assert.ok(labels.includes('400 cm'));assert.ok(labels.includes('300 cm'));assert.equal(el('showMeasures').checked,false);assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).measures,false);
 deselect();labels.length=0;api.draw();assert.equal(labels.length,0);
 
 // Rotation and fullscreen preferences survive other setting changes; viewport changes are not scene edits.
 const rememberedScene=memory.get('infoa_grid_loops_v1');el('viewportRotate').click();assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).rotation,1);
 el('showGrid').checked=false;el('showGrid').change();assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).rotation,1);
 el('autoFullscreen').checked=false;el('autoFullscreen').change();assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).autoFullscreen,false);assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).rotation,1);assert.equal(memory.get('infoa_grid_loops_v1'),rememberedScene);
+
+// An off-axis tap stops drawing without projecting or committing an unwanted wall.
+while(api.viewportTurns)el('viewportRotate').click();el('clearAll').click();el('clearAll').click();api.fit();startDrawing();click(100,100);click(300,100);const beforeOffAxis=JSON.stringify(api.segments),beforeOffAxisCamera={...api.view};click(400,200);assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(JSON.stringify(api.segments),beforeOffAxis);assert.deepEqual({...api.view},beforeOffAxisCamera);
+startDrawing();click(400,300);click(500,306);assert.equal(api.mode,'draw');assert.ok(api.segments.some(s=>s.y1===600&&s.y2===600&&s.x1===800&&s.x2===1000));finishDrawing();
+// The same orthogonal rule works after rotating the viewport.
+el('viewportRotate').click();startDrawing();const startDisplay=api.displayPoint({x:200,y:200});click(startDisplay.x,startDisplay.y);const beforeRotatedOffAxis=JSON.stringify(api.segments),diagonalDisplay=api.displayPoint({x:300,y:300});click(diagonalDisplay.x,diagonalDisplay.y);assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(JSON.stringify(api.segments),beforeRotatedOffAxis);

@@ -1,8 +1,9 @@
 'use strict';
 (()=>{
  const $=id=>document.getElementById(id),board=$('board'),g=board.getContext('2d');
- const KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
+ const CUSTOM_KEY='cadup_custom_library_v1',KEY='infoa_grid_loops_v1',WIDTH=2000,MIN=5,HISTORY=80;
  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+ let customLibrary=[],customNaming=false;
  let objects=[],objectIds=new Set(),objectMulti=false,objectEditorKey=null,liveEdit=null;
  let segments=[],past=[],future=[],first=null,preview=null,mode='edit',wallsVisible=true,selected=null,selectedWall=null,wallSession=null;
  let w=0,h=0,dpr=1,scale=1,ox=0,oy=0,height=2000,gesture=null,frame=false,clearArmed=false;
@@ -10,16 +11,26 @@
  const pointers=new Map();
  const copy=a=>a.map(s=>({...s}));
  const snapshot=()=>({segments:copy(segments),objects:copy(objects)});
- function restoreSnapshot(state){segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;}
+ function restoreSnapshot(state){segments=copy(state.segments);objects=copy(state.objects||[]);objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;}
  function recordChange(before){
   if(!liveEdit||!liveEdit.recorded){past.push(liveEdit?liveEdit.before:before);if(past.length>HISTORY)past.shift();}
   if(liveEdit)liveEdit.recorded=true;future=[];
  }
  function setEditorValue(id,value){if(document.activeElement!==$(id))$(id).value=value;}
+ function finishMeasureInput(){
+  const edit=liveEdit;if(!edit)return;
+  if(edit.dirty){edit.dirty=false;edit.apply({preventDefault(){}});}
+  if(liveEdit===edit)liveEdit=null;
+ }
  function bindLiveEditor(id,apply){
-  const form=$(id);form.addEventListener('submit',apply);form.addEventListener('input',apply);
-  form.addEventListener('focusin',e=>{if(e.target?.tagName==='INPUT')liveEdit={before:snapshot(),recorded:false};});
-  form.addEventListener('focusout',()=>{liveEdit=null;});
+  const form=$(id);
+  form.addEventListener('submit',e=>{e.preventDefault();if(liveEdit?.apply===apply)finishMeasureInput();else apply(e);});
+  form.addEventListener('input',()=>{if(liveEdit?.apply===apply)liveEdit.dirty=true;});
+  form.addEventListener('focusin',e=>{
+   if(e.target?.tagName!=='INPUT')return;finishMeasureInput();
+   liveEdit={before:snapshot(),recorded:false,dirty:false,apply,input:e.target};
+  });
+  form.addEventListener('focusout',finishMeasureInput);
   form.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.target.blur?.();}});
  }
  function commitObjects(before,ids=[]){
@@ -398,8 +409,11 @@
  board.addEventListener('contextmenu',e=>e.preventDefault());
  board.addEventListener('wheel',e=>{closeMenu();e.preventDefault();const p=xy(e);zoomAt(e.deltaY<0?1.1:1/1.1,p.x,p.y);},{passive:false});
  function closeMenu(){$('topMenu').open=false;$('objectMenu').open=false;}
- document.addEventListener('pointerdown',e=>{if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;});
- function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;resetClear();status();draw();}
+ document.addEventListener('pointerdown',e=>{
+  if(liveEdit&&e.target!==liveEdit.input){const input=liveEdit.input;finishMeasureInput();input.blur?.();}
+  if(!e.target?.closest?.('#topMenu'))$('topMenu').open=false;if(!e.target?.closest?.('#objectMenu'))$('objectMenu').open=false;
+ },true);
+ function changeMode(next){liveEdit=null;closeMenu();cancelInteraction();mode=next;selectedWall=null;wallSession=null;objectIds.clear();objectMulti=false;objectEditorKey=null;customNaming=false;resetClear();status();draw();}
  $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
  $('reloadApp').addEventListener('click',async()=>{
   const button=$('reloadApp');if(button.disabled)return;
@@ -425,7 +439,7 @@
  });
  $('toggleWalls').addEventListener('click',()=>{wallsVisible=!wallsVisible;save();status();draw();});
  $('undo').addEventListener('click',undo);$('redo').addEventListener('click',redo);
- function deselectWall(){objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
+ function deselectWall(){customNaming=false;objectIds.clear();objectMulti=false;objectEditorKey=null;selectedWall=null;wallSession=null;status();draw();}
  function selectedDimension(){if(!selectedWall)return null;const h=selectedWall.y1===selectedWall.y2;return {axis:h?'h':'v',line:h?selectedWall.y1:selectedWall.x1,start:h?selectedWall.x1:selectedWall.y1,end:h?selectedWall.x2:selectedWall.y2};}
  $('wallDelete').addEventListener('click',()=>{if(mode!=='edit'||!selectedWall)return;const before=copy(segments);segments=GridGeometry.eraseLine(segments,selectedWall);selectedWall=null;commit(before);});
  $('clearAll').addEventListener('click',()=>{
@@ -473,7 +487,7 @@
  bindLiveEditor('dimensionForm',applyWallInputs);
  $('saveJson').addEventListener('click',()=>{
   try{
-   const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),objects:copy(objects),wallsVisible};
+   const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),objects:copy(objects),customLibrary,wallsVisible};
    const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
    const link=document.createElement('a');link.href=url;link.download='CADup-'+new Date().toISOString().slice(0,10)+'.json';link.click();
    setTimeout(()=>URL.revokeObjectURL(url),1000);status('JSON datoteka je spremna za preuzimanje');
@@ -493,9 +507,11 @@
     (s.x1===s.x2||s.y1===s.y2)&&(s.x1!==s.x2||s.y1!==s.y2)&&
     (s.thickness===undefined||(Number.isFinite(s.thickness)&&s.thickness>=1&&s.thickness<=100)));
    if(!valid)throw new Error('JSON sadrži neispravne zidove.');
-   const importedObjects=CadObjects.validate(data.objects??[]);
+   const importedObjects=CadObjects.validate(data.objects??[]),importedLibrary=CadObjects.validateTemplates(data.customLibrary??[]);
+   const mergedLibrary=CadObjects.validateTemplates([...customLibrary,...importedLibrary.filter(template=>!customLibrary.some(saved=>saved.id===template.id))]);
    const imported=GridGeometry.normalize(data.segments);
    GridGeometry.detectWithDoors(imported); // Provjeri složenost prije zamjene crteža.
+   if(importedLibrary.length){persistCustomLibrary(mergedLibrary);customLibrary=mergedLibrary;renderObjectLibrary();}
    cancelInteraction();const before=snapshot();segments=imported;objects=importedObjects;objectIds.clear();
    wallsVisible=data.wallsVisible!==false;selected=null;selectedWall=null;wallSession=null;
    commit(before);save();resetClear();draw();status('Tlocrt je uvezen · Poništi vraća prethodni crtež');
@@ -523,13 +539,27 @@
   $('objectMulti').setAttribute('aria-pressed',String(objectMulti));$('objectMulti').classList.toggle('active',objectMulti);
   $('objectGroup').disabled=count<2;$('objectUngroup').disabled=!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;
   $('objectTitle').textContent=count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':'Dodirni elemente za višestruki odabir';
-  $('objectRotate').disabled=!count;
+  $('objectRotate').disabled=!count;$('saveCustom').disabled=!count;if(!count)customNaming=false;$('customSaveForm').hidden=!customNaming;
   const key=JSON.stringify(items);if(key===objectEditorKey)return;objectEditorKey=key;$('objectError').textContent='';
   if(!count){$('objectWidth').value='';$('objectDepth').value='';return;}
   const box=count===1?items[0]:CadObjects.selectionBounds(items);
   setEditorValue('objectWidth',String(Math.round(box.width*10)/10).replace('.',','));setEditorValue('objectDepth',String(Math.round(box.depth*10)/10).replace('.',','));
  }
- $('objectLibrary').innerHTML=buildObjectLibrary();
+ loadCustomLibrary();renderObjectLibrary();
+ function loadCustomLibrary(){try{customLibrary=CadObjects.validateTemplates(JSON.parse(localStorage.getItem(CUSTOM_KEY)||'[]'));}catch(_){customLibrary=[];}}
+ function persistCustomLibrary(library){try{localStorage.setItem(CUSTOM_KEY,JSON.stringify(library));}catch(_){throw new Error('Biblioteka nije spremljena: nema dovoljno prostora u pregledniku.');}}
+ function renderObjectLibrary(){$('objectLibrary').innerHTML=buildObjectLibrary();}
+ function escapeText(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+ function customLibraryIcon(template){
+  try{const canvas=document.createElement('canvas');canvas.width=72;canvas.height=72;const context=canvas.getContext('2d'),b=CadObjects.selectionBounds(template.items),factor=52/Math.max(b.width,b.depth);
+   for(const item of template.items)CadObjects.draw(context,item,factor,36-b.x*factor,36-b.y*factor);return '<img alt="" width="44" height="44" src="'+canvas.toDataURL()+'">';
+  }catch(_){return '<span aria-hidden="true">▱</span>';}
+ }
+ function addCustomObject(id){
+  const template=customLibrary.find(item=>item.id===id);if(!template)return;
+  try{changeMode('edit');const before=snapshot(),center=point(w/2,h/2),result=CadObjects.instantiate(template,center.x,center.y);objects.push(...result.items);commitObjects(before,result.ids);}
+  catch(error){status(error.message);}
+ }
  function objectLibraryIcon(item){
   try{
    const canvas=document.createElement('canvas');canvas.width=72;canvas.height=72;const context=canvas.getContext('2d');
@@ -546,7 +576,11 @@
     for(const item of catalog.filter(item=>item.category===category&&item.subcategory===subcategory))html+='<button type="button" data-object="'+item.kind+'">'+objectLibraryIcon(item)+'<span>'+item.name+'</span><small>'+item.width+' × '+item.depth+' cm</small></button>';
     html+='</div></details>';
    }html+='</details>';
-  }return html;
+  }
+  html+='<details class="catalog-category custom-category" name="object-category"><summary>Custom</summary><div class="catalog-items">';
+  for(const template of customLibrary){const b=CadObjects.selectionBounds(template.items);html+='<button type="button" data-custom="'+escapeText(template.id)+'">'+customLibraryIcon(template)+'<span>'+escapeText(template.name)+'</span><small>'+Math.round(b.width)+' × '+Math.round(b.depth)+' cm</small></button>';}
+  if(!customLibrary.length)html+='<small>Odaberi grupu i spremi je u biblioteku.</small>';
+  return html+'</div></details>';
  }
  $('topMenu').addEventListener('toggle',()=>{if($('topMenu').open)$('objectMenu').open=false;});
  $('objectMenu').addEventListener('toggle',()=>{if($('objectMenu').open)$('topMenu').open=false;});
@@ -554,7 +588,16 @@
   const target=e.target;if(!target.open||target.tagName!=='DETAILS'||!target.parentElement)return;
   for(const sibling of target.parentElement.children)if(sibling!==target&&sibling.tagName==='DETAILS')sibling.open=false;
  },true);
- $('objectMenu').addEventListener('click',e=>{const button=e.target?.closest?.('[data-object]');if(button)addObject(button.dataset.object);});
+ $('objectMenu').addEventListener('click',e=>{const button=e.target?.closest?.('[data-object],[data-custom]');if(button){if(button.dataset.object)addObject(button.dataset.object);else addCustomObject(button.dataset.custom);}});
+ $('saveCustom').addEventListener('click',()=>{if(!objectIds.size)return;customNaming=!customNaming;$('customSaveForm').hidden=!customNaming;$('customMessage').textContent='';if(customNaming){$('customName').focus();$('customName').select();}});
+ $('customSaveForm').addEventListener('submit',e=>{
+  e.preventDefault();try{
+   const template=CadObjects.createTemplate(objects,[...objectIds],$('customName').value);
+   if(customLibrary.some(item=>item.name.toLocaleLowerCase()===template.name.toLocaleLowerCase()))throw new Error('Taj naziv već postoji. Upiši drugi naziv.');
+   const library=CadObjects.validateTemplates([...customLibrary,template]);persistCustomLibrary(library);customLibrary=library;renderObjectLibrary();
+   $('customName').value='';customNaming=false;$('customSaveForm').hidden=true;$('customMessage').textContent='Spremljeno u Custom: '+template.name;
+  }catch(error){$('customMessage').textContent=error.message;}
+ });
  $('objectMulti').addEventListener('click',()=>{objectMulti=!objectMulti;status();draw();});
  $('objectRotate').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{objects=CadObjects.rotate(objects,[...objectIds]);commitObjects(before,[...objectIds]);}catch(error){$('objectError').textContent=error.message;}});
  $('objectCopy').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{const result=CadObjects.duplicate(objects,[...objectIds]);objects=result.items;commitObjects(before,result.ids);}catch(error){$('objectError').textContent=error.message;}});

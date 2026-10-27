@@ -12,7 +12,7 @@ function el(id){
 const context=vm.createContext({console,Blob,fetch:async(url,options)=>{updateRequests.push({url,options});if(updateFailure==='network')throw new Error('Offline');return {ok:updateFailure!=='http'&&!(updateFailure==='script'&&url.includes('grid-app.js')),status:updateFailure==='http'||(updateFailure==='script'&&url.includes('grid-app.js'))?503:200,text:async()=>url.includes('CADup.html')?(updateFailure==='incomplete'?'<html></html>':publishedHtml):'/* verified script response */'};},URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
 for(const file of ['room-geometry.js','grid-geometry.js','cad-objects.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={addCustomObject,get customLibrary(){return customLibrary},addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,hitMoveHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -376,14 +376,26 @@ el('topMenu').open=true;el('topMenu').toggle();assert.equal(el('objectMenu').ope
 const menuSibling={tagName:'DETAILS',open:true},menuTarget={tagName:'DETAILS',open:true,parentElement:{children:[]}};menuTarget.parentElement.children=[menuTarget,menuSibling];
 el('objectLibrary').toggle({target:menuTarget});assert.equal(menuSibling.open,false);
 
-// Unos mjera odmah mijenja scenu, zadržava decimalni unos i grupira jedan unos za Undo.
+// Upisana mjera čeka prvi klik izvan polja, zatim se primjenjuje u jednom Undo koraku.
 el('clearAll').click();el('clearAll').click();api.fit();api.addObject('sofa');
 context.document.activeElement=el('objectWidth');el('objectForm').focusin({target:{tagName:'INPUT'}});
 for(const value of ['3','30','300','300,','300,5']){el('objectWidth').value=value;el('objectForm').input({preventDefault(){}});assert.equal(el('objectWidth').value,value);}
-assert.equal(api.objects[0].width,300.5);el('objectForm').focusout();context.document.activeElement=null;
+assert.equal(api.objects[0].width,220,'Tijekom tipkanja crtež se ne mijenja');context.document.pointerdown({target:{closest:()=>null}});assert.equal(api.objects[0].width,300.5);el('objectForm').focusout();context.document.activeElement=null;
 api.undo();assert.equal(api.objects[0].width,220,'Jedan Undo poništi cijelo upisivanje');api.redo();assert.equal(api.objects[0].width,300.5);
 el('clearAll').click();el('clearAll').click();line(100,100,300,100);click(200,100);
 context.document.activeElement=el('dimensionValue');el('dimensionForm').focusin({target:{tagName:'INPUT'}});
 for(const value of ['100','200','350']){el('dimensionValue').value=value;el('dimensionForm').input({preventDefault(){}});assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionValue').value,value);}
-assert.equal(api.segments[0].x2-api.segments[0].x1,350);el('dimensionForm').focusout();context.document.activeElement=null;
+assert.equal(api.segments[0].x2-api.segments[0].x1,400);context.document.pointerdown({target:{closest:()=>null}});assert.equal(api.segments[0].x2-api.segments[0].x1,350);el('dimensionForm').focusout();context.document.activeElement=null;
 api.undo();assert.equal(api.segments[0].x2-api.segments[0].x1,400);api.redo();assert.equal(api.segments[0].x2-api.segments[0].x1,350);
+
+// Imenovana grupa sprema se na kraj Custom biblioteke i ponovno se umeće kao zasebna grupa.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('sofa');api.addObject('chair');
+let customView=api.view,customChair=api.objects[1];drag(customView.ox+customChair.x*customView.scale,customView.oy+customChair.y*customView.scale,customView.ox+customChair.x*customView.scale+120,customView.oy+customChair.y*customView.scale);
+el('objectMulti').click();click(customView.ox+api.objects[0].x*customView.scale,customView.oy+api.objects[0].y*customView.scale);el('objectGroup').click();
+assert.equal(api.objectIds.length,2);el('saveCustom').click();assert.equal(el('customSaveForm').hidden,false);
+el('customName').value='Kutak <A>';el('customSaveForm').submit({preventDefault(){}});
+assert.equal(api.customLibrary.length,1);assert.equal(api.customLibrary[0].name,'Kutak <A>');assert.ok(el('objectLibrary').innerHTML.includes('Kutak &lt;A&gt;'));
+assert.equal(JSON.parse(memory.get('cadup_custom_library_v1')).length,1);assert.equal(el('customSaveForm').hidden,true);
+const customTemplate=api.customLibrary[0];api.addCustomObject(customTemplate.id);assert.equal(api.objects.length,4);assert.equal(api.objectIds.length,2);
+assert.notEqual(api.objects[2].group,api.objects[0].group);assert.equal(api.objects[2].group,api.objects[3].group);
+el('saveCustom').click();el('customName').value='Kutak <A>';el('customSaveForm').submit({preventDefault(){}});assert.equal(api.customLibrary.length,1,'Isto ime se ne prepisuje');

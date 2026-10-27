@@ -80,6 +80,23 @@ globalThis.CadObjects=(()=>{
   if(b.left<0||b.top<0||b.right>2000||b.bottom>2000){angle=rotation(angle+180);attached={...attached,rotation:angle};b=bounds(attached);}
   return b.left<0||b.top<0||b.right>2000||b.bottom>2000?item:attached;
  }
+ function createTemplate(items,ids,name){
+  name=String(name??'').trim();if(!name||name.length>60)throw new Error('Upiši naziv do 60 znakova.');
+  const chosen=items.filter(item=>ids.includes(item.id));if(!chosen.length)throw new Error('Prvo odaberi elemente.');
+  const b=selectionBounds(chosen),centered=move(chosen,chosen.map(item=>item.id),1000-b.x,1000-b.y);
+  return {id:id(),name,items:validate(centered)};
+ }
+ function validateTemplates(input){
+  if(!Array.isArray(input)||input.length>100)throw new Error('Neispravna Custom biblioteka.');const seen=new Set();let count=0;
+  return input.map(template=>{
+   if(!template||typeof template.id!=='string'||!/^[A-Za-z0-9_-]{1,100}$/.test(template.id)||seen.has(template.id)||typeof template.name!=='string'||!template.name.trim()||template.name.trim().length>60||!Array.isArray(template.items)||!template.items.length)throw new Error('Neispravan Custom objekt.');
+   seen.add(template.id);const items=validate(template.items);count+=items.length;if(count>2000)throw new Error('Custom biblioteka ima previše elemenata.');return {id:template.id,name:template.name.trim(),items};
+  });
+ }
+ function instantiate(template,x,y){
+  const valid=validateTemplates([template])[0],copies=duplicate(valid.items,valid.items.map(item=>item.id)),items=copies.items.filter(item=>copies.ids.includes(item.id)),b=selectionBounds(items);
+  const moved=move(items,copies.ids,x-b.x,y-b.y);return {items:group(moved,copies.ids),ids:copies.ids};
+ }
  function snapToWalls(items,ids,walls,rooms=[],tolerance=20){
   const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);
   if(group.length===1&&['door','double-door','window'].includes(group[0].kind))return items.map(item=>selected.has(item.id)?attach(item,walls):{...item});
@@ -135,5 +152,5 @@ globalThis.CadObjects=(()=>{
   }
   g.restore();
  }
- return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,duplicate,group,ungroup,attach,snapToWalls,draw};
+ return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,duplicate,group,ungroup,attach,createTemplate,validateTemplates,instantiate,snapToWalls,draw};
 })();

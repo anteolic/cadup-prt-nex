@@ -37,3 +37,9 @@ assert.equal(C.bounds(C.snapToWalls([leftFurniture],[leftFurniture.id],[innerWal
 const farFurniture={...snapSofa,y:300};assert.equal(C.snapToWalls([farFurniture],[farFurniture.id],[topWall],snapRoom)[0].y,300,'Udaljeni elementi ne skaču na zid');
 const snapGroup=[{...snapSofa,id:'g1',width:100,x:250,y:160,group:'g'},{...snapSofa,id:'g2',width:100,x:400,y:160,group:'g'}];
 const snappedGroup=C.snapToWalls(snapGroup,['g1','g2'],[topWall],snapRoom);assert.equal(C.selectionBounds(snappedGroup).top,100);assert.equal(snappedGroup[1].x-snappedGroup[0].x,150);
+const template=C.createTemplate(grouped,grouped.map(item=>item.id),'Kutak za čitanje');
+assert.equal(template.name,'Kutak za čitanje');assert.equal(template.items.length,2);assert.equal(C.selectionBounds(template.items).width,C.selectionBounds(grouped).width);
+assert.deepEqual(C.validateTemplates(JSON.parse(JSON.stringify([template]))),[template]);
+const instance=C.instantiate(template,700,700);assert.equal(instance.items.length,2);assert.ok(instance.items[0].group);assert.equal(instance.items[0].group,instance.items[1].group);assert.notEqual(instance.items[0].id,template.items[0].id);
+const instance2=C.instantiate(template,20,20);assert.notEqual(instance2.items[0].group,instance.items[0].group);assert.equal(C.validate(instance2.items).length,2);
+assert.throws(()=>C.createTemplate(grouped,grouped.map(item=>item.id),' '));assert.throws(()=>C.validateTemplates([{...template,id:'" onclick="alert(1)'}]));

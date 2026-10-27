@@ -52,6 +52,7 @@ footer[hidden]{display:none}#editorFooter .wall-actions{margin:0}
 .object-actions[hidden]{display:none}.object-title{font-size:11px;color:#1e40af;font-weight:650;margin:0 0 5px}.object-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 66px;gap:5px;align-items:end}.object-fields label{font-size:10px;color:#1e40af;font-weight:650;min-width:0}.object-fields input,.object-fields select{display:block;width:100%;min-width:0;margin-top:3px;padding:6px;border:1px solid #93c5fd;border-radius:7px;background:white;color:#162335;font-size:16px}.object-actions button{min-height:34px;padding:5px 8px;border:1px solid #bfdbfe;border-radius:7px;background:#fff;color:#1e40af;font:inherit;font-size:11px;font-weight:650}.object-buttons{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}.object-buttons button{flex:1;padding-inline:5px}.object-buttons #objectDelete{background:#fff1f2;border-color:#fecaca;color:#b91c1c}#objectMulti.active{background:#dbeafe;border-color:#2563eb}#objectError{font-size:11px;color:#b91c1c;margin:5px 0 0}#objectError:empty{display:none}
 .catalog-items button{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:7px;align-items:center}.catalog-items button img,.catalog-items button>span[aria-hidden]{grid-row:1 / 3;max-width:44px;object-fit:contain}.catalog-items button>span:not([aria-hidden]){min-width:0;font-size:11px}.catalog-items small{grid-column:2}
 .menu-credit{grid-column:1 / -1;padding:7px 3px 2px;text-align:center;font-size:11px;color:#64748b}.menu-credit a{color:#24557e;text-decoration:underline}
+.object-buttons #saveCustom{flex-basis:100%;min-height:30px}.custom-save-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;margin-top:6px}.custom-save-form[hidden]{display:none}.custom-save-form label{grid-column:1 / -1;font-size:11px;color:#1e40af}.custom-save-form input{min-width:0;padding:7px;border:1px solid #93c5fd;border-radius:7px;font:inherit;font-size:16px}#customMessage{font-size:11px;color:#24557e;margin:5px 0 0}#customMessage:empty{display:none}#editorFooter{max-height:45dvh;overflow:auto}
 </style>
 </head>
 <body>
@@ -70,7 +71,7 @@ footer[hidden]{display:none}#editorFooter .wall-actions{margin:0}
    <button id="saveJson" class="file-action">Spremi JSON</button>
    <button id="importJson" class="file-action">Uvezi JSON</button>
    <button id="reloadApp" class="file-action" type="button">↻ Učitaj novu verziju</button>
-   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v55</small></div>
+   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v57</small></div>
   </div>
  </details>
  <input id="jsonFile" type="file" accept=".json,application/json" hidden>
@@ -94,13 +95,17 @@ footer[hidden]{display:none}#editorFooter .wall-actions{margin:0}
    <label>Dubina (cm)<input id="objectDepth" type="text" inputmode="decimal" required></label>
    <button id="objectRotate" type="button" title="Zakreni odabrano za 90°">↻ +90°</button>
   </form>
-  <div class="object-buttons"><button id="objectCopy" type="button">Kopiraj</button><button id="objectMulti" type="button" aria-pressed="false">Više odabira</button><button id="objectGroup" type="button">Grupiraj</button><button id="objectUngroup" type="button">Razgrupiraj</button><button id="objectDelete" type="button">Obriši</button></div>
+  <div class="object-buttons"><button id="objectCopy" type="button">Kopiraj</button><button id="objectMulti" type="button" aria-pressed="false">Više odabira</button><button id="objectGroup" type="button">Grupiraj</button><button id="objectUngroup" type="button">Razgrupiraj</button><button id="objectDelete" type="button">Obriši</button><button id="saveCustom" type="button">Spremi u biblioteku</button></div>
+  <form id="customSaveForm" class="custom-save-form" hidden>
+   <label for="customName">Naziv custom objekta</label><input id="customName" type="text" maxlength="60" autocomplete="off" required><button type="submit">Spremi</button>
+  </form>
+  <p id="customMessage" role="status"></p>
   <p id="objectError" role="alert"></p>
  </div>
 </footer>
-<script src="room-geometry.js?v=20261027-55"></script>
-<script src="grid-geometry.js?v=20261027-55"></script>
-<script src="cad-objects.js?v=20261027-55"></script>
-<script src="grid-app.js?v=20261027-55"></script>
+<script src="room-geometry.js?v=20261027-57"></script>
+<script src="grid-geometry.js?v=20261027-57"></script>
+<script src="cad-objects.js?v=20261027-57"></script>
+<script src="grid-app.js?v=20261027-57"></script>
 </body>
 </html>

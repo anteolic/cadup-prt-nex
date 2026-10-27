@@ -183,7 +183,7 @@ click(200,100);el('dimensionValue').value='520';el('dimensionThickness').value='
 assert.equal(el('dimensionError').textContent,'');assert.equal(api.model().faces.length,1);
 assert.ok(api.model().wallOutline.edges.some(e=>e.axis==='h'&&e.line===160&&e.span[1]-e.span[0]===600));
 // Odabir zida ne dodaje naglašenu kotu uz postojeća donja polja.
-assert.ok(!api.dimensions.some(r=>r.dimension.axis==='h'&&r.dimension.line===200));
+assert.ok(api.dimensions.every(r=>r.dimension.side===-1||r.dimension.side===1),'Prikazane su samo postojeće rubne kote');
 el('wallDeselect').click();assert.equal(el('wallActions').hidden,true);
 
 // Mreža ostaje vidljiva i nakon odabira početka linije.

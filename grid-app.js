@@ -145,11 +145,12 @@
  function tag(x,y,text,color='#24557e',vertical=false,priority=1){pendingTags.push({x,y,text,color,vertical,priority});}
  function paintTags(){
   const occupied=[];
-  for(const {x:rawX,y:rawY,text,color,vertical} of pendingTags.sort((a,b)=>b.priority-a.priority)){
+  for(const {x:rawX,y:rawY,text,color,vertical,priority} of pendingTags.sort((a,b)=>b.priority-a.priority)){
   let x=rawX,y=rawY;
-  const size=clamp(12+Math.log2(Math.max(1,scale/(w/WIDTH))),12,17),boxHeight=size+10;
+  const base=priority===3?7:priority===1?8:12;
+  const size=clamp(base+Math.log2(Math.max(1,scale/(w/WIDTH))),base,base+2),boxHeight=size+(priority===3?4:6);
   g.save();g.font='600 '+size+'px system-ui';
-  const width=g.measureText(text).width+16,halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
+  const width=g.measureText(text).width+(priority===3?6:10),halfX=(vertical?boxHeight:width)/2,halfY=(vertical?width:boxHeight)/2;
   x=clamp(x,Math.max(0,ox)+halfX+3,Math.min(w,ox+WIDTH*scale)-halfX-3);
   y=clamp(y,Math.max(0,oy)+halfY+3,Math.min(h,oy+height*scale)-halfY-3);
   const bounds={left:x-halfX-3,right:x+halfX+3,top:y-halfY-2,bottom:y+halfY+2};
@@ -194,7 +195,7 @@
    const label=visible.sort((a,b)=>(b.right-b.x)*(b.bottom-b.y)-(a.right-a.x)*(a.bottom-a.y))[0];
    if(label&&face.area>=10000&&net.width>=20&&net.height>=20){
     const center=screen({x:(label.x+label.right)/2,y:(label.y+label.bottom)/2});
-    const gap=clamp(27+Math.log2(Math.max(1,scale/(w/WIDTH))),27,32);
+    const gap=clamp(15+Math.log2(Math.max(1,scale/(w/WIDTH))),15,18);
     tag(center.x,center.y-gap,'Prostorija '+face.id,'#24557e',false,3);
     if(RoomGeometry.union(face.rects).edges.length===4)tag(center.x,center.y,lengthText(net.width)+' × '+lengthText(net.height),'#24557e',false,3);
     tag(center.x,center.y+gap,areaText(net.area),'#24557e',false,3);

@@ -313,7 +313,7 @@
   try{
    const data={format:'infoa-tlocrt',version:1,unit:'cm',segments:copy(segments),wallsVisible};
    const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-   const link=document.createElement('a');link.href=url;link.download='infoa-tlocrt-'+new Date().toISOString().slice(0,10)+'.json';link.click();
+   const link=document.createElement('a');link.href=url;link.download='CADup-'+new Date().toISOString().slice(0,10)+'.json';link.click();
    setTimeout(()=>URL.revokeObjectURL(url),1000);status('JSON datoteka je spremna za preuzimanje');
   }catch(_){status('Spremanje nije uspjelo. Pokušaj ponovno.');}
  });

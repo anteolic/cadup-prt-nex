@@ -54,3 +54,14 @@ for(const angle of [0,90,180,270]){
  assert.equal(C.duplicate(mirrored,ids).items[2].mirrored,true);
  assert.equal(C.instantiate(C.createTemplate(mirrored,ids,'Mirror test'),1000,1000).items[0].mirrored,true);
 }
+
+// Absolute lower-left anchoring removes half-width and insertion offsets.
+for(const rotation of [0,90,180,270])for(const unit of [5,20,50,100]){
+ const drawer={...C.create('drawer-cabinet',502.5,501.25),width:65,depth:60,rotation};
+ const out=C.moveOnGrid([drawer],[drawer.id],37,43,unit),b=C.bounds(out[0]);
+ assert.equal(b.left%unit,0);assert.equal(b.bottom%unit,0);assert.equal(out[0].width,65);assert.equal(out[0].depth,60);
+ const originalBox=C.bounds(drawer);assert.equal(b.left,Math.round((originalBox.left+37)/unit)*unit);
+ const second={...C.create('chair',700,600),group:'grid-group'},first={...drawer,group:'grid-group'};
+ const moved=C.moveOnGrid([first,second],[first.id,second.id],37,43,unit),groupBox=C.selectionBounds(moved);
+ assert.equal(groupBox.left%unit,0);assert.equal(groupBox.bottom%unit,0);assert.equal(moved[1].x-moved[0].x,second.x-first.x);assert.equal(moved[1].y-moved[0].y,second.y-first.y);
+}

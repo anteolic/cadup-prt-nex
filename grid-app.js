@@ -75,6 +75,7 @@
  }
  const point=(x,y)=>({x:(x-ox)/scale,y:(y-oy)/scale});
  const screen=p=>({x:ox+p.x*scale,y:oy+p.y*scale});
+ function gridUnit(){return scale<=w/WIDTH*(1+1e-9)?100:step();}
  function step(){for(const s of [5,10,20,50,100,200,500,1000,2000])if(s*scale>=19)return s;return 2000;}
  function guideAxes(){
   const xs=new Set(),ys=new Set();
@@ -293,7 +294,7 @@
   for(const face of current.faces){
    g.beginPath();for(const r of face.rects)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);g.fill();
   }
-  const unit=scale<=w/WIDTH*(1+1e-9)?100:step();
+  const unit=gridUnit();
   g.lineWidth=1;
   // Mreža prekriva cijeli prikaz, uključujući rubove izvan smanjene radne plohe.
   for(let i=Math.ceil(-ox/scale/unit);i<=Math.floor((w-ox)/scale/unit);i++){const x=ox+i*unit*scale;g.strokeStyle=i%5===0?'#c1ccda':'#e4e9f0';g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke();}
@@ -433,7 +434,9 @@
   if(!gesture||gesture.id!==e.pointerId)return;
   if(gesture.type==='erase-span'){if(Math.hypot(p.x-gesture.start.x,p.y-gesture.start.y)>9)gesture.moved=true;}
   else if(gesture.type==='object-move'){
-   let moved=CadObjects.move(gesture.before.objects,gesture.ids,Math.round((p.x-gesture.start.x)/scale/5)*5,Math.round((p.y-gesture.start.y)/scale/5)*5);
+   if(!gesture.moved&&Math.hypot(p.x-gesture.start.x,p.y-gesture.start.y)<3)return;
+   gesture.moved=true;
+   let moved=CadObjects.moveOnGrid(gesture.before.objects,gesture.ids,(p.x-gesture.start.x)/scale,(p.y-gesture.start.y)/scale,gridUnit());
    moved=CadObjects.snapToWalls(moved,gesture.ids,segments,model().rooms,Math.min(30,14/scale));
    objects=moved;schedule();
   }

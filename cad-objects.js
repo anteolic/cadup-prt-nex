@@ -48,6 +48,12 @@ globalThis.CadObjects=(()=>{
   dx=Math.max(-b.left,Math.min(2000-b.right,dx));dy=Math.max(-b.top,Math.min(2000-b.bottom,dy));
   return items.map(item=>selected.has(item.id)?{...item,x:item.x+dx,y:item.y+dy}:{...item});
  }
+ function moveOnGrid(items,ids,dx,dy,unit=5){
+  const selected=new Set(ids),box=selectionBounds(items.filter(item=>selected.has(item.id)));
+  if(!box)return clone(items);
+  // Anchor the actual lower-left corner, not the original object centre.
+  return move(items,ids,Math.round((box.left+dx)/unit)*unit-box.left,Math.round((box.bottom+dy)/unit)*unit-box.bottom);
+ }
  function resize(items,ids,width,depth,angle){
   if(![width,depth].every(n=>Number.isFinite(n)&&n>=5&&n<=2000)||!Number.isFinite(angle)||angle%90!==0)throw new Error('Mjere moraju biti od 5 do 2000 cm, a kut višekratnik 90°.');
   const selected=new Set(ids),group=items.filter(item=>selected.has(item.id));if(!group.length)return clone(items);let resized;
@@ -132,8 +138,10 @@ globalThis.CadObjects=(()=>{
   g.lineWidth=1.2/Math.max(.1,Math.min(fx,fy));g.strokeStyle=erase?'#dc2626':selected?'#2563eb':'#475569';g.fillStyle=erase?'#fee2e2':selected?'#dbeafe':'#f8fafc';
   const rect=(x,y,w,h)=>{g.beginPath();g.rect(x,y,w,h);g.fill();g.stroke();},line=(x,y,a,b)=>{g.beginPath();g.moveTo(x,y);g.lineTo(a,b);g.stroke();},ellipse=(x,y,rx,ry)=>{g.beginPath();g.ellipse(x,y,rx,ry,0,0,Math.PI*2);g.stroke();};
   const opening=['door','double-door','window'].includes(item.kind);
+  // Include the entire ink stroke in the declared footprint, at every zoom.
+  g.beginPath();g.rect(-50,opening?-100:-50,100,100);g.clip();
   if(opening){if(wallThickness){g.fillStyle='#fff';g.fillRect(-50,-wallThickness/item.depth*50,100,wallThickness/item.depth*100);g.fillStyle=erase?'#fee2e2':selected?'#dbeafe':'#f8fafc';}}
-  else rect(-50,-50,100,100);
+  else{const inset=Math.min(49,g.lineWidth/2);rect(-50+inset,-50+inset,100-2*inset,100-2*inset);}
   switch(item.kind){
    case 'sofa':case 'armchair':rect(-49,-48,14,96);rect(35,-48,14,96);rect(-35,-48,70,20);for(let i=0,n=item.kind==='sofa'?3:1;i<n;i++)rect(-35+i*70/n,-25,70/n,72);break;
    case 'bed':case 'single-bed':rect(-48,-48,96,15);rect(-45,-27,90,74);rect(-42,-25,item.kind==='bed'?39:84,20);if(item.kind==='bed')rect(3,-25,39,20);break;
@@ -159,11 +167,11 @@ globalThis.CadObjects=(()=>{
    case 'sink':ellipse(0,3,39,30);ellipse(0,-30,5,5);break;
    case 'washer':ellipse(0,7,34,34);line(-50,-32,50,-32);break;
    case 'stairs':for(let i=0;i<=10;i++)line(-48,-48+i*9.6,48,-48+i*9.6);line(0,40,0,-35);line(0,-35,-10,-20);line(0,-35,10,-20);break;
-   case 'window':rect(-50,-25,100,50);line(-50,0,50,0);break;
+   case 'window':rect(-50,-75,100,50);line(-50,-50,50,-50);break;
    case 'door':line(-50,0,-50,-95);g.beginPath();g.arc(-50,0,95,-Math.PI/2,0);g.stroke();break;
    case 'double-door':line(-50,0,-50,-90);line(50,0,50,-90);g.beginPath();g.ellipse(-50,0,50,90,0,-Math.PI/2,0);g.stroke();g.beginPath();g.ellipse(50,0,50,90,0,Math.PI,Math.PI*1.5);g.stroke();break;
   }
   g.restore();
  }
- return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,resize,rotate,mirror,duplicate,group,ungroup,attach,createTemplate,validateTemplates,instantiate,snapToWalls,draw};
+ return {catalog,definition,create,validate,bounds,selectionBounds,hit,expandedSelection,move,moveOnGrid,resize,rotate,mirror,duplicate,group,ungroup,attach,createTemplate,validateTemplates,instantiate,snapToWalls,draw};
 })();

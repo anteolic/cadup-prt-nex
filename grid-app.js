@@ -226,8 +226,11 @@
    g.fillStyle='#93c5fd';g.fill();g.strokeStyle='#2563eb';g.lineWidth=2;
    if(mode==='edit')for(const p of [a,b]){g.fillStyle='#fff';g.beginPath();g.arc(p.x,p.y,9,0,Math.PI*2);g.fill();g.stroke();}
    const middle={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
-   g.fillStyle='#2563eb';g.fillRect(middle.x-7,middle.y-7,14,14);g.strokeStyle='#fff';g.lineWidth=1.3;
-   g.beginPath();g.moveTo(middle.x-4,middle.y);g.lineTo(middle.x+4,middle.y);g.moveTo(middle.x,middle.y-4);g.lineTo(middle.x,middle.y+4);g.stroke();
+   g.save();g.translate(middle.x,middle.y);if(horizontal)g.rotate(Math.PI/2);
+   g.beginPath();g.roundRect(-12,-9,24,18,4);g.fillStyle='#2563eb';g.fill();
+   g.strokeStyle='#fff';g.lineWidth=1.6;g.lineCap='round';g.lineJoin='round';g.beginPath();
+   g.moveTo(-7,0);g.lineTo(7,0);g.moveTo(-3,-3);g.lineTo(-7,0);g.lineTo(-3,3);
+   g.moveTo(3,-3);g.lineTo(7,0);g.lineTo(3,3);g.stroke();g.restore();
    const center=visibleWallCenter(selectedWall);if(center)tag(center.x+(horizontal?0:20),center.y+(horizontal?-20:0),lengthText(horizontal?selectedWall.x2-selectedWall.x1:selectedWall.y2-selectedWall.y1),'#1d4ed8',!horizontal,5,{axis:horizontal?'h':'v',line:horizontal?selectedWall.y1:selectedWall.x1,start:horizontal?selectedWall.x1:selectedWall.y1,end:horizontal?selectedWall.x2:selectedWall.y2});
   }
   if(first){

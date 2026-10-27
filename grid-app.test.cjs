@@ -17,9 +17,10 @@ vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
 function click(x,y){board.pointerdown(event(x,y));board.pointerup(event(x,y));}
-function enterEdit(){if(api.mode==='draw')el('drawMode').click();else deselect();}
+function enterEdit(){if(api.mode==='draw')el('drawMode').click();else if(api.mode==='erase')el('eraseMode').click();else deselect();}
 function finishDrawing(){enterEdit();}
 function startDrawing(){if(api.mode!=='draw')el('drawMode').click();}
+function eraseSelection(){const selected=api.selection;if(!selected)return;const h=selected.y1===selected.y2,wall=context.GridGeometry.atomic(api.segments).find(s=>(s.y1===s.y2)===h&&(h?s.y1===selected.y1&&s.x1>=selected.x1&&s.x2<=selected.x2:s.x1===selected.x1&&s.y1>=selected.y1&&s.y2<=selected.y2));if(!wall)return;if(api.mode!=='erase')el('eraseMode').click();const v=api.view;click(v.ox+(wall.x1+wall.x2)/2*v.scale,v.oy+(wall.y1+wall.y2)/2*v.scale);}
 function deselect(){click(api.view.w-8,api.view.h-8);}
 function line(x1,y1,x2,y2){finishDrawing();startDrawing();click(x1,y1);click(x2,y2);finishDrawing();}
 line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);
@@ -32,11 +33,11 @@ line(200,100,200,250);assert.equal(api.model().faces.length,2);assert.equal(api.
 assert.equal(api.visible,true);assert.equal(api.model().faces.length,2);
 enterEdit();const beforeEraseSelection=JSON.stringify(api.segments);
 click(200,150);assert.ok(api.selection);assert.equal(JSON.stringify(api.segments),beforeEraseSelection,'Prvi dodir samo označava');
-el('wallDelete').click();assert.equal(api.model().faces.length,1,'Brisanje u načinu Uredi uklanja cijelu pregradu');
+eraseSelection();assert.equal(api.model().faces.length,1,'Brisanje u načinu Uredi uklanja cijelu pregradu');
 assert.equal(api.selection,null);assert.ok(!api.segments.some(s=>s.x1===400&&s.x2===400));
 api.undo();assert.equal(api.model().faces.length,2);api.redo();assert.equal(api.model().faces.length,1);
 // Gumica otvara obris i undo ga zatvara.
-click(150,100);el('wallDelete').click();assert.equal(api.model().faces.length,0);api.undo();assert.equal(api.model().faces.length,1);
+click(150,100);eraseSelection();assert.equal(api.model().faces.length,0);api.undo();assert.equal(api.model().faces.length,1);
 // Otkazivanje gumice ne mijenja spremljeni tlocrt.
 const count=JSON.stringify(api.segments);board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),count);
 // Isti stari način podešavanja: klizanje gore-dolje mijenja duljinu vodoravnog poteza.
@@ -204,9 +205,9 @@ click(400,400);assert.equal(api.selection,null);assert.equal(el('wallActions').h
 click(200,175);click(150,100);assert.equal(api.selection.y1,200);assert.equal(api.selection.x2,600);
 assert.equal(JSON.stringify(api.segments),eraseOriginal);
 click(175,100);assert.equal(JSON.stringify(api.segments),eraseOriginal,'Ponovljeni odabir ne briše zid');
-el('wallDelete').click();assert.equal(api.selection,null);
+eraseSelection();assert.equal(api.selection,null);
 assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1<400));
-assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200),'Briše se cijeli spojeni ravni zid');
+assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===400),'Gumica ostavlja susjedni dio ravnog zida iza čvora');
 api.undo();assert.equal(JSON.stringify(api.segments),eraseOriginal);api.redo();assert.notEqual(JSON.stringify(api.segments),eraseOriginal);
 
 // Precrtavanje postojećeg zida ne briše njegov dio.
@@ -228,8 +229,8 @@ click(200,100);assert.equal(el('wallActions').hidden,false);assert.equal(el('dim
 click(200,100);assert.equal(el('wallActions').hidden,false);assert.equal(el('dimensionThickness').value,'10');deselect();
 const beforeSelectionDelete=JSON.stringify(api.segments);
 deselect();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
-el('wallDelete').click();assert.equal(JSON.stringify(api.segments),beforeSelectionDelete,'Brisanje bez odabira ništa ne radi');
-click(200,100);el('wallDelete').click();assert.equal(api.segments.length,0);api.undo();assert.equal(JSON.stringify(api.segments),beforeSelectionDelete);
+eraseSelection();assert.equal(JSON.stringify(api.segments),beforeSelectionDelete,'Brisanje bez odabira ništa ne radi');
+click(200,100);eraseSelection();assert.equal(api.segments.length,0);api.undo();assert.equal(JSON.stringify(api.segments),beforeSelectionDelete);
 startDrawing();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
 const drawDimension=api.dimensions[0];assert.ok(drawDimension);
 click((drawDimension.left+drawDimension.right)/2,(drawDimension.top+drawDimension.bottom)/2);
@@ -409,7 +410,7 @@ assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===200&&s.x2===600&&s
 
 // Uhvaćena ručka skriva se tijekom povlačenja i vraća pri puštanju.
 el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();click(200,100);
-gripCircles.length=0;api.draw();assert.equal(gripCircles.length,2);
+gripCircles.length=0;paintCalls.length=0;api.draw();assert.equal(gripCircles.length,2);assert.ok(paintCalls.some(p=>p.color==='rgba(255,255,255,0.35)'),'Ručke su prozirne da se vidi crvena os');
 gripCircles.length=0;board.pointerdown(event(300,100));assert.equal(gripCircles.length,1,'Uhvaćena ručka je odmah skrivena');
 gripCircles.length=0;board.pointermove(event(350,100));assert.equal(gripCircles.length,1);assert.ok(api.segments.some(s=>s.x2===700));
 gripCircles.length=0;board.pointerup(event(350,100));assert.equal(gripCircles.length,2,'Nakon puštanja su opet vidljive obje ručke');
@@ -427,3 +428,23 @@ finishDrawing();
 
 // Crvene osnovne linije vide se i tijekom crtanja; plave pomoćne osi ostaju dostupne.
 startDrawing();redStrokes=0;api.draw();assert.ok(redStrokes>0,'Osnovne linije su crvene i u načinu Crtaj');assert.ok(api.guideAxes().x.length>0);finishDrawing();
+
+// Krajnja ručka hvata točnu crvenu osnovnu liniju drugog zida mimo mreže.
+el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();click(200,100);
+el('dimensionValue').value='333';el('dimensionForm').submit({preventDefault(){}});
+startDrawing();click(270.5,200);click(270.5,400);finishDrawing();assert.ok(api.segments.some(s=>s.x1===533&&s.x2===533));
+line(100,300,200,300);enterEdit();click(150,300);drag(200,300,270.5,300);
+assert.ok(api.segments.some(s=>s.y1===600&&s.y2===600&&s.x2===533),'Ručka sjeda na osnovnu liniju, ne na 550 cm mreže');
+assert.ok(api.model().layout.physicalJoints.some(j=>j.x===533&&j.y===600),'Nakon snap-a nastaje točan spoj osnovnih linija');
+// Pomicanje zida hvata istu točnu koordinatu završetka druge osnovne linije.
+el('clearAll').click();el('clearAll').click();line(100,100,100,300);enterEdit();click(100,200);el('dimensionValue').value='333';el('dimensionForm').submit({preventDefault(){}});
+line(200,400,300,400);enterEdit();click(250,400);drag(250,400,250,270.5);
+assert.ok(api.segments.some(s=>s.y1===533&&s.y2===533&&s.x1===400&&s.x2===600));
+
+// Gumica briše odmah jednim klikom, ali samo dio između presjeka.
+el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);line(300,100,300,250);line(300,250,100,250);line(100,250,100,100);line(200,100,200,250);
+const beforeSpanErase=JSON.stringify(api.segments);el('eraseMode').click();assert.equal(api.mode,'erase');click(150,100);
+assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1<400));assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===400));
+api.undo();assert.equal(JSON.stringify(api.segments),beforeSpanErase);click(450,400);assert.equal(JSON.stringify(api.segments),beforeSpanErase);
+board.pointerdown(event(150,100));board.pointermove(event(150,150));board.pointerup(event(150,100));assert.equal(JSON.stringify(api.segments),beforeSpanErase,'Povlačenje ne briše');
+board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),beforeSpanErase);el('eraseMode').click();assert.equal(api.mode,'edit');

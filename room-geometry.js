@@ -125,10 +125,32 @@ globalThis.RoomGeometry = (() => {
    const box={x:x-b.box.width/2,y:y-a.box.height/2,width:b.box.width,height:a.box.height};
    (a.exterior||b.exterior?outer:inner).push(box);physicalJoints.push({x,y,box,sources:[a.source,b.source]});
   }
+  const parent=walls.map((_,i)=>i),root=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;};
+  const touches=(a,b)=>{
+   const ah=a.y1===a.y2,bh=b.y1===b.y2;
+   if(ah===bh)return (ah?a.y1===b.y1:a.x1===b.x1)&&Math.max(ah?Math.min(a.x1,a.x2):Math.min(a.y1,a.y2),bh?Math.min(b.x1,b.x2):Math.min(b.y1,b.y2))<=Math.min(ah?Math.max(a.x1,a.x2):Math.max(a.y1,a.y2),bh?Math.max(b.x1,b.x2):Math.max(b.y1,b.y2));
+   const h=ah?a:b,v=ah?b:a;return v.x1>=Math.min(h.x1,h.x2)&&v.x1<=Math.max(h.x1,h.x2)&&h.y1>=Math.min(v.y1,v.y2)&&h.y1<=Math.max(v.y1,v.y2);
+  };
+  for(let i=0;i<walls.length;i++)for(let j=i+1;j<walls.length;j++)if(touches(walls[i],walls[j]))parent[root(j)]=root(i);
+  const index=new Map(walls.map((wall,i)=>[wall,i])),groupsByRoot=new Map();
+  for(const part of physicalParts){const key=root(index.get(part.source));if(!groupsByRoot.has(key))groupsByRoot.set(key,[]);groupsByRoot.get(key).push(part.box);}
+  for(const joint of physicalJoints)groupsByRoot.get(root(index.get(joint.sources[0]))).push(joint.box);
+  const wallGroups=[...groupsByRoot.values()];let disconnectedOverlap=false;
+  for(let i=0;i<wallGroups.length&&!disconnectedOverlap;i++)for(let j=i+1;j<wallGroups.length&&!disconnectedOverlap;j++)for(const a of wallGroups[i])for(const b of wallGroups[j])if(a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y)disconnectedOverlap=true;
+  const unjoinedCaps=[],capKeys=new Set(),pointOn=(p,s)=>s.y1===s.y2?p.y===s.y1&&p.x>=Math.min(s.x1,s.x2)&&p.x<=Math.max(s.x1,s.x2):p.x===s.x1&&p.y>=Math.min(s.y1,s.y2)&&p.y<=Math.max(s.y1,s.y2);
+  for(const part of physicalParts){const source=part.source,h=source.y1===source.y2;
+   for(const n of [1,2]){const p={x:source['x'+n],y:source['y'+n]};if(walls.some(other=>other!==source&&pointOn(p,other)))continue;
+    if(h?(p.x<part.box.x||p.x>part.box.x+part.box.width):(p.y<part.box.y||p.y>part.box.y+part.box.height))continue;
+    const cap=h?{x1:p.x,y1:part.box.y,x2:p.x,y2:part.box.y+part.box.height}:{x1:part.box.x,y1:p.y,x2:part.box.x+part.box.width,y2:p.y};
+    const overlaps=physicalParts.some(other=>other.source!==source&&(h?cap.x1>other.box.x&&cap.x1<other.box.x+other.box.width&&cap.y1<other.box.y+other.box.height&&cap.y2>other.box.y:cap.y1>other.box.y&&cap.y1<other.box.y+other.box.height&&cap.x1<other.box.x+other.box.width&&cap.x2>other.box.x));
+    const key=JSON.stringify(cap);if(overlaps&&!capKeys.has(key)){capKeys.add(key);unjoinedCaps.push(cap);}
+   }
+  }
+  disconnectedOverlap||=unjoinedCaps.length>0;
   const boxes=[...outer,...inner];
   const net=groups(rects).map(group=>{let free=group.rects;for(const box of boxes)free=subtract(free,box);return {id:group.id,area:union(free).area,width:free.length?Math.max(...free.map(r=>r.x+r.width))-Math.min(...free.map(r=>r.x)):0,height:free.length?Math.max(...free.map(r=>r.y+r.height))-Math.min(...free.map(r=>r.y)):0};});
   let free=rects;for(const box of boxes)free=subtract(free,box);
-  return {outer,inner,net,area:union(free).area,segments,physicalParts,physicalJoints,centered:true};
+  return {outer,inner,net,area:union(free).area,segments,physicalParts,physicalJoints,wallGroups,disconnectedOverlap,unjoinedCaps,centered:true};
  }
  function wallSelection(rects,physicalWalls,wall,layout){
   if(layout.centered){

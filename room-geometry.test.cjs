@@ -104,3 +104,10 @@ const shortOfAxis=RoomGeometry.layout([],[axisHorizontal,{...axisVertical,y1:101
 const parallelGap=RoomGeometry.layout([],[axisHorizontal,{x1:201,y1:100,x2:300,y2:100,thickness:20}]);
 assert.ok(!parallelGap.inner.some(r=>r.x<200.5&&r.x+r.width>200.5),'Razmak između kolinearnih osnovnih linija ostaje otvoren');
 assert.equal(RoomGeometry.layout([],[axisHorizontal]).inner[0].y,90);assert.equal(RoomGeometry.layout([],[axisHorizontal]).inner[0].height,20);
+
+assert.equal(exactCorner.wallGroups.length,1,'Dodirnute osnovne linije daju jednu povezanu cjelinu');
+assert.equal(nearCorner.wallGroups.length,2,'Preklop debljina ne spaja odvojene osnovne linije');assert.equal(nearCorner.disconnectedOverlap,true);
+assert.equal(shortOfAxis.wallGroups.length,2);assert.equal(parallelGap.wallGroups.length,2);
+
+const almostClosed=[axisHorizontal,{x1:205,y1:100,x2:205,y2:200,thickness:20},{x1:100,y1:200,x2:205,y2:200,thickness:20},{x1:100,y1:100,x2:100,y2:200,thickness:20}];
+const unjoinedLoop=RoomGeometry.layout([],almostClosed);assert.equal(unjoinedLoop.wallGroups.length,1,'Zidovi su povezani preko druge strane tlocrta');assert.ok(unjoinedLoop.unjoinedCaps.some(cap=>cap.x1===200&&cap.x2===200),'Lokalni prekid ostaje odvojen i kad postoji druga veza oko tlocrta');

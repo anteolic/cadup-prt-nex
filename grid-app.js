@@ -176,6 +176,11 @@
   if(!w||!h)return;
   const current=model();pendingTags=[];g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,w,h);g.fillStyle='#e9eef3';g.fillRect(0,0,w,h);
   g.fillStyle='#fff';g.fillRect(ox,oy,WIDTH*scale,height*scale);
+  // Blaga pastelna ispuna samo zatvorenih prostora; mreža i zidovi crtaju se iznad.
+  g.fillStyle='#edf6ef';
+  for(const face of current.faces){
+   g.beginPath();for(const r of face.rects)g.rect(ox+r.x*scale,oy+r.y*scale,r.width*scale,r.height*scale);g.fill();
+  }
   const unit=scale<=w/WIDTH*(1+1e-9)?100:step();
   g.lineWidth=1;
   // Mreža prekriva cijeli prikaz, uključujući rubove izvan smanjene radne plohe.

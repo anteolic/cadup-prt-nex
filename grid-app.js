@@ -742,7 +742,7 @@
    }html+='</details>';
   }
   html+='<details class="catalog-category custom-category" name="object-category"><summary>Custom</summary><div class="catalog-items">';
-  for(const template of customLibrary){const b=CadObjects.selectionBounds(template.items);html+='<button type="button" data-custom="'+escapeText(template.id)+'">'+customLibraryIcon(template)+'<span>'+escapeText(template.name)+'</span><small>'+Math.round(b.width)+' × '+Math.round(b.depth)+' cm</small></button>';}
+  for(const template of customLibrary){const b=CadObjects.selectionBounds(template.items);html+='<div class="custom-entry"><button type="button" data-custom="'+escapeText(template.id)+'">'+customLibraryIcon(template)+'<span>'+escapeText(template.name)+'</span><small>'+Math.round(b.width)+' × '+Math.round(b.depth)+' cm</small></button><button class="custom-delete" type="button" data-delete-custom="'+escapeText(template.id)+'" aria-label="Izbriši iz biblioteke: '+escapeText(template.name)+'" title="Izbriši iz biblioteke"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 10v8m4-8v8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>';}
   if(!customLibrary.length)html+='<small>Odaberi grupu i spremi je u biblioteku.</small>';
   return html+'</div></details>';
  }
@@ -752,7 +752,12 @@
   const target=e.target;if(!target.open||target.tagName!=='DETAILS'||!target.parentElement)return;
   for(const sibling of target.parentElement.children)if(sibling!==target&&sibling.tagName==='DETAILS')sibling.open=false;
  },true);
- $('objectMenu').addEventListener('click',e=>{const button=e.target?.closest?.('[data-object],[data-custom]');if(button){if(button.dataset.object)addObject(button.dataset.object);else addCustomObject(button.dataset.custom);}});
+ function deleteCustomObject(id){
+  if(!customLibrary.some(template=>template.id===id))return;
+  try{const library=customLibrary.filter(template=>template.id!==id);persistCustomLibrary(library);customLibrary=library;renderObjectLibrary();const category=$('objectLibrary').querySelector?.('.custom-category');if(category)category.open=true;}
+  catch(error){status(error.message);}
+ }
+ $('objectMenu').addEventListener('click',e=>{const button=e.target?.closest?.('[data-object],[data-custom],[data-delete-custom]');if(button){if(button.dataset.deleteCustom)deleteCustomObject(button.dataset.deleteCustom);else if(button.dataset.object)addObject(button.dataset.object);else addCustomObject(button.dataset.custom);}});
  $('saveCustom').addEventListener('click',()=>{if(!objectIds.size)return;customNaming=!customNaming;$('customSaveForm').hidden=!customNaming;$('customMessage').textContent='';if(customNaming){$('customName').focus();$('customName').select();}});
  $('customSaveForm').addEventListener('submit',e=>{
   e.preventDefault();try{

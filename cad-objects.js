@@ -198,8 +198,20 @@ globalThis.CadObjects=(()=>{
    case 'washer':ellipse(0,7,34,34);line(-50,-32,50,-32);break;
    case 'stairs':for(let i=0;i<=10;i++)line(-48,-48+i*9.6,48,-48+i*9.6);line(0,40,0,-35);line(0,-35,-10,-20);line(0,-35,10,-20);break;
    case 'window':rect(-50,-25,100,50);line(-50,0,50,0);break;
-   case 'door':line(-50,0,-50,-95);g.beginPath();g.arc(-50,0,95,-Math.PI/2,0);g.stroke();break;
-   case 'double-door':line(-50,0,-50,-90);line(50,0,50,-90);g.beginPath();g.ellipse(-50,0,50,90,0,-Math.PI/2,0);g.stroke();g.beginPath();g.ellipse(50,0,50,90,0,Math.PI,Math.PI*1.5);g.stroke();break;
+   case 'door':case 'double-door':{
+    const jamb=Math.min(8,300/item.width),leaf=Math.min(7,400/item.width),base=-3;
+    const left=-50+jamb+leaf/2,right=50-jamb-leaf/2,double=item.kind==='double-door',height=Math.min(93,(right-left)/(double?2:1)*item.width/item.depth),top=base-height,leverY=base-height*.68;
+    // Rebated jambs, an open leaf with thickness, hinges, lever handles and swing arcs.
+    rect(-edge,-14,jamb,14-inset);rect(edge-jamb,-14,jamb,14-inset);
+    line(-50+jamb,-14,-50+jamb+3,-14);line(50-jamb-3,-14,50-jamb,-14);
+    g.save();g.lineWidth*=.6;g.setLineDash([4,3]);line(left,base,right,base);g.restore();
+    for(const [hinge,side] of double?[[left,1],[right,-1]]:[[left,1]]){
+     rect(hinge-leaf/2,top,leaf,height);ellipse(hinge,base,1.6,1.6);
+     line(hinge+side*leaf/2,leverY,hinge+side*(leaf/2+7),leverY);line(hinge+side*(leaf/2+7),leverY,hinge+side*(leaf/2+7),leverY+4);
+     g.save();g.lineWidth*=.65;g.beginPath();g.ellipse(hinge,base,(right-left)/(double?2:1),height,0,side===1?-Math.PI/2:Math.PI,side===1?0:Math.PI*1.5);g.stroke();g.restore();
+    }
+    break;
+   }
   }
   g.restore();
  }

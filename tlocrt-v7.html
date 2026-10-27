@@ -55,6 +55,7 @@ footer[hidden]{display:none}#editorFooter .wall-actions{margin:0}
 .object-buttons #saveCustom{flex-basis:100%;min-height:30px}.custom-save-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;margin-top:6px}.custom-save-form[hidden]{display:none}.custom-save-form label{grid-column:1 / -1;font-size:11px;color:#1e40af}.custom-save-form input{min-width:0;padding:7px;border:1px solid #93c5fd;border-radius:7px;font:inherit;font-size:16px}#customMessage{font-size:11px;color:#24557e;margin:5px 0 0}#customMessage:empty{display:none}#editorFooter{max-height:45dvh;overflow:auto}
 header #mainTools #eraseMode{flex:0 0 32px;width:32px;min-width:32px;height:28px;margin:0;padding:3px;border-radius:7px}#eraseMode svg{display:block;width:22px;height:22px;margin:auto}#eraseMode.active{color:#b91c1c;background:#fff1f2;border-color:#dc2626;box-shadow:inset 0 0 0 1px #dc2626}
 .view-settings{padding:7px 4px;border-top:1px solid #dbe2eb}.view-settings>summary{font-size:12px;padding:6px 2px;cursor:pointer}.view-settings label{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 5px;font-size:12px}.view-settings input{width:18px;height:18px;accent-color:#2563eb}
+.custom-entry{position:relative;min-width:0}.custom-entry>button[data-custom]{width:100%;height:100%;padding-right:38px}.custom-entry span{overflow-wrap:anywhere}.catalog-items .custom-delete{position:absolute;right:4px;top:4px;width:30px;min-height:30px;padding:5px;align-items:center;justify-content:center;border-color:#fecaca;color:#b91c1c;background:#fff1f2}
 </style>
 </head>
 <body>
@@ -74,7 +75,7 @@ header #mainTools #eraseMode{flex:0 0 32px;width:32px;min-width:32px;height:28px
    <button id="importJson" class="file-action">Uvezi JSON</button>
    <details class="view-settings"><summary>Postavke prikaza</summary><label><span>Grid</span><input id="showGrid" type="checkbox" checked></label><label><span>Prikaži mjere</span><input id="showMeasures" type="checkbox" checked></label></details>
    <button id="reloadApp" class="file-action" type="button">↻ Učitaj novu verziju</button>
-   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v84</small></div>
+   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v85</small></div>
   </div>
  </details>
  <input id="jsonFile" type="file" accept=".json,application/json" hidden>
@@ -107,9 +108,9 @@ header #mainTools #eraseMode{flex:0 0 32px;width:32px;min-width:32px;height:28px
   <p id="objectError" role="alert"></p>
  </div>
 </footer>
-<script src="room-geometry.js?v=20261027-84"></script>
-<script src="grid-geometry.js?v=20261027-84"></script>
-<script src="cad-objects.js?v=20261027-84"></script>
-<script src="grid-app.js?v=20261027-84"></script>
+<script src="room-geometry.js?v=20261027-85"></script>
+<script src="grid-geometry.js?v=20261027-85"></script>
+<script src="cad-objects.js?v=20261027-85"></script>
+<script src="grid-app.js?v=20261027-85"></script>
 </body>
 </html>

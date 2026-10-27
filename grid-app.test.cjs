@@ -526,3 +526,9 @@ el('clearAll').click();el('clearAll').click();api.fit();api.addObject('drawer-ca
 timedTap(gripView.ox+gripObject.x*gripView.scale,gripView.oy+gripObject.y*gripView.scale,4000);timedTap(gripView.ox+gripObject.x*gripView.scale,gripView.oy+gripObject.y*gripView.scale,4200);assert.equal(api.objectHandles().length,2);
 let objectWidthGrip=api.objectHandles().find(h=>h.axis==='width');drag(objectWidthGrip.x,objectWidthGrip.y,objectWidthGrip.x+20,objectWidthGrip.y);assert.equal(api.objects[0].width,100);assert.equal(api.objects[0].depth,60);assert.deepEqual({...api.view},gripView);
 let objectDepthGrip=api.objectHandles().find(h=>h.axis==='depth');drag(objectDepthGrip.x,objectDepthGrip.y,objectDepthGrip.x,objectDepthGrip.y+15);assert.equal(api.objects[0].depth,90);assert.equal(api.objects[0].width,100);api.undo();assert.equal(api.objects[0].depth,60);assert.equal(api.objectHandles().length,2);api.undo();assert.equal(api.objects[0].width,60);assert.equal(api.objects[0].depth,60);deselect();assert.equal(api.objectHandles().length,0);
+
+// Remove a saved Custom definition without deleting or editing its placed instances.
+const customDeleteId=api.customLibrary[0].id,customDeleteScene=memory.get('infoa_grid_loops_v1'),customDeleteCamera={...api.view};
+assert.ok(el('objectLibrary').innerHTML.includes('data-delete-custom="'+customDeleteId+'"'));
+el('objectMenu').click({target:{closest:()=>({dataset:{deleteCustom:customDeleteId}})}});
+assert.equal(api.customLibrary.length,0);assert.equal(JSON.parse(memory.get('cadup_custom_library_v1')).length,0);assert.equal(memory.get('infoa_grid_loops_v1'),customDeleteScene);assert.deepEqual({...api.view},customDeleteCamera);assert.ok(!el('objectLibrary').innerHTML.includes('data-delete-custom="'+customDeleteId+'"'));

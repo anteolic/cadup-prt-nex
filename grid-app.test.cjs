@@ -20,10 +20,12 @@ assert.equal(api.model().faces.length,1);assert.equal(api.model().faces[0].area,
 assert.ok(labels.includes('Prostorija 1'));assert.ok(labels.some(t=>t.includes('m²')));
 line(200,100,200,250);assert.equal(api.model().faces.length,2);assert.equal(api.model().layout.inner[0].width,10);
 el('toggleWalls').click();assert.equal(api.visible,false);assert.equal(api.model().faces.length,2);
-el('eraseMode').click();line(200,150,200,200);assert.equal(api.model().faces.length,1);
-api.undo();assert.equal(api.model().faces.length,2);api.redo();assert.equal(api.model().faces.length,1);
+el('eraseMode').click();line(200,150,200,200);assert.equal(api.model().faces.length,2,'Otvor za vrata zadržava dvije prostorije');
+assert.equal(api.model().doors.length,1);
+assert.ok(!api.model().layout.inner.some(r=>r.y<400&&r.y+r.height>300),'Vrata ostaju bez ispune zida');
+api.undo();assert.equal(api.model().faces.length,2);api.redo();assert.equal(api.model().faces.length,2);
 // Gumica otvara obris i undo ga zatvara.
-line(150,100,175,100);assert.equal(api.model().faces.length,0);api.undo();assert.equal(api.model().faces.length,1);
+line(150,100,175,100);assert.equal(api.model().faces.length,0);api.undo();assert.equal(api.model().faces.length,2);
 // Otkazivanje gumice ne mijenja spremljeni tlocrt.
 const count=JSON.stringify(api.segments);board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),count);
 // Isti stari način podešavanja: klizanje gore-dolje mijenja duljinu vodoravnog poteza.

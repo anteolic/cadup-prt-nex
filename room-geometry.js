@@ -97,7 +97,7 @@ globalThis.RoomGeometry = (() => {
   }
   return result;
  }
- function layout(rects){
+ function layout(rects,physicalWalls=null){
   const xs=[...new Set(rects.flatMap(r=>[r.x,r.x+r.width]))].sort((a,b)=>a-b);
   const ys=[...new Set(rects.flatMap(r=>[r.y,r.y+r.height]))].sort((a,b)=>a-b);
   const members=(x,y)=>[...new Set(rects.filter(r=>contains(r,x,y)).map(roomKey))].sort((a,b)=>a-b).join(',');
@@ -115,6 +115,20 @@ globalThis.RoomGeometry = (() => {
   for(let j=1;j<ys.length-1;j++)for(let i=0;i<xs.length-1;i++){
    const x=(xs[i]+xs[i+1])/2;
    add('h',ys[j],xs[i],xs[i+1],members(x,(ys[j-1]+ys[j])/2),members(x,(ys[j]+ys[j+1])/2));
+  }
+  if(physicalWalls){
+   // Debljina zida dolazi od stvarnih poteza, uključujući slijepe pregrade.
+   segments.length=0;
+   const covered=(x,y)=>rects.some(r=>x>=r.x&&x<=r.x+r.width&&y>=r.y&&y<=r.y+r.height);
+   for(const s of physicalWalls){
+    const h=s.y1===s.y2,line=h?s.y1:s.x1,start=h?s.x1:s.y1,end=h?s.x2:s.y2;
+    const cuts=[...new Set([start,end,...(h?xs:ys).filter(v=>v>start&&v<end)])].sort((a,b)=>a-b);
+    for(let i=1;i<cuts.length;i++){
+     const mid=(cuts[i-1]+cuts[i])/2,x=h?mid:line,y=h?line:mid;
+     if(covered(x-(h?0:.001),y-(h?.001:0))&&covered(x+(h?0:.001),y+(h?.001:0)))
+      segments.push({axis:h?'h':'v',line,start:cuts[i-1],end:cuts[i]});
+    }
+   }
   }
   const inner=segments.map(s=>s.axis==='v'?{x:s.line-5,y:s.start,width:10,height:s.end-s.start}:{x:s.start,y:s.line-5,width:s.end-s.start,height:10});
   const outer=shell(rects,30);

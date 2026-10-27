@@ -55,3 +55,27 @@ const leftFace=GridGeometry.detect(divided).faces.find(f=>f.rects.some(r=>r.x===
 const adjacentShift=GridGeometry.moveRoom(divided,leftFace.rects,-50,50);
 assert.equal(GridGeometry.detect(adjacentShift.segments).faces.length,2,'Pomak sobe prilagođava susjedne spojeve');
 console.log('PASS: otvoreni i zatvoreni obrisi, L oblik, pregrade, spojevi, gumica, zidovi 30/10, preklapanje i unutarnje petlje.');
+
+// Vrata između poravnatih pregrada odvajaju prostorije bez fizičke ispune otvora.
+const doorway=[...outline,line(300,100,300,200),line(300,280,300,400)];
+result=GridGeometry.detectWithDoors(doorway);
+assert.equal(result.faces.length,2);assert.equal(result.doors.length,1);
+layout=RoomGeometry.layout(result.rooms,GridGeometry.normalize(doorway));
+assert.equal(layout.area,117800,'Oduzima se samo stvarnih 220 cm zida debljine 10 cm');
+assert.ok(layout.inner.every(r=>r.width===10));
+assert.ok(!layout.inner.some(r=>r.y<280&&r.y+r.height>200),'Otvor za vrata nema zid');
+const horizontalDoor=[...outline,line(100,250,250,250),line(350,250,500,250)];
+result=GridGeometry.detectWithDoors(horizontalDoor);assert.equal(result.faces.length,2);
+assert.equal(RoomGeometry.layout(result.rooms,horizontalDoor).area,117000);
+const threeRooms=[...doorway,line(100,250,180,250),line(260,250,300,250)];
+assert.equal(GridGeometry.detectWithDoors(threeRooms).faces.length,3,'Više vrata prepoznaje tri prostorije');
+const wideOpening=[...outline,line(300,100,300,150),line(300,300,300,400)];
+result=GridGeometry.detectWithDoors(wideOpening);assert.equal(result.faces.length,1,'Prolaz preko 100 cm ne dijeli prostoriju');
+assert.equal(RoomGeometry.layout(result.rooms,wideOpening).inner.length,2,'Prekinuti zidovi se prikazuju i u jednoj prostoriji');
+const blind=[...outline,line(300,100,300,250)];
+result=GridGeometry.detectWithDoors(blind);assert.equal(result.faces.length,1);
+assert.equal(RoomGeometry.layout(result.rooms,blind).inner.length,1,'Slijepa pregrada ima debljinu zida');
+assert.equal(GridGeometry.detectWithDoors(gap).faces.length,0,'Ne zatvara se otvor na vanjskom obrisu');
+assert.equal(GridGeometry.detectWithDoors([line(100,100,200,100),line(280,100,400,100)]).doors.length,0);
+assert.equal(GridGeometry.detectWithDoors(doorway,50).faces.length,1,'Prag širine vrata može se ograničiti');
+console.log('PASS: vrata do 100 cm, tri prostorije, fizički otvori, široki prolazi i slijepe pregrade.');

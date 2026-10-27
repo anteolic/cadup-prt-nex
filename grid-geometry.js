@@ -57,6 +57,29 @@ globalThis.GridGeometry=(()=>{
   }
   return {rooms,faces};
  }
+ // Otvori se zatvaraju samo za prepoznavanje prostorija, nikad u nacrtanim potezima.
+ function detectWithDoors(input,maxWidth=100){
+  const lines=normalize(input),enclosed=detect(lines),doors=[];
+  // Rubovi ćelija mogu prolaziti kroz unutrašnjost; uključujemo susjedne ćelije.
+  const interior=(x,y)=>{
+   const covered=(a,b)=>enclosed.rooms.some(r=>a>=r.x&&a<=r.x+r.width&&b>=r.y&&b<=r.y+r.height);
+   return covered(x-.001,y-.001)&&covered(x+.001,y-.001)&&covered(x-.001,y+.001)&&covered(x+.001,y+.001);
+  };
+  const groups=new Map();
+  for(const s of lines){const h=s.y1===s.y2,key=(h?'h':'v')+':'+(h?s.y1:s.x1);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(s);}
+  for(const spans of groups.values()){
+   const h=spans[0].y1===spans[0].y2;
+   spans.sort((a,b)=>(h?a.x1-b.x1:a.y1-b.y1));
+   for(let i=1;i<spans.length;i++){
+    const a=spans[i-1],b=spans[i],start=h?a.x2:a.y2,end=h?b.x1:b.y1,line=h?a.y1:a.x1;
+    if(end-start>maxWidth)continue;
+    const cuts=[start,end,...enclosed.rooms.flatMap(r=>h?[r.x,r.x+r.width]:[r.y,r.y+r.height]).filter(v=>v>start&&v<end)].sort((a,b)=>a-b);
+    if(!cuts.slice(1).every((v,j)=>v===cuts[j]||interior(h?(v+cuts[j])/2:line,h?line:(v+cuts[j])/2)))continue;
+    doors.push(h?{x1:start,y1:line,x2:end,y2:line}:{x1:line,y1:start,x2:line,y2:end});
+   }
+  }
+  return {...detect([...lines,...doors]),doors};
+ }
  function atomic(input){
   const lines=normalize(input),result=[];
   for(const s of lines){
@@ -146,5 +169,5 @@ globalThis.GridGeometry=(()=>{
   }
   return {segments:normalize(result),dx,dy};
  }
- return {normalize,erase,detect,atomic,eraseLine,moveWall,moveRoom};
+ return {normalize,erase,detect,detectWithDoors,atomic,eraseLine,moveWall,moveRoom};
 })();

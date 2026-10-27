@@ -28,7 +28,7 @@
  }
  function model(){
   const key=JSON.stringify(segments);
-  if(cachedKey!==key){const detected=GridGeometry.detect(segments);cached={...detected,layout:RoomGeometry.layout(detected.rooms)};cachedKey=key;}
+  if(cachedKey!==key){const detected=GridGeometry.detectWithDoors(segments);cached={...detected,layout:RoomGeometry.layout(detected.rooms,segments)};cachedKey=key;}
   return cached;
  }
  const point=(x,y)=>({x:(x-ox)/scale,y:(y-oy)/scale});
@@ -101,7 +101,7 @@
  function updateRoom(p,drag){
   const dx=Math.round((p.x-drag.start.x)/scale/step())*step(),dy=Math.round((p.y-drag.start.y)/scale/step())*step();
   const moved=GridGeometry.moveRoom(drag.before,drag.face.rects,dx,dy,WIDTH,height);
-  const detected=GridGeometry.detect(moved.segments);
+  const detected=GridGeometry.detectWithDoors(moved.segments);
   if(detected.faces.length!==drag.faceCount)return;
   segments=moved.segments;drag.dx=moved.dx;drag.dy=moved.dy;
   const cell=drag.face.rects.reduce((a,b)=>a.width*a.height>=b.width*b.height?a:b);

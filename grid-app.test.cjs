@@ -18,7 +18,7 @@ const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
 function click(x,y){board.pointerdown(event(x,y));board.pointerup(event(x,y));}
 function clickObjectAction(action){const target=api.objectViewportActions().find(item=>item.action===action);assert.ok(target);const p=api.displayPoint(target);click(p.x,p.y);}
-function enterEdit(){if(api.mode==='draw')el('drawMode').click();else if(api.mode==='erase')el('eraseMode').click();else deselect();}
+function enterEdit(){if(api.mode!=='edit')el('selectMode').click();else deselect();}
 function finishDrawing(){enterEdit();}
 function startDrawing(){if(api.mode!=='draw')el('drawMode').click();}
 function eraseSelection(){const selected=api.selection;if(!selected)return;const h=selected.y1===selected.y2,wall=context.GridGeometry.atomic(api.segments).find(s=>(s.y1===s.y2)===h&&(h?s.y1===selected.y1&&s.x1>=selected.x1&&s.x2<=selected.x2:s.x1===selected.x1&&s.y1>=selected.y1&&s.y2<=selected.y2));if(!wall)return;if(api.mode!=='erase')el('eraseMode').click();const v=api.view;click(v.ox+(wall.x1+wall.x2)/2*v.scale,v.oy+(wall.y1+wall.y2)/2*v.scale);}
@@ -299,7 +299,7 @@ finishDrawing();
 // Olovka je prekidač Crtaj/Uredi; zidovi i olovka ostaju dostupni pri odabiru.
 enterEdit();const pencilCamera={scale:api.view.scale,ox:api.view.ox,oy:api.view.oy};
 el('drawMode').click();assert.equal(api.mode,'draw');assert.equal(el('drawMode').attributes['aria-pressed'],'true');
-el('drawMode').click();assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(el('drawMode').attributes['aria-pressed'],'false');
+el('drawMode').click();assert.equal(api.mode,'draw');el('selectMode').click();assert.equal(api.mode,'edit');assert.equal(api.first,null);assert.equal(el('drawMode').attributes['aria-pressed'],'false');
 assert.deepEqual({scale:api.view.scale,ox:api.view.ox,oy:api.view.oy},pencilCamera);assert.equal(el('mainTools').hidden,false);
 
 // Dolje se prikazuje samo editor odabranog zida; glavni alati ostaju dostupni gore.
@@ -449,7 +449,7 @@ const beforeSpanErase=JSON.stringify(api.segments);el('eraseMode').click();asser
 assert.ok(!api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1<400));assert.ok(api.segments.some(s=>s.y1===200&&s.y2===200&&s.x1===400));
 api.undo();assert.equal(JSON.stringify(api.segments),beforeSpanErase);click(450,400);assert.equal(JSON.stringify(api.segments),beforeSpanErase);assert.equal(api.mode,'edit');el('eraseMode').click();
 board.pointerdown(event(150,100));board.pointermove(event(150,150));board.pointerup(event(150,100));assert.equal(JSON.stringify(api.segments),beforeSpanErase,'Povlačenje ne briše');
-board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),beforeSpanErase);el('eraseMode').click();assert.equal(api.mode,'edit');
+board.pointerdown(event(150,100));board.pointercancel(event(150,100));assert.equal(JSON.stringify(api.segments),beforeSpanErase);el('selectMode').click();assert.equal(api.mode,'edit');
 
 // Potvrđeni čvor na križanju je vidljiv i ima prednost pri snap-u.
 el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);enterEdit();click(200,100);el('dimensionValue').value='333';el('dimensionForm').submit({preventDefault(){}});
@@ -465,7 +465,7 @@ click(15,700);assert.equal(api.mode,'edit');assert.equal(el('eraseMode').attribu
 el('clearAll').click();el('clearAll').click();api.addCustomObject(api.customLibrary[0].id);assert.equal(api.objects.length,2);
 const eraseGroupBefore=JSON.stringify(api.objects),groupPoints=api.objects.map(item=>({x:api.view.ox+item.x*api.view.scale,y:api.view.oy+item.y*api.view.scale}));
 el('eraseMode').click();click(groupPoints[0].x,groupPoints[0].y);assert.equal(api.objects.length,0);api.undo();assert.equal(JSON.stringify(api.objects),eraseGroupBefore);
-el('eraseMode').click();click(groupPoints[0].x,groupPoints[0].y);el('objectUngroup').click();assert.ok(api.objects.every(item=>!item.group));
+el('selectMode').click();click(groupPoints[0].x,groupPoints[0].y);el('objectUngroup').click();assert.ok(api.objects.every(item=>!item.group));
 el('eraseMode').click();click(groupPoints[1].x,groupPoints[1].y);assert.equal(api.objects.length,1);api.undo();assert.equal(api.objects.length,2);
 // Trenutačni potez je plav, a potvrđene osi ostaju crvene.
 el('clearAll').click();el('clearAll').click();startDrawing();click(100,100);blueDraftStrokes=0;board.pointermove(event(200,100));assert.ok(blueDraftStrokes>0);finishDrawing();
@@ -581,3 +581,5 @@ el('viewportRotate').click();mirrorCorner=api.objectViewportActions().find(a=>a.
 
 // Active canvas actions do not inherit the dimmed group's background opacity.
 paintCalls.length=0;canvas.globalAlpha=.2;api.drawObjectViewportActions();const activeActionFills=paintCalls.filter(p=>p.color==='rgba(255,255,255,0.96)');assert.equal(activeActionFills.length,2);assert.ok(activeActionFills.every(p=>p.alpha===1));
+
+for(const [id,mode] of [['selectMode','edit'],['drawMode','draw'],['eraseMode','erase'],['selectMode','edit']]){el(id).click();el(id).click();assert.equal(api.mode,mode);assert.equal(['selectMode','drawMode','eraseMode'].filter(key=>el(key).attributes['aria-pressed']==='true').length,1);}

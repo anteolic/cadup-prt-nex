@@ -155,8 +155,7 @@
   $('roomArea').textContent='';
   $('eraseMode').classList.toggle('active',mode==='erase');$('eraseMode').setAttribute('aria-pressed',String(mode==='erase'));
   $('drawMode').classList.toggle('active',mode==='draw');$('drawMode').setAttribute('aria-pressed',String(mode==='draw'));
-  $('drawMode').setAttribute('title',mode==='draw'?'Završi crtanje i uredi':'Crtaj');
-  $('drawMode').setAttribute('aria-label',mode==='draw'?'Završi crtanje i uredi':'Crtaj');
+  $('selectMode').classList.toggle('active',mode==='edit');$('selectMode').setAttribute('aria-pressed',String(mode==='edit'));
   const editingWall=mode==='edit'&&!!selectedWall;
   $('wallActions').hidden=!editingWall;
   const editingObjects=mode==='edit'&&(objectIds.size>0||objectMulti||editingGroup);
@@ -642,8 +641,9 @@
   else if(document.fullscreenElement||document.webkitFullscreenElement){try{await (document.exitFullscreen||document.webkitExitFullscreen)?.call(document);}catch(_){}}
  });
  $('viewportRotate').addEventListener('click',()=>{finishMeasureInput();closeMenu();if(gesture)cancelInteraction();viewportTurns=(viewportTurns+1)%4;saveViewSettings();lastGroupTap=null;status();draw();});
- $('drawMode').addEventListener('click',()=>changeMode(mode==='draw'?'edit':'draw'));
- $('eraseMode').addEventListener('click',()=>changeMode(mode==='erase'?'edit':'erase'));
+ $('drawMode').addEventListener('click',()=>changeMode('draw'));
+ $('eraseMode').addEventListener('click',()=>changeMode('erase'));
+ $('selectMode').addEventListener('click',()=>changeMode('edit'));
  $('reloadApp').addEventListener('click',async()=>{
   const button=$('reloadApp');if(button.disabled)return;
   button.disabled=true;button.textContent='Učitavam…';closeMenu();save();status('Učitavam novu verziju…');

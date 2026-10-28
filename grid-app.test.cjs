@@ -4,7 +4,7 @@ let downloadedBlob=null,downloadName=null,redStrokes=0,blueDraftStrokes=0;
 const updateRequests=[];let updateFailure=null;
 const publishedHtml=fs.readFileSync(__dirname+'/CADup.html','utf8');
 const gridLines=[],paintCalls=[],wallGrips=[];let gridStart=null;
-const canvas=new Proxy({stroke(){if(this.strokeStyle==='#dc2626'&&this.lineWidth===1.8)wallGrips.push({});if(this.strokeStyle==='#dc2626')redStrokes++;if(this.strokeStyle==='#1675d1'&&this.lineWidth===2.5)blueDraftStrokes++;},arc(){},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
+const canvas=new Proxy({stroke(){if(this.strokeStyle==='#4b5563'&&this.lineWidth===1.5)wallGrips.push({});if(this.strokeStyle==='#dc2626')redStrokes++;if(this.strokeStyle==='#1675d1'&&this.lineWidth===2.5)blueDraftStrokes++;},arc(){},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
  if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
@@ -17,6 +17,7 @@ vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
 function click(x,y){board.pointerdown(event(x,y));board.pointerup(event(x,y));}
+function clickObjectAction(action){const target=api.objectViewportActions().find(item=>item.action===action);assert.ok(target);const p=api.displayPoint(target);click(p.x,p.y);}
 function enterEdit(){if(api.mode==='draw')el('drawMode').click();else if(api.mode==='erase')el('eraseMode').click();else deselect();}
 function finishDrawing(){enterEdit();}
 function startDrawing(){if(api.mode!=='draw')el('drawMode').click();}
@@ -332,7 +333,7 @@ deselect();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainToo
 el('clearAll').click();el('clearAll').click();api.fit();
 api.addObject('sofa');assert.equal(api.objects.length,1);assert.equal(el('objectActions').hidden,false);assert.equal(el('wallActions').hidden,true);
 assert.equal(el('objectWidth').value,'220');el('objectWidth').value='240';el('objectDepth').value='100';el('objectForm').submit({preventDefault(){}});
-assert.equal(api.objects[0].width,240);el('objectRotate').click();assert.equal(api.objects[0].rotation,90);el('objectRotate').click();assert.equal(api.objects[0].rotation,180);api.undo();assert.equal(api.objects[0].rotation,90);
+assert.equal(api.objects[0].width,240);clickObjectAction('rotate');assert.equal(api.objects[0].rotation,90);clickObjectAction('rotate');assert.equal(api.objects[0].rotation,180);api.undo();assert.equal(api.objects[0].rotation,90);
 api.addObject('chair');assert.equal(api.objects.length,2);
 let furniture=api.objects,objectView=api.view,chairPoint={x:objectView.ox+furniture[1].x*objectView.scale,y:objectView.oy+furniture[1].y*objectView.scale};
 drag(chairPoint.x,chairPoint.y,chairPoint.x+100,chairPoint.y);

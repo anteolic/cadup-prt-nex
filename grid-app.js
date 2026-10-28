@@ -220,13 +220,26 @@
    return {...handle,item,x:p.x+(handle.nx*c-handle.ny*s)*offset,y:p.y+(handle.nx*s+handle.ny*c)*offset};
   });
  }
+ const CONTROL_COLOR='#4b5563';
+ function drawControlCircle(fill=false,pressed=false){
+  g.strokeStyle=CONTROL_COLOR;g.lineWidth=1.2;g.beginPath();g.arc(0,0,12,0,Math.PI*2);
+  if(fill){g.fillStyle=pressed?'#f3f4f6':'rgba(255,255,255,0.96)';g.fill();}g.stroke();
+ }
+ function drawControlGlyph(kind){
+  g.strokeStyle=CONTROL_COLOR;g.lineWidth=1.5;g.lineCap='round';g.lineJoin='round';g.setLineDash([]);
+  if(kind==='resize'){
+   g.beginPath();g.moveTo(-3.5,-3.5);g.lineTo(-7,0);g.lineTo(-3.5,3.5);g.moveTo(3.5,-3.5);g.lineTo(7,0);g.lineTo(3.5,3.5);g.stroke();
+  }else if(kind==='mirror'){
+   g.setLineDash([1.5,2]);g.beginPath();g.moveTo(0,-6);g.lineTo(0,6);g.stroke();g.setLineDash([]);
+   g.beginPath();g.moveTo(-3,-4.5);g.lineTo(-7,4.5);g.lineTo(-3,4.5);g.closePath();g.moveTo(3,-4.5);g.lineTo(7,4.5);g.lineTo(3,4.5);g.closePath();g.stroke();
+  }else{
+   g.beginPath();g.arc(0,0,6,Math.PI*.14,Math.PI*1.75);g.lineTo(6,-2.5);g.stroke();g.beginPath();g.moveTo(6,-6.5);g.lineTo(6,-2.5);g.lineTo(2,-2.5);g.stroke();
+  }
+ }
  function drawObjectHandles(){
   for(const handle of objectHandles()){
    if(gesture?.type==='object-resize'&&gesture.axis===handle.axis)continue;
-   g.save();g.translate(handle.x,handle.y);g.rotate(handle.item.rotation*Math.PI/180+(handle.axis==='depth'?Math.PI/2:0));g.scale(handleScale(),handleScale());
-   g.fillStyle='rgba(255,255,255,0.95)';g.strokeStyle='#2563eb';g.lineWidth=1.4;g.beginPath();g.arc(0,0,12,0,Math.PI*2);g.fill();g.stroke();
-   // Symmetrical vector arrows stay optically centered on every device.
-   g.lineWidth=1.8;g.lineCap='round';g.lineJoin='round';g.beginPath();g.moveTo(-6,0);g.lineTo(6,0);g.moveTo(-2.5,-3.5);g.lineTo(-6,0);g.lineTo(-2.5,3.5);g.moveTo(2.5,-3.5);g.lineTo(6,0);g.lineTo(2.5,3.5);g.stroke();g.restore();
+   g.save();g.translate(handle.x,handle.y);g.rotate(handle.item.rotation*Math.PI/180+(handle.axis==='depth'?Math.PI/2:0));g.scale(handleScale(),handleScale());drawControlCircle(true);drawControlGlyph('resize');g.restore();
   }
  }
  function objectViewportActions(){
@@ -238,14 +251,7 @@
  function drawObjectViewportActions(){
   for(const action of objectViewportActions()){
    g.save();g.setTransform(dpr,0,0,dpr,0,0);g.translate(action.screenX,action.screenY);g.scale(handleScale(),handleScale());
-   g.fillStyle=gesture?.type==='object-action'&&gesture.action===action.action?'#dbeafe':'rgba(255,255,255,0.97)';g.strokeStyle='#2563eb';g.lineWidth=1.4;g.beginPath();g.arc(0,0,11,0,Math.PI*2);g.fill();g.stroke();g.lineWidth=1.5;g.lineCap='round';g.lineJoin='round';
-   if(action.action==='mirror'){
-    g.setLineDash([2,2]);g.beginPath();g.moveTo(0,-6);g.lineTo(0,6);g.stroke();g.setLineDash([]);
-    g.beginPath();g.moveTo(-3,-5);g.lineTo(-7,0);g.lineTo(-3,5);g.closePath();g.moveTo(3,-5);g.lineTo(7,0);g.lineTo(3,5);g.closePath();g.stroke();
-   }else{
-    g.beginPath();g.arc(0,0,6,Math.PI*.2,Math.PI*1.75);g.stroke();g.beginPath();g.moveTo(0,-4.5);g.lineTo(4.5,-4.5);g.lineTo(4.5,-9);g.stroke();
-   }
-   g.restore();
+   drawControlCircle(true,gesture?.type==='object-action'&&gesture.action===action.action);drawControlGlyph(action.action);g.restore();
   }
  }
  function hitHandle(x,y){
@@ -406,8 +412,7 @@
    g.strokeStyle='#dc2626';const gripScale=handleScale();
    if(mode==='edit')for(const [index,p] of [a,b].entries()){
     if(gesture?.type==='wall-resize'&&gesture.endpoint===index+1)continue;
-    g.save();g.translate(p.x,p.y);g.rotate(horizontal?0:Math.PI/2);g.scale(gripScale,gripScale);g.lineWidth=1.4;g.beginPath();g.arc(0,0,12,0,Math.PI*2);g.stroke();
-    g.lineWidth=1.8;g.lineCap='round';g.lineJoin='round';g.beginPath();g.moveTo(-4.5,-4);g.lineTo(-8.5,0);g.lineTo(-4.5,4);g.moveTo(4.5,-4);g.lineTo(8.5,0);g.lineTo(4.5,4);g.stroke();g.restore();
+    g.save();g.translate(p.x,p.y);g.rotate(horizontal?0:Math.PI/2);g.scale(gripScale,gripScale);drawControlCircle();drawControlGlyph('resize');g.restore();
    }
 
   }
@@ -757,7 +762,7 @@
   const group=items[0]?.group,canEditGroup=!!group&&items.every(item=>item.group===group);
   $('objectEditGroup').hidden=!editingGroup&&!canEditGroup;$('objectEditGroup').textContent=editingGroup?'Zatvori grupu':'Uredi grupu';$('objectEditGroup').setAttribute('aria-pressed',String(!!editingGroup));
   $('objectTitle').textContent=(editingGroup?'Uređivanje grupe · ':'')+(count===1?CadObjects.definition(items[0].kind).name:count?count+' odabranih elemenata':(editingGroup?'Dodirni element unutar grupe':'Dodirni elemente za višestruki odabir'));
-  $('objectRotate').disabled=!count;$('objectMirror').disabled=!count;$('saveCustom').disabled=!count;if(!count)customNaming=false;$('customSaveForm').hidden=!customNaming;
+  $('saveCustom').disabled=!count;if(!count)customNaming=false;$('customSaveForm').hidden=!customNaming;
   $('objectWidth').disabled=!count;$('objectDepth').disabled=!count;
   const key=JSON.stringify(items);if(key===objectEditorKey)return;objectEditorKey=key;$('objectError').textContent='';
   if(!count){$('objectWidth').value='';$('objectDepth').value='';return;}
@@ -839,8 +844,6 @@
  $('objectMulti').addEventListener('click',()=>{objectMulti=!objectMulti;status();draw();});
  function mirrorSelectedObjects(){if(!objectIds.size)return;const before=snapshot();objects=CadObjects.mirror(objects,[...objectIds]);commitObjects(before,[...objectIds]);}
  function rotateSelectedObjects(){if(!objectIds.size)return;const before=snapshot();try{objects=CadObjects.rotate(objects,[...objectIds]);commitObjects(before,[...objectIds]);}catch(error){$('objectError').textContent=error.message;}}
- $('objectMirror').addEventListener('click',mirrorSelectedObjects);
- $('objectRotate').addEventListener('click',rotateSelectedObjects);
  $('objectCopy').addEventListener('click',()=>{if(!objectIds.size)return;const before=snapshot();try{const result=CadObjects.duplicate(objects,[...objectIds]);objects=result.items.map(item=>editingGroup&&result.ids.includes(item.id)?{...item,group:editingGroup}:item);commitObjects(before,result.ids);}catch(error){$('objectError').textContent=error.message;}});
  $('objectGroup').addEventListener('click',()=>{if(editingGroup||objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});
  $('objectUngroup').addEventListener('click',()=>{if(editingGroup)return;const before=snapshot();objects=CadObjects.ungroup(objects,[...objectIds]);commitObjects(before,[...objectIds]);});

@@ -236,5 +236,7 @@ globalThis.GridGeometry=(()=>{
   }
   return {segments:normalize(result),dx,dy};
  }
- return {normalize,erase,detect,detectWithDoors,atomic,junctions,eraseLine,wallForDimension,setWallThickness,resizeDimension,resizeWall,moveWall,moveRoom};
+ function drawingStep(scale){for(const unit of [5,10,20,50,100,200,500,1000,2000])if(unit*scale>=19)return unit;return 2000;}
+ function orthogonalPoint(first,raw,snapped,axis=null){const horizontal=axis?axis==='h':Math.abs(raw.x-first.x)>=Math.abs(raw.y-first.y);return horizontal?{x:snapped.x,y:first.y}:{x:first.x,y:snapped.y};}
+ return {drawingStep,orthogonalPoint,normalize,erase,detect,detectWithDoors,atomic,junctions,eraseLine,wallForDimension,setWallThickness,resizeDimension,resizeWall,moveWall,moveRoom};
 })();

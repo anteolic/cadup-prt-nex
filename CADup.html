@@ -53,13 +53,17 @@ footer[hidden]{display:none}#editorFooter .wall-actions{margin:0}
 .catalog-items button{display:grid;grid-template-columns:44px minmax(0,1fr);column-gap:7px;align-items:center}.catalog-items button img,.catalog-items button>span[aria-hidden]{grid-row:1 / 3;max-width:44px;object-fit:contain}.catalog-items button>span:not([aria-hidden]){min-width:0;font-size:11px}.catalog-items small{grid-column:2}
 .menu-credit{grid-column:1 / -1;padding:7px 3px 2px;text-align:center;font-size:11px;color:#64748b}.menu-credit a{color:#24557e;text-decoration:underline}
 .object-buttons #saveCustom{flex-basis:100%;min-height:30px}.custom-save-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;margin-top:6px}.custom-save-form[hidden]{display:none}.custom-save-form label{grid-column:1 / -1;font-size:11px;color:#1e40af}.custom-save-form input{min-width:0;padding:7px;border:1px solid #93c5fd;border-radius:7px;font:inherit;font-size:16px}#customMessage{font-size:11px;color:#24557e;margin:5px 0 0}#customMessage:empty{display:none}#editorFooter{max-height:45dvh;overflow:auto}
-header #mainTools #eraseMode{flex:0 0 32px;width:32px;min-width:32px;height:28px;margin:0;padding:3px;border-radius:7px}#eraseMode svg{display:block;width:22px;height:22px;margin:auto}#eraseMode.active{color:#b91c1c;background:#fff1f2;border-color:#dc2626;box-shadow:inset 0 0 0 1px #dc2626}
+header #mainTools #eraseMode{flex:0 0 32px;width:32px;min-width:32px;height:28px;margin:0;padding:3px;border-radius:7px}#eraseMode svg{display:block;width:22px;height:22px;margin:auto}.tool.tool-erase.active{color:#b91c1c;background:#fff1f2;border-color:#dc2626;box-shadow:inset 0 0 0 1px #dc2626}
 .view-settings{grid-column:1 / -1;padding:7px 4px;border-top:1px solid #dbe2eb}.view-settings>summary{font-size:12px;padding:6px 2px;cursor:pointer}.view-settings label{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 5px;font-size:12px}.view-settings input{width:18px;height:18px;accent-color:#2563eb}
-.custom-entry{position:relative;min-width:0}.custom-entry>button[data-custom]{width:100%;height:100%;padding-right:38px}.custom-entry span{overflow-wrap:anywhere}.catalog-items .custom-delete{position:absolute;right:4px;top:4px;width:30px;min-height:30px;padding:5px;align-items:center;justify-content:center;border-color:#fecaca;color:#b91c1c;background:#fff1f2}
+.custom-entry{position:relative;min-width:0}.custom-entry>button[data-custom]{width:100%;height:100%;padding-right:38px}.custom-entry span{overflow-wrap:anywhere}.catalog-items .custom-delete{position:absolute;right:5px;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:30px;height:34px;min-height:34px;padding:0;border:1px solid #f1c8ce;border-radius:8px;color:#b45360;background:#fff7f8;transition:background .15s,border-color .15s,color .15s}
+.catalog-items .custom-delete svg{display:block;flex:none;width:17px;height:17px;pointer-events:none}
+.catalog-items .custom-delete:hover{background:#ffe4e6;border-color:#fda4af;color:#be123c}
+.catalog-items .custom-delete:active{background:#fecdd3}
+.catalog-items .custom-delete:focus-visible{outline:2px solid #e11d48;outline-offset:2px}
 header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #drawMode,header #mainTools #eraseMode{flex-basis:38px;width:38px;min-width:38px;height:34px}.object-menu>summary{width:38px;height:34px}header>.top-menu>summary{display:flex;align-items:center;justify-content:center;min-width:36px;height:34px}#viewportRotate svg{display:block;width:21px;height:21px;margin:auto}.object-library{top:max(48px,calc(env(safe-area-inset-top) + 44px))}
 @media(max-width:360px){header{gap:4px;padding-inline:8px}header .top-action{width:32px}header #mainTools #drawMode,header #mainTools #eraseMode{flex-basis:34px;width:34px;min-width:34px}.object-menu>summary{width:34px}header>.top-menu>summary{min-width:32px}}
 #modeTools{position:fixed;bottom:0;left:0;right:0;z-index:21;display:flex;justify-content:center;gap:10px;padding:8px 12px max(8px,env(safe-area-inset-bottom));background:#fffffff2;border-top:1px solid #dde4ec;box-shadow:0 -2px 12px #16233512}#modeTools .tool{width:46px;height:42px;flex:none;padding:8px;border-radius:10px}#modeTools svg{display:block;width:24px;height:24px;margin:auto}#editorFooter{bottom:calc(59px + max(0px,env(safe-area-inset-bottom) - 8px));padding-bottom:5px;max-height:calc(45dvh - 59px)}
-#selectMode.active{color:#7e22ce;background:#f3e8ff;border-color:#9333ea;box-shadow:inset 0 0 0 1px #9333ea}
+.tool.tool-select.active{color:#7e22ce;background:#f3e8ff;border-color:#9333ea;box-shadow:inset 0 0 0 1px #9333ea}
 
 #modeTools[hidden]{display:none}
 #editorFooter{bottom:0;max-height:45dvh;padding:8px 8px max(8px,env(safe-area-inset-bottom))}
@@ -87,15 +91,75 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
 #objectActions.group-controls{grid-template-columns:minmax(0,1fr) auto}
 #objectActions.group-controls #objectGroupMenu{grid-column:1;grid-row:1;justify-content:flex-start}
 #objectActions.group-controls #objectMulti{grid-column:2;grid-row:1}
+#objectActions:not([hidden]){grid-template-columns:minmax(0,1fr)}
+#objectActions #objectMulti,#objectActions #objectGroup,#objectActions #objectUngroup{display:none}
+
+#sketchEditor{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;background:#e9eef3}
+#sketchEditor[hidden]{display:none}
+.sketch-header{display:flex;align-items:center;gap:7px;padding:max(6px,env(safe-area-inset-top)) 8px 6px;background:#fff;border-bottom:1px solid #cbd5e1}
+.sketch-header strong{flex:1;min-width:0;font-size:13px}
+.sketch-header button{display:flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;color:#334155;background:#f8fafc;font-size:12px}
+.sketch-header svg,.sketch-tools svg{width:20px;height:20px;flex:none}
+#sketchDone{color:#1d4ed8;background:#eff6ff;border-color:#93c5fd}
+#sketchHint{margin:0;padding:6px 10px;background:#f8fafc;color:#64748b;font-size:11px}
+#sketchHint:empty{display:none}
+.sketch-tools{display:flex;justify-content:center;gap:8px;padding:8px 8px max(8px,env(safe-area-inset-bottom));background:#fff;border-top:1px solid #cbd5e1}
+#sketchDelete{color:#b91c1c;background:#fff1f2}
+#sketchDone{margin-left:auto}
+.sketch-tools{justify-content:flex-start;gap:6px}
+@media(max-width:480px){.sketch-tools button{font-size:11px;padding:7px;gap:3px}.sketch-tools svg{width:18px;height:18px}#sketchDelete{position:absolute;right:8px;bottom:64px}}
+
+#sketchEditor button[hidden],#sketchDelete{display:none!important}
+.sketch-tool-label{display:none}
+.sketch-tools{justify-content:center;gap:10px}
+.sketch-tools button{width:46px;height:42px;padding:8px}
+.sketch-tools svg{width:24px;height:24px}
+
+.sketch-tools{padding:8px 12px max(8px,env(safe-area-inset-bottom));background:#fffffff2;border-top:1px solid #dde4ec;box-shadow:0 -2px 12px #16233512}
+.sketch-tools .tool{display:flex;align-items:center;justify-content:center;flex:none;min-height:42px;border-radius:10px}
+
+#sketchClose,#sketchDone{width:auto;min-width:56px;min-height:42px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;font:inherit;font-size:12px;font-weight:650;white-space:nowrap}
+#sketchClose{margin-left:auto;background:#f8fafc;color:#475569}
+#sketchDone{margin-left:0;background:#eff6ff;color:#1d4ed8;border-color:#93c5fd}
+
+#viewportRotate.viewport-grip{position:fixed;top:60px;right:max(12px,env(safe-area-inset-right));z-index:15;display:flex;align-items:center;justify-content:center;width:56px;height:56px;padding:10px;border:1px solid #cbd5e1;border-radius:50%;background:#fffffff2;color:#475569;box-shadow:0 3px 12px #16233526;touch-action:manipulation}
+#viewportRotate.viewport-grip svg{display:block;width:32px;height:32px;margin:0}
+#viewportRotate.viewport-grip:hover{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
+#viewportRotate.viewport-grip:active{background:#dbeafe;box-shadow:0 1px 5px #16233526}
+#viewportRotate.viewport-grip:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+
+#helpDialog{width:min(660px,calc(100vw - 24px));max-height:calc(100dvh - 32px);margin:auto;padding:0;border:1px solid #cbd5e1;border-radius:16px;color:#24354c;background:#f8fafc;box-shadow:0 20px 70px #0f172a40;overflow:auto;overscroll-behavior:contain}
+#helpDialog::backdrop{background:#0f172a66}
+.help-heading{position:sticky;top:0;z-index:1;display:flex;align-items:center;gap:12px;padding:16px;background:#fff;border-bottom:1px solid #dde4ec}
+.help-heading>div{flex:1;min-width:0}.help-heading h2{margin:0;font-size:18px}.help-heading p{margin:5px 0 0;font-size:12px;color:#64748b}
+#helpClose{flex:none;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#475569;font-size:24px}
+#helpClose:focus-visible,.help-body summary:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.help-body{padding:10px 14px 16px}.help-body details{margin:7px 0;border:1px solid #dbe2eb;border-radius:10px;background:#fff;overflow:hidden}
+.help-body summary{padding:13px 12px;cursor:pointer;font-size:13px;font-weight:700;line-height:1.4}.help-body details[open] summary{background:#eff6ff;color:#1e40af;border-bottom:1px solid #dbeafe}
+.help-body p,.help-body ul,.help-body ol,.help-body dl{margin:12px;font-size:13px;line-height:1.65}.help-body ul,.help-body ol{padding-left:20px}.help-body li+li{margin-top:7px}
+.help-body dt{margin-top:12px;font-weight:700;color:#334155}.help-body dt:first-child{margin-top:0}.help-body dd{margin:3px 0 0;color:#475569}
+.help-body kbd{font:inherit;font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:4px;background:#f1f5f9;white-space:nowrap}
+
+@media(max-width:400px){.sketch-tools{gap:4px;padding-inline:8px}.sketch-tools .tool{width:40px;padding:7px}#sketchClose,#sketchDone{min-width:50px;padding:8px}}
+
+#roomActions[hidden]{display:none}.room-fields{display:grid;grid-template-columns:minmax(140px,1fr) auto minmax(120px,1fr);gap:10px;align-items:end}
+.room-fields label{font-size:11px;font-weight:650;color:#475569}.room-fields .room-name input{display:block;width:100%;min-width:0;margin-top:4px;padding:7px 8px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#24354c;font:inherit;font-size:16px}
+.room-fields .room-area{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-height:36px}.room-area input{width:18px;height:18px;accent-color:#64748b}.room-area span{font-size:11px;font-weight:500;color:#64748b}
+.room-fields .room-hue{display:flex;flex-direction:column;gap:8px;padding-bottom:7px}
+#roomHue{appearance:none;-webkit-appearance:none;width:100%;height:12px;margin:0;border:1px solid #cbd5e1;border-radius:8px;background:linear-gradient(90deg,hsl(0,35%,96%),hsl(60,35%,96%),hsl(120,35%,96%),hsl(180,35%,96%),hsl(240,35%,96%),hsl(300,35%,96%),hsl(360,35%,96%));cursor:pointer}
+#roomHue::-webkit-slider-thumb{appearance:none;width:22px;height:22px;border:2px solid #64748b;border-radius:50%;background:var(--room-color,#fff);box-shadow:0 1px 3px #16233526}#roomHue::-moz-range-thumb{width:18px;height:18px;border:2px solid #64748b;border-radius:50%;background:var(--room-color,#fff)}
+@media(max-width:600px){.room-fields{grid-template-columns:minmax(0,1fr) minmax(110px,1fr);gap:7px}.room-fields .room-name{grid-column:1 / -1}.room-fields .room-area{font-size:10px}.room-fields .room-area span{flex-basis:100%;padding-left:24px}}
+
+.catalog-items .custom-delete.armed{background:#be123c;border-color:#be123c;color:#fff}
+.catalog-items .custom-delete.armed:hover{background:#9f1239;border-color:#9f1239;color:#fff}
 </style>
 </head>
 <body>
-<header>
+<header id="appHeader">
  <div id="mainTools" class="mode-row"><details id="objectMenu" class="object-menu" name="header-menu"><summary title="Dodaj element" aria-label="Dodaj namještaj, vrata, prozore ili stepenice"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m3 6 9-4 9 4v12l-9 4-9-4V6Zm0 0 9 4 9-4M12 10v12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M16 11v6m-3-3h6" stroke="currentColor" stroke-width="1.8"/></svg></summary><div id="objectLibrary" class="object-library"></div></details></div>
  <div class="brand"><strong>CADup</strong></div>
  <button id="undo" class="top-action" title="Poništi" aria-label="Poništi">↶</button>
  <button id="redo" class="top-action" title="Vrati" aria-label="Vrati">↷</button>
- <button id="viewportRotate" class="top-action" type="button" title="Zakreni prikaz za 90°" aria-label="Zakreni prikaz za 90°"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" aria-hidden="true"><path d="M19 9a8 8 0 1 0 1 7M19 3v6h-6M8 10h6v6H8z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
  <details id="topMenu" class="top-menu" name="header-menu"><summary aria-label="Izbornik" title="Izbornik">☰</summary>
   <div class="menu-panel">
    <button id="minus" class="file-action" aria-label="Smanji zoom">− Zoom</button>
@@ -105,13 +169,14 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
    <button id="saveJson" class="file-action">Spremi JSON</button>
    <button id="saveCustom" type="button" class="file-action">Spremi u biblioteku</button>
    <button id="importJson" class="file-action">Uvezi JSON</button>
+   <button id="helpOpen" class="file-action" type="button">? Help / Upute</button>
   <form id="customSaveForm" class="custom-save-form" hidden>
    <label for="customName">Naziv custom objekta</label><input id="customName" type="text" maxlength="60" autocomplete="off" required><button type="submit">Spremi</button>
   </form>
   <p id="customMessage" role="status"></p>
-   <details class="view-settings"><summary>Postavke</summary><label><span>Neprekinuto crtanje</span><input id="continuousDrawing" type="checkbox" checked></label><label><span>Automatski puni zaslon</span><input id="autoFullscreen" type="checkbox" checked></label><label><span>Grid</span><input id="showGrid" type="checkbox" checked></label><label><span>Prikaži mjere</span><input id="showMeasures" type="checkbox" checked></label></details>
+   <details class="view-settings"><summary>Postavke</summary><label><span>Neprekinuto crtanje</span><input id="continuousDrawing" type="checkbox" checked></label><label><span>Automatski puni zaslon</span><input id="autoFullscreen" type="checkbox" checked></label><label><span>Grid</span><input id="showGrid" type="checkbox" checked></label><label><span>Prikaži mjere</span><input id="showMeasures" type="checkbox" checked></label><label><span>Ukupne kote ku&#263;e</span><input id="showOverallMeasures" type="checkbox" checked></label></details>
    <button id="reloadApp" class="file-action" type="button">↻ Učitaj novu verziju</button>
-   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v115</small></div>
+   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v154</small></div>
   </div>
  </details>
  <input id="jsonFile" type="file" accept=".json,application/json" hidden>
@@ -119,8 +184,16 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
  <span id="status" class="status" role="status" hidden></span>
 </header>
 <canvas id="board" aria-label="Mreža za crtanje obrisa prostorija"></canvas>
-<nav id="modeTools" aria-label="Alati"><button id="selectMode" class="tool active" aria-pressed="true" aria-label="Odabir" title="Odabir"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 3 14 10-7 1-3 7L5 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button><button id="drawMode" class="tool" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button><button id="eraseMode" class="tool" aria-pressed="false" aria-label="Gumica: dodirni za brisanje" title="Gumica"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 14 9-10a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 9H9l-5-5a2 2 0 0 1 0-2Z" stroke="currentColor" stroke-width="1.8"/><path d="m8 10 9 8M12 21h10" stroke="currentColor" stroke-width="1.8"/></svg></button></nav>
+<button id="viewportRotate" class="viewport-grip" type="button" title="Zakreni prikaz za 90&#176;" aria-label="Zakreni prikaz za 90&#176;"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="6" y="12" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M9 7a12 12 0 0 1 18 10M27 7v10h-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 17h6m-6 4h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+<nav id="modeTools" aria-label="Alati"><button id="selectMode" class="tool tool-select active" aria-pressed="true" aria-label="Odabir" title="Odabir"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 3 14 10-7 1-3 7L5 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button><button id="drawMode" class="tool tool-draw" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button><button id="eraseMode" class="tool tool-erase" aria-pressed="false" aria-label="Gumica: dodirni za brisanje" title="Gumica"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 14 9-10a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 9H9l-5-5a2 2 0 0 1 0-2Z" stroke="currentColor" stroke-width="1.8"/><path d="m8 10 9 8M12 21h10" stroke="currentColor" stroke-width="1.8"/></svg></button></nav>
 <footer id="editorFooter" hidden>
+ <div id="roomActions" hidden aria-label="Postavke prostorije">
+  <form id="roomForm" class="room-fields">
+   <label class="room-name">Naziv prostorije<input id="roomName" type="text" maxlength="80" placeholder="Npr. Dnevni boravak" autocomplete="off"></label>
+   <label class="room-area"><input id="roomShowArea" type="checkbox">Prika&#382;i kvadraturu <span id="roomAreaValue"></span></label>
+   <label class="room-hue" for="roomHue">Nijansa<input id="roomHue" type="range" min="0" max="360" step="1" aria-label="Pastelna nijansa prostorije"></label>
+  </form>
+ </div>
  <div id="wallActions" class="wall-actions" hidden aria-label="Uređivanje odabranog zida">
   <button id="wallDelete" type="button" class="selection-delete">Briši</button>
   <form id="dimensionForm" class="dimension-fields">
@@ -135,15 +208,91 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
    <label>Širina (cm)<input id="objectWidth" type="text" inputmode="decimal" required></label>
    <label>Dubina (cm)<input id="objectDepth" type="text" inputmode="decimal" required></label>
   </form>
-  <button id="objectMulti" type="button" aria-pressed="false">Više odabira</button>
-  <div id="objectGroupMenu" class="object-buttons" hidden><button id="objectEditGroup" type="button" aria-pressed="false" hidden>Uredi grupu</button><button id="objectGroup" type="button">Grupiraj</button><button id="objectUngroup" type="button">Razgrupiraj</button></div>
+  <button id="objectMulti" type="button" hidden aria-pressed="false">Više odabira</button>
+  <div id="objectGroupMenu" class="object-buttons" hidden><button id="objectGroup" type="button" hidden>Grupiraj</button><button id="objectUngroup" type="button" hidden>Razgrupiraj</button></div>
   <button id="objectCopy" type="button" hidden>Dupliciraj</button>
   <p id="objectError" role="alert"></p>
  </div>
 </footer>
-<script src="room-geometry.js?v=20261028-115"></script>
-<script src="grid-geometry.js?v=20261028-115"></script>
-<script src="cad-objects.js?v=20261028-115"></script>
-<script src="grid-app.js?v=20261028-115"></script>
+<section id="sketchEditor" tabindex="-1" hidden role="dialog" aria-modal="true" aria-label="Uredi crte&#382; objekta">
+ <div class="sketch-header"><strong id="sketchTitle"></strong><button id="sketchUndo" type="button" hidden aria-label="Poni&#353;ti" title="Poni&#353;ti">&#8630;</button><button id="sketchRedo" type="button" hidden aria-label="Vrati" title="Vrati">&#8631;</button><button id="sketchFit" type="button" hidden>Cijelo</button></div>
+ <p id="sketchHint" role="status"></p>
+ <canvas id="sketchBoard" aria-label="Crte&#382; objekta: linije bez zidova"></canvas>
+ <nav class="sketch-tools" aria-label="Alati crte&#382;a objekta">
+ <button id="sketchselect" class="tool tool-select" type="button" title="Odabir" aria-label="Odabir" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 3 14 10-7 1-3 7L5 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span class="sketch-tool-label">Odabir</span></button>
+ <button id="sketchdraw" class="tool tool-draw" type="button" title="Crtaj" aria-label="Crtaj" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span class="sketch-tool-label">Olovka</span></button>
+ <button id="sketchcircle" class="tool tool-draw" type="button" title="Kru&#382;nica: centar pa rub" aria-label="Kru&#382;nica" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8"/><path d="M12 10v4m-2-2h4m2 0h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+ <button id="sketcherase" class="tool tool-erase" type="button" title="Gumica" aria-label="Gumica" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 14 9-10a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 9H9l-5-5a2 2 0 0 1 0-2Z" stroke="currentColor" stroke-width="1.8"/><path d="m8 10 9 8M12 21h10" stroke="currentColor" stroke-width="1.8"/></svg><span class="sketch-tool-label">Gumica</span></button>
+ <button id="sketchDelete" type="button" hidden>Obri&#353;i liniju</button>
+ <button id="sketchClose" type="button">Close</button>
+ <button id="sketchDone" type="button">Spremi</button>
+ </nav>
+</section>
+<dialog id="helpDialog" aria-labelledby="helpTitle">
+ <div class="help-heading"><div><h2 id="helpTitle">Kako koristiti CADup</h2><p>Iste geste vrijede za miš i dodir.</p></div><button id="helpClose" type="button" aria-label="Zatvori upute">×</button></div>
+ <div class="help-body">
+  <details open><summary>Klik, dvostruki klik i dugo držanje</summary>
+   <dl><dt>Klik ili dodir</dt><dd>Odabire objekt, grupu ili zid. Klik u prazno uklanja odabir. Ako uređuješ grupu, klik izvan nje izlazi jednu razinu.</dd>
+   <dt>Dvostruki klik ili dva brza dodira</dt><dd>Na grupi otvara njezin sadržaj. Ponovi na podgrupi za ulazak još jednu razinu. Na pojedinačnom objektu otvara uređivač njegovih linija.</dd>
+   <dt>Dugo držanje objekta, oko pola sekunde</dt><dd>Uključuje višestruki odabir. Otpusti pa dodiruj ostale objekte ili grupe koje želiš dodati. Ako počneš povlačiti, objekt se pomiče i dugo držanje se ne aktivira.</dd>
+   <dt>Povlačenje</dt><dd>Odabrani objekt ili grupu pomičeš povlačenjem. Povlačenje prazne podloge pomiče prikaz.</dd></dl>
+  </details>
+  <details><summary>Tri donja alata</summary>
+   <ul><li><strong>Odabir, ljubičasto:</strong> odabiranje, pomicanje i uređivanje objekata, grupa i zidova.</li><li><strong>Olovka, plavo:</strong> crtanje vodoravnih i okomitih poteza.</li><li><strong>Gumica, crveno:</strong> dodirni objekt ili segment zida koji želiš obrisati. U uređivaču objekta briše samo linije.</li></ul>
+   <p>Boja označava aktivni alat. Kad odabereš objekt ili zid, donju traku zamjenjuju njegove dimenzije. Klik u prazno vraća alate.</p>
+  </details>
+  <details><summary>Crtanje: dvije točke i povlačenje</summary>
+   <ol><li>Uključi olovku i klikni početnu točku.</li><li>Klikni završnu točku. Aplikacija poravna potez vodoravno ili okomito i hvata mrežu te postojeće točke.</li></ol>
+   <p><strong>Povlačenje završetka:</strong> nakon odabira početka pritisni na željenom završetku, drži i pomiči miš ili prst, pa otpusti. Pregled poteza i mjera prate pomicanje. Kod vodoravnog poteza povlačenje gore ili dolje može fino podesiti duljinu.</p>
+   <p><strong>Neprekinuto crtanje:</strong> završetak postaje početak idućeg poteza. Ponovno dodirni zadnju točku, klikni izvan osi ili prijeđi na Odabir da završiš lanac. U Postavkama možeš isključiti neprekinuto crtanje.</p>
+   <p>Zatvoreni obrisi automatski postaju prostorije s blagim pastelnim bojama. Razmak mreže prilagođava se zoomu.</p>
+  </details>
+  <details><summary>Nazivi, kvadratura i boje prostorija</summary><p>U Odabiru klikni prazno podru&#269;je unutar prostorije. Dolje upi&#353;i naziv, uklju&#269;i prikaz kvadrature i kliza&#269;em odaberi nijansu. Boje uvijek ostaju blage i pastelne. Ako je ve&#263; odabran objekt ili zid, prvim klikom u prazno ukloni odabir pa klikni prostoriju.</p><p>Naziv i uklju&#269;ena kvadratura prikazuju se na tlocrtu. Povr&#353;ina se ra&#269;una bez zidova i osvje&#382;ava nakon njihovih izmjena. Postavke se spremaju s tlocrtom i u JSON datoteku.</p></details>
+  <details><summary>Zidovi i njihove dimenzije</summary>
+   <p>U Odabiru klikni zid. Dolje možeš upisati duljinu vidljivog segmenta i debljinu zida u centimetrima. Oznaka mjere na crtežu sama po sebi ne otvara uređivanje.</p>
+   <p>Povuci odabrani zid da ga pomakneš ili grip na njegovu kraju da promijeniš duljinu. Pripadajuća vrata i prozori prate pomicanje. Zid možeš obrisati gumicom ili gumbom za brisanje u njegovu panelu.</p>
+  </details>
+  <details><summary>Objekti i gripovi u oblačiću</summary>
+   <p>Gornja ikona biblioteke otvara kategorije namještaja, geometrije, vrata, prozora i ostalih elemenata. Dodir stavke umeće objekt u prikaz.</p>
+   <ul><li><strong>×:</strong> briše odabrani objekt ili cijelu odabranu grupu.</li><li><strong>Rotiraj:</strong> zakreće odabir za 90°.</li><li><strong>Mirror:</strong> zrcali prema objektnoj X osi.</li><li><strong>Dupliciraj, dva preklopljena kvadrata:</strong> stvara pomaknutu kopiju odabira.</li><li><strong>+:</strong> uključuje ili isključuje dodavanje u višestruki odabir.</li></ul>
+   <p>Grip desno mijenja veličinu u smjeru X prikaza, a donji u smjeru Y. Dimenzije možeš upisati i u donjem panelu. Odabrani pojedinačni objekt je plav, a grupa ljubičasta.</p>
+  </details>
+  <details><summary>Stvaranje grupa i podgrupa</summary>
+   <ol><li>Odaberi prvi objekt i pritisni grip <strong>+</strong>, ili ga dugo drži.</li><li>Dodirni sve ostale objekte i grupe koje želiš uključiti. Ponovni dodir uklanja ih iz odabira.</li><li>Kad odabereš barem dvije stavke, u oblačiću se pojavi <strong>Grupiraj</strong>: dva objekta sa strelicama prema unutra.</li></ol>
+   <p>Nova grupa može sadržavati pojedinačne objekte, postojeće grupe ili njihovu kombinaciju. Unutarnje grupe ostaju sačuvane.</p>
+   <p><strong>Razgrupiraj:</strong> bez uključenog + odaberi grupu ili podgrupu. Ikona s razdvojenim objektima i strelicama prema van uklanja samo jednu razinu grupiranja.</p>
+   <p><strong>Uređivanje sadržaja:</strong> dvostruki klik otvara grupu i ističe njezino područje, dok ostatak tlocrta ostaje prigušen. Unutra biraš objekte ili podgrupe. Klik izvan područja ili Esc izlazi jednu razinu. Promjena ukupne veličine grupe skalira sve njezine članove.</p>
+  </details>
+  <details><summary>Uređivanje crteža objekta</summary>
+   <p>Dvostrukim klikom na pojedinačni objekt otvaraš njegov postojeći crtež. Ako pripada grupi, najprije uđi u grupu.</p>
+   <p>Olovka koristi istu mrežu i crtanje po dvije točke ili povlačenjem kao tlocrt, ali stvara samo linije, bez zidova. Zatvoreni oblici dobiju prozirnu sivu ispunu kroz koju se vidi mreža.</p>
+   <p>Odabirom označi liniju i povuci je ili pomakni jedan od njezinih krajeva. Gumicom obriši liniju. Na računalu možeš obrisati odabranu liniju i tipkom Delete ili Backspace.</p>
+   <ul><li><strong>Spremi:</strong> sprema izmjene i zatvara uređivač.</li><li><strong>Close:</strong> zatvara bez spremanja izmjena iz tog uređivanja.</li><li>Klik u prazno ne zatvara uređivač.</li></ul>
+  </details>
+  <details><summary>Vrata i prozori</summary>
+   <p>U biblioteci su fiksni, jednokrilni, dvokrilni, kip te dvokrilni i trokrilni klizni prozori. Linije i lukovi ozna&#269;avaju otvaranje, a strelice klizanje.</p><p>Vrata i prozori automatski se priljubljuju uz bliski zid i poravnavaju s njim. Povlačenjem ih smjesti uz zid. Dovratnici vrata prate njegovu debljinu, a šarke i krilo nalaze se na rubu zida.</p>
+   <p>Rotacijom i mirrorom podesi stranu šarki i smjer otvaranja. Otvor vrata prikazuje podlogu i mrežu umjesto bijele ispune.</p>
+  </details>
+  <details><summary>Pomicanje, zoom i rotacija prikaza</summary>
+   <ul><li><strong>Pomicanje prikaza:</strong> povuci praznu podlogu.</li><li><strong>Zoom na računalu:</strong> kotačić miša zumira oko pokazivača.</li><li><strong>Zoom na mobitelu:</strong> približi ili razmakni dva prsta.</li><li><strong>+ Zoom i − Zoom:</strong> dostupni su i u glavnom izborniku.</li><li><strong>Cijelo:</strong> vraća osnovni pregled radne plohe.</li><li><strong>Veliki kružni grip gore desno:</strong> zakreće cijeli prikaz za 90°, bez mijenjanja geometrije tlocrta. Razlikuje se od rotacije odabranog objekta.</li></ul>
+  </details>
+  <details><summary>Custom biblioteka, spremanje i uvoz</summary>
+   <p><strong>Spremi u biblioteku:</strong> odaberi objekt ili grupu pa u glavnom izborniku odaberi tu naredbu i upiši naziv. Vlastiti elementi nalaze se u kategoriji Custom gornje biblioteke.</p>
+   <p>Dodir Custom stavke umeće novu kopiju. Ikona koša briše samo predložak iz biblioteke; već postavljeni objekti ostaju u tlocrtu.</p>
+   <p><strong>Spremi JSON:</strong> preuzima datoteku tlocrta s objektima i vlastitom bibliotekom. <strong>Uvezi JSON:</strong> učitava spremljeni tlocrt.</p>
+   <p>Rad se automatski čuva u ovom pregledniku. Za prijenos na drugi uređaj ili sigurnosnu kopiju spremi JSON.</p>
+  </details>
+  <details><summary>Poništavanje, postavke i brisanje svega</summary>
+   <p>Gornje strelice poništavaju i vraćaju izmjene. Na računalu koristi <kbd>Ctrl/Cmd + Z</kbd>, <kbd>Ctrl/Cmd + Shift + Z</kbd> ili <kbd>Ctrl/Cmd + Y</kbd>. U uređivaču objekta prečaci vrijede za njegov crtež. Esc završava trenutnu radnju ili izlazi iz grupe; u uređivaču objekta prvo prekida započeti potez, a zatim zatvara bez spremanja.</p>
+   <p>Postavke u izborniku uključuju mrežu, prikaz mjera, neprekinuto crtanje i automatski puni zaslon.</p>
+   <p><strong>Briši sve:</strong> traži još jedan dodir za potvrdu. Poništavanje može vratiti obrisani tlocrt. <strong>Učitaj novu verziju:</strong> osvježava aplikaciju s weba uz prethodno spremanje tlocrta.</p>
+  </details>
+ </div>
+</dialog>
+<script src="room-geometry.js?v=20261028-154"></script>
+<script src="grid-geometry.js?v=20261028-154"></script>
+<script src="object-sketch.js?v=20261028-154"></script>
+<script src="cad-objects.js?v=20261028-154"></script>
+<script src="grid-app.js?v=20261028-154"></script>
 </body>
 </html>

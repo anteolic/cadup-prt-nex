@@ -1,3 +1,4 @@
+require('./object-sketch.js');
 const assert=require('node:assert/strict');require('./cad-objects.js');
 const C=CadObjects;
 assert.ok(C.catalog.length>=20);for(const kind of ['door','window','stairs','sofa','bed'])assert.ok(C.definition(kind));
@@ -98,4 +99,86 @@ const handleDoor=C.create('door',500,500),deepDoor=C.resizeFromHandle([handleDoo
 for(const angle of [0,90,180,270]){
  const item={...C.create('desk',700,800),rotation:angle},other=C.create('chair',1000,1000),mirrored=C.mirror([item,other],[item.id]);
  assert.equal(mirrored[0].rotation,angle);assert.equal(mirrored[0].x,item.x);assert.equal(mirrored[0].y,item.y);assert.equal(mirrored[0].width,item.width);assert.equal(mirrored[0].depth,item.depth);assert.equal(mirrored[0].mirrored,true);assert.deepEqual(mirrored[1],other);assert.deepEqual(C.mirror(mirrored,[item.id]),[item,other]);
+}
+
+// Nested groups preserve inner membership through grouping, copying and one-level ungrouping.
+{
+ const original=[C.create('desk',300,400),C.create('chair',500,400),C.create('desk',900,400),C.create('chair',1100,400),C.create('shelf',700,800)],ids=original.map(item=>item.id);
+ let scene=C.group(original,ids.slice(0,2)),firstGroup=scene[0].group;
+ scene=C.group(scene,ids.slice(2,4));const secondGroup=scene[2].group;
+ scene=C.group(scene,ids);const outer=scene[0].group;
+ assert.ok(scene.every(item=>item.group===outer));
+ assert.deepEqual(scene[0].subgroups,[firstGroup]);assert.deepEqual(scene[2].subgroups,[secondGroup]);assert.equal(scene[4].subgroups,undefined);
+ assert.deepEqual(C.expandedSelection(scene,[ids[0]]),ids);
+ assert.deepEqual(C.expandedSelection(scene,[ids[0]],outer),ids.slice(0,2));
+ assert.deepEqual(C.expandedSelection(scene,[ids[0]],firstGroup),[ids[0]]);
+ assert.deepEqual(C.validate(JSON.parse(JSON.stringify(scene))),scene);
+ const duplicate=C.duplicate(scene,ids),copies=duplicate.items.slice(5);
+ assert.notEqual(copies[0].group,outer);assert.notEqual(copies[0].subgroups[0],firstGroup);assert.equal(copies[0].subgroups[0],copies[1].subgroups[0]);
+ assert.deepEqual(C.validate(duplicate.items),duplicate.items);
+ const innerCopy=C.duplicate(scene,ids.slice(0,2),outer).items.slice(5);
+ assert.equal(innerCopy[0].group,outer);assert.notEqual(innerCopy[0].subgroups[0],firstGroup);
+ const restored=C.ungroup(scene,ids);
+ assert.equal(restored[0].group,firstGroup);assert.equal(restored[2].group,secondGroup);assert.equal(restored[4].group,null);
+ assert.equal(restored[0].subgroups,undefined);
+ const opened=C.ungroup(scene,ids.slice(0,2),outer);
+ assert.equal(opened[0].group,outer);assert.equal(opened[0].subgroups,undefined);assert.deepEqual(opened[2].subgroups,[secondGroup]);
+ const resized=C.resize(scene,ids,1000,700,0);assert.deepEqual(resized[0].subgroups,[firstGroup]);
+ const transformed=C.mirror(C.rotate(scene,ids),ids);assert.deepEqual(transformed[2].subgroups,[secondGroup]);
+ const template=C.createTemplate(scene,ids,'Nested');const placed=C.instantiate(template,1000,1000).items;
+ assert.ok(placed[0].subgroups);assert.equal(placed[0].subgroups[0],placed[1].subgroups[0]);
+ assert.throws(()=>C.validate([{...scene[0],subgroups:[outer]}]));
+ assert.throws(()=>C.validate([{...scene[0],subgroups:['shared']},{...scene[2],group:'other-root',subgroups:['shared']}]));
+}
+
+// Door hardware follows actual wall faces, including asymmetric exterior walls.
+for(const angle of [0,90,180,270])for(const mirrored of [false,true])for(const kind of ['door','double-door']){
+ const item={...C.create(kind,600,700),rotation:angle,mirrored},r=angle*Math.PI/180,c=Math.round(Math.cos(r)),sn=Math.round(Math.sin(r));
+ for(const [near,far] of [[-5,5],[-30,0],[0,30],[-22,8]]){
+  const corners=[[-item.width/2,near],[item.width/2,near],[-item.width/2,far],[item.width/2,far]].map(([x,y])=>({x:item.x+x*c-y*sn,y:item.y+x*sn+y*c}));
+  const left=Math.min(...corners.map(p=>p.x)),right=Math.max(...corners.map(p=>p.x)),top=Math.min(...corners.map(p=>p.y)),bottom=Math.max(...corners.map(p=>p.y));
+  const profile=C.doorWallProfile(item,[{x:left,y:top,width:right-left,height:bottom-top}]);assert.deepEqual(profile,{min:near,max:far});
+  const geometry=C.doorGeometry(item,profile);assert.ok(Math.abs(geometry.near*item.depth/100-near)<1e-8);assert.ok(Math.abs((geometry.far-geometry.near)*item.depth/100-(far-near))<1e-8);
+  const rects=[],ellipses=[],scales=[];
+  const g=new Proxy({rect(...args){rects.push(args);},ellipse(...args){ellipses.push(args);},scale(...args){scales.push(args);}},{get:(obj,key)=>key in obj?obj[key]:(()=>{})});
+  C.draw(g,item,1,0,0,false,0,false,false,profile);
+  const jambs=rects.slice(1,3);assert.ok(jambs.every(rect=>rect[1]===geometry.near&&rect[3]===geometry.far-geometry.near));
+  const arcs=ellipses.filter(args=>args[2]===geometry.radiusX);
+  assert.equal(arcs.length,kind==='double-door'?2:1);assert.ok(arcs.every(arc=>arc[1]===geometry.near));
+  assert.equal(scales[0][0]<0,mirrored);
+ }
+}
+
+// Library symbols have a fixed normalized drawing, independent of zoom and resize.
+{
+ const geometry=(item,scale)=>{
+  const commands=[],g=new Proxy({}, {get:(obj,key)=>{if(key in obj)return obj[key];if(['rect','roundRect','ellipse','arc','moveTo','lineTo','closePath'].includes(key))return (...args)=>commands.push([key,...args]);return ()=>{};},set:(obj,key,value)=>{obj[key]=value;return true;}});
+  C.draw(g,item,scale,0,0);return commands;
+ };
+ for(const definition of C.catalog){
+  const item=C.create(definition.kind,1000,1000),original=geometry(item,1);
+  assert.deepEqual(geometry(item,.15),original,definition.kind+' zoom out');
+  assert.deepEqual(geometry(item,5),original,definition.kind+' zoom in');
+  assert.deepEqual(geometry({...item,width:item.width*1.4,depth:item.depth*.6},1),original,definition.kind+' resize');
+ }
+}
+
+// Every window type attaches and follows its supporting wall like existing openings.
+for(const kind of ['window','window-casement','window-double','window-tilt','window-sliding','window-sliding-three']){
+ assert.ok(C.definition(kind));assert.equal(C.isWindow(kind),true);
+ const wall={x1:100,y1:500,x2:1400,y2:500},item=C.create(kind,600,510),attached=C.snapToWalls([item],[item.id],[wall])[0];
+ assert.equal(attached.y,500);assert.equal(attached.rotation,0);
+ const movedWall={...wall,y1:550,y2:550},moved=C.followWallOpenings([attached],[wall],[movedWall],{from:wall,to:movedWall})[0];
+ assert.equal(moved.y,550);assert.equal(moved.kind,kind);assert.deepEqual(C.validate([moved]),[moved]);
+}
+
+// Independent tables have no chairs; arrangements declare their complete footprint.
+assert.equal(C.definition('table').width,180);assert.equal(C.definition('table').depth,90);
+{
+ const capture=kind=>{const rects=[],ellipses=[],g=new Proxy({rect(...args){rects.push(args);},ellipse(...args){ellipses.push(args);}},{get:(obj,key)=>obj[key]||(()=>{})});const item=C.create(kind,1000,1000);C.draw(g,item,1,0,0);return {item,rects,ellipses};};
+ assert.equal(capture('table').rects.length,2);assert.equal(capture('round-table').ellipses.length,1);
+ const set=capture('dining-set'),top=set.rects.at(-1);
+ assert.ok(Math.abs(top[2]*set.item.width/100-180)<1e-8);assert.ok(Math.abs(top[3]*set.item.depth/100-90)<1e-8);
+ assert.equal(set.rects.length,8);
+ const round=capture('round-dining-set');assert.equal(round.rects.length,5);assert.ok(Math.abs(round.ellipses[0][2]*2*round.item.width/100-110)<1e-8);
 }

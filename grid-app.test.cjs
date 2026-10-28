@@ -1,18 +1,18 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const nodes=new Map(),labels=[],memory=new Map();
 let downloadedBlob=null,downloadName=null,redStrokes=0,blueDraftStrokes=0;
-const updateRequests=[];let updateFailure=null;
+const holdTimers=[];const updateRequests=[];let updateFailure=null;
 const publishedHtml=fs.readFileSync(__dirname+'/CADup.html','utf8');
 const gridLines=[],paintCalls=[],wallGrips=[];let gridStart=null;
 const canvas=new Proxy({stroke(){if(this.strokeStyle==='#4b5563'&&this.lineWidth===1.5)wallGrips.push({});if(this.strokeStyle==='#dc2626')redStrokes++;if(this.strokeStyle==='#1675d1'&&this.lineWidth===2.5)blueDraftStrokes++;},arc(){},fill(){paintCalls.push({color:this.fillStyle,alpha:this.globalAlpha});},measureText:text=>({width:text.length*6}),fillText:text=>labels.push(text),moveTo(x,y){gridStart={x,y};},lineTo(x,y){if(gridStart&&['#c1ccda','#e4e9f0'].includes(this.strokeStyle))gridLines.push({...gridStart,x2:x,y2:y});}},{get:(o,k)=>o[k]||(()=>{})});
 function el(id){
- if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
+ if(!nodes.has(id))nodes.set(id,{clientWidth:1000,clientHeight:800,style:{},classList:{toggle(){},add(){},remove(){}},focus(){},select(){},showModal(){this.open=true;},close(){this.open=false;},attributes:{},setAttribute(k,v){this.attributes[k]=v;},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getContext:()=>canvas,getBoundingClientRect:()=>({left:0,top:0}),setPointerCapture(){}});
  return nodes.get(id);
 }
-const context=vm.createContext({console,Blob,fetch:async(url,options)=>{updateRequests.push({url,options});if(updateFailure==='network')throw new Error('Offline');return {ok:updateFailure!=='http'&&!(updateFailure==='script'&&url.includes('grid-app.js')),status:updateFailure==='http'||(updateFailure==='script'&&url.includes('grid-app.js'))?503:200,text:async()=>url.includes('CADup.html')?(updateFailure==='incomplete'?'<html></html>':publishedHtml):'/* verified script response */'};},URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:fn=>fn(),document:{addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}},requestAnimationFrame:fn=>fn()});
-for(const file of ['room-geometry.js','grid-geometry.js','cad-objects.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
+const context=vm.createContext({console,Blob,fetch:async(url,options)=>{updateRequests.push({url,options});if(updateFailure==='network')throw new Error('Offline');return {ok:updateFailure!=='http'&&!(updateFailure==='script'&&url.includes('grid-app.js')),status:updateFailure==='http'||(updateFailure==='script'&&url.includes('grid-app.js'))?503:200,text:async()=>url.includes('CADup.html')?(updateFailure==='incomplete'?'<html></html>':publishedHtml):'/* verified script response */'};},URL:class extends URL{static createObjectURL(blob){downloadedBlob=blob;return 'blob:test';}static revokeObjectURL(){}},setTimeout:(fn,delay)=>delay===550?holdTimers.push(fn):fn(),document:{removeEventListener(){},addEventListener(type,fn){if(type==='close')this.onclose=fn;else this[type]=fn;},getElementById:el,createElement:()=>({click(){downloadName=this.download;}}),documentElement:{}},window:{location:{href:'https://anteolic.github.io/cadup-prt-nex/CADup.html?v=39&mode=test#drawing',replace(url){this.href=url;}},devicePixelRatio:1,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},ResizeObserver:class{observe(){}disconnect(){}},requestAnimationFrame:fn=>fn()});
+for(const file of ['room-geometry.js','grid-geometry.js','object-sketch.js','cad-objects.js'])vm.runInContext(fs.readFileSync(__dirname+'/'+file,'utf8'),context);
 let source=fs.readFileSync(__dirname+'/grid-app.js','utf8');new Function(source);
-source=source.replace('restore();status();',`globalThis.api={drawObjectViewportActions,objectViewportActions,displayPoint,viewBounds,get viewportTurns(){return viewportTurns},objectHandles,guideAxes,addCustomObject,get customLibrary(){return customLibrary},addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
+source=source.replace('restore();status();',`globalThis.api={overallDimensions,get roomDetails(){return roomDetails},readRoomDetails,get selectedRoomId(){return selected},openGroupEditor,closeGroupEditor,get editingGroup(){return editingGroup},drawObjectViewportActions,objectViewportActions,displayPoint,viewBounds,get viewportTurns(){return viewportTurns},objectHandles,guideAxes,addCustomObject,get customLibrary(){return customLibrary},addObject,get objects(){return objects},get objectIds(){return [...objectIds]},handleScale,hitHandle,get mode(){return mode},model,undo,redo,draw,snap,step,point,resize,zoomAt,fit,get view(){return {w,h,ox,oy,scale,height}},get selection(){return selectedWall},get dimensions(){return dimensionHits},get segments(){return segments},get first(){return first},get visible(){return wallsVisible}};restore();status();`);
 vm.runInContext(source,context);
 const {api}=context,board=el('board');
 const event=(x,y,id=1)=>({button:0,pointerId:id,pointerType:'touch',clientX:x,clientY:y,preventDefault(){}});
@@ -316,8 +316,8 @@ deselect();assert.equal(el('editorFooter').hidden,true);assert.equal(el('mainToo
  await el('reloadApp').click();assert.equal(el('topMenu').open,false);
  const reloadUrl=new URL(context.window.location.href);
  assert.equal(reloadUrl.pathname,'/cadup-prt-nex/CADup.html');assert.ok(Number(reloadUrl.searchParams.get('v'))>42);
- assert.equal(updateRequests.length,5);assert.ok(updateRequests.every(request=>request.options.cache==='reload'));
- for(const file of ['room-geometry.js','grid-geometry.js','cad-objects.js','grid-app.js'])assert.ok(updateRequests.some(request=>request.url.includes(file+'?v=')));
+ assert.equal(updateRequests.length,6);assert.ok(updateRequests.every(request=>request.options.cache==='reload'));
+ for(const file of ['room-geometry.js','grid-geometry.js','object-sketch.js','cad-objects.js','grid-app.js'])assert.ok(updateRequests.some(request=>request.url.includes(file+'?v=')));
  assert.equal(JSON.stringify(api.segments),beforeReload);assert.equal(JSON.stringify(JSON.parse(memory.get('infoa_grid_loops_v1')).segments),beforeReload);
  assert.equal(el('reloadApp').disabled,false);
  const previousUrl=context.window.location.href;
@@ -367,7 +367,7 @@ vm.runInContext(source,context);assert.equal(el('redo').disabled,false);el('redo
 el('clearAll').click();el('clearAll').click();api.fit();api.addObject('sofa');
 const furnitureBefore={...api.objects[0]},furnitureView=api.view;
 const corner={x:furnitureView.ox+(furnitureBefore.x+furnitureBefore.width/2-2)*furnitureView.scale,y:furnitureView.oy+(furnitureBefore.y+furnitureBefore.depth/2-2)*furnitureView.scale};
-drag(corner.x,corner.y,corner.x+40,corner.y+20);
+drag(corner.x,corner.y,corner.x+40,corner.y+40);
 assert.equal(api.objects[0].width,furnitureBefore.width);assert.equal(api.objects[0].depth,furnitureBefore.depth);
 assert.ok(api.objects[0].x>furnitureBefore.x);assert.ok(api.objects[0].y>furnitureBefore.y);
 el('objectWidth').value='300';el('objectForm').submit({preventDefault(){}});assert.equal(api.objects[0].width,300,'Unos dimenzija u panelu ostaje dostupan');
@@ -487,17 +487,17 @@ el('eraseMode').click();drag(500,500,470,460);assert.equal(api.mode,'erase');ass
 // Open a group, edit one member, duplicate inside it, and close without ungrouping.
 el('clearAll').click();el('clearAll').click();api.fit();api.addCustomObject(api.customLibrary[0].id);
 const groupMembers=JSON.parse(JSON.stringify(api.objects)),member=groupMembers[0],otherMember=groupMembers[1],groupView=api.view,groupCamera={...api.view};
-assert.equal(api.objectIds.length,2);assert.equal(el('objectEditGroup').hidden,true);el('objectEditGroup').click();assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');assert.equal(api.objectIds.length,0);assert.equal(el('objectActions').hidden,false);
+assert.equal(api.objectIds.length,2);api.openGroupEditor(api.objects.find(item=>api.objectIds.includes(item.id)).group);assert.ok(api.editingGroup);assert.equal(api.objectIds.length,0);assert.equal(el('objectActions').hidden,false);
 click(groupView.ox+member.x*groupView.scale,groupView.oy+member.y*groupView.scale);assert.equal(api.objectIds.length,1);assert.equal(api.objectIds[0],member.id);
 el('objectWidth').value=String(member.width+20);el('objectForm').submit({preventDefault(){}});assert.equal(api.objects.find(o=>o.id===member.id).width,member.width+20);assert.equal(JSON.stringify(api.objects.find(o=>o.id===otherMember.id)),JSON.stringify(otherMember));
-el('objectCopy').click();assert.equal(api.objects.length,3);assert.ok(api.objects.every(o=>o.group===member.group));api.undo();assert.equal(api.objects.length,2);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
-click(990,790);assert.equal(el('objectEditGroup').textContent,'Uredi grupu');assert.equal(api.objectIds.length,2);assert.deepEqual({...api.view},groupCamera);
+el('objectCopy').click();assert.equal(api.objects.length,3);assert.ok(api.objects.every(o=>o.group===member.group));api.undo();assert.equal(api.objects.length,2);assert.ok(api.editingGroup);
+click(990,790);assert.equal(api.editingGroup,null);assert.equal(api.objectIds.length,2);assert.deepEqual({...api.view},groupCamera);
 
 // View settings hide only the grid and labels; measures remain editable.
 const viewSettingsCamera={...api.view},viewSettingsScene=JSON.stringify(api.segments);
 el('showGrid').checked=false;el('showGrid').change();gridLines.length=0;api.draw();assert.equal(gridLines.length,0);
-el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);assert.equal(api.dimensions.length,0);
-assert.deepEqual(JSON.parse(memory.get('cadup_view_settings_v1')),{grid:false,measures:false,rotation:0,autoFullscreen:true,continuousDrawing:true});assert.deepEqual({...api.view},viewSettingsCamera);assert.equal(JSON.stringify(api.segments),viewSettingsScene);
+el('showMeasures').checked=false;el('showMeasures').change();el('showOverallMeasures').checked=false;el('showOverallMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);assert.equal(api.dimensions.length,0);
+assert.deepEqual(JSON.parse(memory.get('cadup_view_settings_v1')),{grid:false,measures:false,overallMeasures:false,rotation:0,autoFullscreen:true,continuousDrawing:true});assert.deepEqual({...api.view},viewSettingsCamera);assert.equal(JSON.stringify(api.segments),viewSettingsScene);
 el('showGrid').checked=true;el('showGrid').change();gridLines.length=0;api.draw();assert.ok(gridLines.length);
 el('showMeasures').checked=true;el('showMeasures').change();
 
@@ -517,9 +517,9 @@ el('clearAll').click();el('clearAll').click();api.fit();api.addCustomObject(api.
 const doubleGroupMember=api.objects[0],doubleGroupView={...api.view},doubleGroupScene=memory.get('infoa_grid_loops_v1');
 const doubleGroupPoint={x:doubleGroupView.ox+doubleGroupMember.x*doubleGroupView.scale,y:doubleGroupView.oy+doubleGroupMember.y*doubleGroupView.scale};
 function timedTap(x,y,time){board.pointerdown({...event(x,y),timeStamp:time-30});board.pointerup({...event(x,y),timeStamp:time});}
-timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1000);assert.equal(el('objectEditGroup').textContent,'Uredi grupu');timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1200);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');assert.equal(api.objectIds.length,0);
-timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1700);timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1900);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
-timedTap(990,790,2500);assert.equal(el('objectEditGroup').textContent,'Uredi grupu');assert.equal(api.objectIds.length,2);assert.equal(memory.get('infoa_grid_loops_v1'),doubleGroupScene);assert.deepEqual({...api.view},doubleGroupView);
+timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1000);assert.equal(api.editingGroup,null);timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1200);assert.ok(api.editingGroup);assert.equal(api.objectIds.length,0);
+timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1700);timedTap(doubleGroupPoint.x,doubleGroupPoint.y,1900);assert.ok(api.editingGroup);
+timedTap(990,790,2500);assert.equal(api.editingGroup,null);assert.equal(api.objectIds.length,2);assert.equal(memory.get('infoa_grid_loops_v1'),doubleGroupScene);assert.deepEqual({...api.view},doubleGroupView);
 
 // A single selection exposes exactly two resize grips; no double tap is needed.
 el('clearAll').click();el('clearAll').click();api.fit();api.addObject('drawer-cabinet');let gripObject=api.objects[0],gripView={...api.view};deselect();assert.equal(api.objectHandles().length,0);
@@ -530,6 +530,11 @@ let objectDepthGrip=api.objectHandles().find(h=>h.axis==='depth');drag(objectDep
 // Remove a saved Custom definition without deleting or editing its placed instances.
 const customDeleteId=api.customLibrary[0].id,customDeleteScene=memory.get('infoa_grid_loops_v1'),customDeleteCamera={...api.view};
 assert.ok(el('objectLibrary').innerHTML.includes('data-delete-custom="'+customDeleteId+'"'));
+el('objectMenu').click({target:{closest:()=>({dataset:{deleteCustom:customDeleteId}})}});
+assert.equal(api.customLibrary.length,1,'Prvi klik samo trazi potvrdu');
+el('objectMenu').open=false;el('objectMenu').toggle();
+el('objectMenu').click({target:{closest:()=>({dataset:{deleteCustom:customDeleteId}})}});
+assert.equal(api.customLibrary.length,1,'Zatvaranje biblioteke ponistava potvrdu');
 el('objectMenu').click({target:{closest:()=>({dataset:{deleteCustom:customDeleteId}})}});
 assert.equal(api.customLibrary.length,0);assert.equal(JSON.parse(memory.get('cadup_custom_library_v1')).length,0);assert.equal(memory.get('infoa_grid_loops_v1'),customDeleteScene);assert.deepEqual({...api.view},customDeleteCamera);assert.ok(!el('objectLibrary').innerHTML.includes('data-delete-custom="'+customDeleteId+'"'));
 
@@ -546,7 +551,7 @@ const rotatedDragCamera={...api.view};drag(projectedObject.x,projectedObject.y,p
 
 // All hidden dimensions appear temporarily while editing a wall.
 while(api.viewportTurns)el('viewportRotate').click();el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);line(100,300,250,300);enterEdit();
-el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);
+el('showMeasures').checked=false;el('showMeasures').change();el('showOverallMeasures').checked=false;el('showOverallMeasures').change();labels.length=0;api.draw();assert.equal(labels.length,0);
 click(200,100);labels.length=0;api.draw();assert.ok(labels.includes('400 cm'));assert.ok(labels.includes('300 cm'));assert.equal(el('showMeasures').checked,false);assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).measures,false);
 deselect();labels.length=0;api.draw();assert.equal(labels.length,0);
 
@@ -574,13 +579,13 @@ el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);en
 board.pointerdown(event(700,600,1));board.pointerdown(event(800,600,2));board.pointermove(event(850,600,2));board.pointerup(event(850,600,2));board.pointerup(event(700,600,1));assert.equal(JSON.stringify(api.selection),keptWall);assert.equal(el('wallActions').hidden,false);assert.equal(memory.get('infoa_grid_loops_v1'),keptWallScene);deselect();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
 
 // Canvas actions stay at screen corners and share Mirror/Rotate undo semantics.
-el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');const actionObject=JSON.parse(JSON.stringify(api.objects[0])),actionCamera={...api.view};assert.equal(api.objectViewportActions().length,4);
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');const actionObject=JSON.parse(JSON.stringify(api.objects[0])),actionCamera={...api.view};assert.equal(api.objectViewportActions().length,5);
 let mirrorCorner=api.objectViewportActions().find(a=>a.action==='mirror'),rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');assert.ok(mirrorCorner.screenX>rotateCorner.screenX);assert.equal(mirrorCorner.screenY,rotateCorner.screenY);click(mirrorCorner.x,mirrorCorner.y);assert.equal(api.objects[0].mirrored,true);assert.equal(api.objects[0].rotation,actionObject.rotation);assert.deepEqual({...api.view},actionCamera);
 rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');click(rotateCorner.x,rotateCorner.y);assert.equal(api.objects[0].rotation,90);api.undo();assert.equal(api.objects[0].rotation,0);api.undo();assert.equal(api.objects[0].mirrored,undefined);
 el('viewportRotate').click();mirrorCorner=api.objectViewportActions().find(a=>a.action==='mirror');rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');assert.ok(mirrorCorner.screenX>rotateCorner.screenX);assert.equal(mirrorCorner.screenY,rotateCorner.screenY);const displayedMirror=api.displayPoint(mirrorCorner);click(displayedMirror.x,displayedMirror.y);assert.equal(api.objects[0].mirrored,true);assert.equal(api.objects[0].rotation,0);
 
 // Active canvas actions do not inherit the dimmed group's background opacity.
-paintCalls.length=0;canvas.globalAlpha=.2;api.drawObjectViewportActions();const activeActionFills=paintCalls.filter(p=>p.color==='rgba(255,255,255,0.96)');assert.equal(activeActionFills.length,4);assert.ok(activeActionFills.every(p=>p.alpha===1));
+paintCalls.length=0;canvas.globalAlpha=.2;api.drawObjectViewportActions();const activeActionFills=paintCalls.filter(p=>p.color==='rgba(255,255,255,0.96)');assert.equal(activeActionFills.length,5);assert.ok(activeActionFills.every(p=>p.alpha===1));
 
 for(const [id,mode] of [['selectMode','edit'],['drawMode','draw'],['eraseMode','erase'],['selectMode','edit']]){el(id).click();el(id).click();assert.equal(api.mode,mode);assert.equal(['selectMode','drawMode','eraseMode'].filter(key=>el(key).attributes['aria-pressed']==='true').length,1);}
 
@@ -615,7 +620,7 @@ clickObjectAction('duplicate');assert.equal(api.objects.length,2);
 deselect();assert.equal(el('modeTools').hidden,false);assert.equal(el('editorFooter').hidden,true);
 
 api.addObject('desk');assert.equal(el('objectGroupMenu').hidden,true);
-el('objectMulti').click();assert.equal(el('objectGroupMenu').hidden,false);
+el('objectMulti').click();assert.equal(el('objectGroupMenu').hidden,true);
 el('objectMulti').click();assert.equal(el('objectGroupMenu').hidden,true);
 deselect();assert.equal(el('modeTools').hidden,false);
 
@@ -627,16 +632,16 @@ el('objectMulti').click();
 // Use an isolated scene to create a group without overlapping hit targets.
 el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');drag(500,400,650,400);api.addObject('chair');
 el('objectMulti').click();click(650,400);el('objectGroup').click();
-assert.equal(api.objectIds.length,2);assert.equal(el('objectForm').hidden,true);
+assert.equal(api.objectIds.length,2);assert.equal(el('objectForm').hidden,false);
 assert.equal(el('objectGroup').hidden,true);
-assert.equal(el('objectUngroup').hidden,false);assert.equal(el('objectGroupMenu').hidden,false);
+assert.equal(el('objectUngroup').hidden,false);assert.equal(el('objectGroupMenu').hidden,true);
 el('objectUngroup').click();assert.ok(api.objects.every(item=>!item.group));
 deselect();
 
 // Size grips stay right/bottom on screen; action icons share a row above the object.
 el('clearAll').click();el('clearAll').click();api.addObject('desk');
 for(let turn=0;turn<4;turn++){
- const actions=api.objectViewportActions();assert.deepEqual(Array.from(actions,a=>a.action),['delete','rotate','mirror','duplicate']);
+ const actions=api.objectViewportActions();assert.deepEqual(Array.from(actions,a=>a.action),['delete','rotate','mirror','duplicate','multi']);
  assert.ok(actions.every(a=>a.screenY===actions[0].screenY));
  const item=api.objects[0],center=api.displayPoint({x:api.view.ox+item.x*api.view.scale,y:api.view.oy+item.y*api.view.scale});
  const grips=api.objectHandles().map(h=>api.displayPoint(h));
@@ -645,4 +650,217 @@ for(let turn=0;turn<4;turn++){
  el('viewportRotate').click();
 }
 clickObjectAction('delete');assert.equal(api.objects.length,0);api.undo();assert.equal(api.objects.length,1);
+deselect();
+
+// Holding an object starts selection, preserves it on release, and exposes group grips.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');drag(500,400,650,400);api.addObject('chair');deselect();
+board.pointerdown(event(650,400));holdTimers.splice(0).forEach(fn=>fn());
+assert.equal(el('objectMulti').attributes['aria-pressed'],'true');assert.equal(api.objectIds.length,1);
+board.pointerup(event(650,400));assert.equal(api.objectIds.length,1);
+click(500,400);assert.equal(api.objectIds.length,2);
+assert.ok(api.objectViewportActions().some(a=>a.action==='group'));
+clickObjectAction('group');assert.ok(api.objects[0].group);assert.equal(api.objects[0].group,api.objects[1].group);
+assert.ok(api.objectViewportActions().some(a=>a.action==='ungroup'));
+clickObjectAction('ungroup');assert.ok(api.objects.every(item=>!item.group));
+deselect();board.pointerdown(event(650,400));board.pointermove(event(700,400));holdTimers.splice(0).forEach(fn=>fn());
+assert.equal(el('objectMulti').attributes['aria-pressed'],'false');board.pointerup(event(700,400));deselect();
+
+// The plus grip toggles multi selection from the object toolbar.
+api.addObject('desk');clickObjectAction('multi');
+assert.equal(el('objectMulti').attributes['aria-pressed'],'true');
+assert.equal(el('objectForm').hidden,true);
+clickObjectAction('multi');assert.equal(el('objectMulti').attributes['aria-pressed'],'false');
+deselect();
+
+// Group dimensions and resize grips scale all members without breaking membership.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');drag(500,400,650,400);api.addObject('chair');
+clickObjectAction('multi');click(650,400);clickObjectAction('group');
+const sizeGroupId=api.objects[0].group,oldGroupWidth=Number(el('objectWidth').value.replace(',','.'));
+assert.equal(el('objectForm').hidden,false);assert.equal(api.objectHandles().length,2);
+el('objectWidth').value=String(oldGroupWidth+100);el('objectForm').submit({preventDefault(){}});
+assert.equal(Number(el('objectWidth').value.replace(',','.')),oldGroupWidth+100);
+assert.ok(api.objects.every(item=>item.group===sizeGroupId));
+const groupGrip=api.objectHandles().find(handle=>handle.axis==='width');
+const beforeGroupGrip=Number(el('objectWidth').value.replace(',','.'));
+drag(groupGrip.x,groupGrip.y,groupGrip.x+20,groupGrip.y);
+assert.ok(Number(el('objectWidth').value.replace(',','.'))>beforeGroupGrip);
+assert.ok(api.objects.every(item=>item.group===sizeGroupId));api.undo();
+assert.ok(Math.abs(context.CadObjects.selectionBounds(api.objects).width-beforeGroupGrip)<1e-7);deselect();
+
+// Group existing groups and loose objects, then edit and ungroup one level at a time.
+el('clearAll').click();el('clearAll').click();api.fit();
+api.addObject('desk');drag(500,400,200,300);api.addObject('chair');drag(500,400,350,300);
+clickObjectAction('multi');click(200,300);clickObjectAction('group');const nestedFirst=api.objects[0].group;
+api.addObject('desk');drag(500,400,650,300);api.addObject('chair');drag(500,400,800,300);
+clickObjectAction('multi');click(650,300);clickObjectAction('group');const nestedSecond=api.objects[2].group;
+api.addObject('shelf');drag(500,400,500,550);clickObjectAction('multi');click(200,300);click(650,300);
+assert.equal(api.objectIds.length,5);assert.ok(api.objectViewportActions().some(action=>action.action==='group'));
+clickObjectAction('group');const nestedOuter=api.objects[0].group;
+assert.ok(api.objects.every(item=>item.group===nestedOuter));assert.equal(api.objects[0].subgroups[0],nestedFirst);assert.equal(api.objects[2].subgroups[0],nestedSecond);
+api.undo();assert.equal(api.objects[0].group,nestedFirst);api.redo();assert.equal(api.objects[0].group,nestedOuter);
+deselect();timedTap(200,300,10000);timedTap(200,300,10200);click(200,300);
+assert.equal(api.objectIds.length,2);assert.equal(api.objectHandles().length,2);
+paintCalls.length=0;api.draw();assert.ok(paintCalls.some(p=>p.color==='#f3e8ff'));
+timedTap(200,300,11000);timedTap(200,300,11200);click(200,300);assert.equal(api.objectIds.length,1);
+paintCalls.length=0;api.draw();assert.ok(paintCalls.some(p=>p.color==='#dbeafe'));
+assert.equal(api.objectHandles().length,2);
+api.closeGroupEditor();assert.equal(api.objectIds.length,2);
+api.closeGroupEditor();assert.equal(api.objectIds.length,5);
+clickObjectAction('ungroup');assert.equal(api.objects[0].group,nestedFirst);assert.equal(api.objects[2].group,nestedSecond);assert.equal(api.objects[4].group,null);
+deselect();
+
+// Plus selects grouping actions exclusively; an ordinary group selection offers ungroup.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');drag(500,400,200,300);api.addObject('chair');drag(500,400,350,300);
+clickObjectAction('multi');click(200,300);clickObjectAction('group');
+assert.ok(api.objectViewportActions().some(a=>a.action==='ungroup'));
+assert.ok(!api.objectViewportActions().some(a=>a.action==='group'));
+clickObjectAction('multi');assert.ok(!api.objectViewportActions().some(a=>a.action==='ungroup'));
+api.addObject('shelf');drag(500,400,700,500);clickObjectAction('multi');click(200,300);
+assert.ok(api.objectViewportActions().some(a=>a.action==='group'));
+assert.ok(!api.objectViewportActions().some(a=>a.action==='ungroup'));
+clickObjectAction('group');const actionOuter=api.objects[0].group;
+deselect();timedTap(200,300,20000);timedTap(200,300,20200);click(200,300);
+assert.ok(api.objectViewportActions().some(a=>a.action==='ungroup'));
+clickObjectAction('multi');assert.ok(!api.objectViewportActions().some(a=>a.action==='ungroup'));
+deselect();
+
+// Double-click an object, edit its lines without walls, save, and undo at plan level.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('shape-rectangle');deselect();
+const planBeforeSketch=JSON.stringify(api.segments),objectBeforeSketch=JSON.stringify(api.objects[0]);
+timedTap(500,400,30000);timedTap(500,400,30200);
+assert.equal(el('sketchEditor').hidden,false);assert.equal(el('appHeader').inert,true);
+el('sketchDone').onclick();assert.equal(JSON.stringify(api.objects[0]),objectBeforeSketch,'Opening and closing does not convert the original symbol');
+timedTap(500,400,31000);timedTap(500,400,31200);
+const sketchCanvas=el('sketchBoard');
+const sketchClick=(x,y)=>{sketchCanvas.onpointerdown(event(x,y));sketchCanvas.onpointerup(event(x,y));};
+const sketchDrag=(x,y,a,b)=>{sketchCanvas.onpointerdown(event(x,y));sketchCanvas.onpointermove(event(a,b));sketchCanvas.onpointerup(event(a,b));};
+el('sketchdraw').onclick();sketchClick(224,400);sketchClick(776,400);
+el('sketchselect').onclick();sketchDrag(500,400,500,455);
+assert.equal(el('sketchDelete').hidden,false);
+el('sketcherase').onclick();sketchClick(500,455);el('sketchUndo').onclick();el('sketchRedo').onclick();el('sketchUndo').onclick();
+el('sketchDone').onclick();
+assert.equal(el('sketchEditor').hidden,true);assert.equal(el('appHeader').inert,false);
+assert.equal(JSON.stringify(api.segments),planBeforeSketch,'Editing an object never creates walls');
+assert.equal(api.objects[0].sketch.lines.length,5);
+assert.ok(api.objects[0].sketch.lines.some(line=>Math.abs(line.y1-line.y2)<1e-7&&line.y1>0&&line.y1<20));
+assert.ok(JSON.parse(memory.get('infoa_grid_loops_v1')).objects[0].sketch);
+api.undo();assert.equal(api.objects[0].sketch,undefined);api.redo();assert.equal(api.objects[0].sketch.lines.length,5);
+deselect();
+
+// The object editor shares the plan grid and allows freely chosen directions.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('shape-rectangle');deselect();
+timedTap(500,400,40000);timedTap(500,400,40200);
+const sharedCanvas=el('sketchBoard');
+const sharedDrag=(x,y,a,b)=>{sharedCanvas.onpointerdown(event(x,y));sharedCanvas.onpointermove(event(a,b));sharedCanvas.onpointerup(event(a,b));};
+el('sketchdraw').onclick();sharedDrag(224,400,776,460);
+// An outside tap neither closes nor saves the editor.
+sharedCanvas.onpointerdown(event(20,20));sharedCanvas.onpointerup(event(20,20));
+assert.equal(el('sketchEditor').hidden,false);assert.equal(api.objects[0].sketch,undefined);
+el('sketchDone').onclick();assert.equal(el('sketchEditor').hidden,true);assert.equal(api.objects[0].sketch.lines.length,5);
+const sharedStroke=api.objects[0].sketch.lines[4];assert.notEqual(sharedStroke.y1,sharedStroke.y2);
+assert.equal(Math.abs(Math.round(sharedStroke.x1)%5),0);assert.equal(Math.abs(Math.round(sharedStroke.x2)%5),0);
+timedTap(500,400,41000);timedTap(500,400,41200);
+sharedDrag(20,20,30,30);assert.equal(el('sketchEditor').hidden,false,'Panning outside the object does not close the editor');
+el('sketchDone').onclick();assert.equal(el('sketchEditor').hidden,true);deselect();
+
+// Close discards local edits without creating plan history or changing the saved sketch.
+timedTap(500,400,42000);timedTap(500,400,42200);
+const savedBeforeClose=JSON.stringify(api.objects[0]),storedBeforeClose=memory.get('infoa_grid_loops_v1');
+el('sketchdraw').onclick();sharedDrag(300,500,700,500);el('sketchClose').onclick();
+assert.equal(el('sketchEditor').hidden,true);assert.equal(el('appHeader').inert,false);
+assert.equal(JSON.stringify(api.objects[0]),savedBeforeClose);assert.equal(memory.get('infoa_grid_loops_v1'),storedBeforeClose);deselect();
+
+// The plan passes the real wall cross-section to the door renderer.
+el('clearAll').click();el('clearAll').click();api.fit();startDrawing();line(100,400,900,400);enterEdit();api.addObject('door');
+const drawDoorOriginal=context.CadObjects.draw,doorDrawProfiles=[];
+context.CadObjects.draw=(...args)=>{if(args[1].kind==='door')doorDrawProfiles.push(args[9]);return drawDoorOriginal(...args);};
+api.draw();context.CadObjects.draw=drawDoorOriginal;
+assert.ok(doorDrawProfiles.some(profile=>profile&&profile.max>profile.min));deselect();
+
+// The open group's area has its own highlight, while other objects remain dimmed.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');drag(500,400,200,300);api.addObject('chair');drag(500,400,350,300);
+clickObjectAction('multi');click(200,300);clickObjectAction('group');
+api.openGroupEditor(api.objects[0].group);paintCalls.length=0;api.draw();
+assert.ok(paintCalls.some(p=>p.color==='rgba(147,51,234,0.07)'&&p.alpha===1));
+click(990,790);assert.equal(api.editingGroup,null);deselect();
+
+// Help is read-only and preserves selection and drawing state.
+const sceneBeforeHelp=JSON.stringify(api.objects),wallsBeforeHelp=JSON.stringify(api.segments),modeBeforeHelp=api.mode;
+el('helpOpen').click();assert.equal(el('helpDialog').open,true);
+assert.equal(JSON.stringify(api.objects),sceneBeforeHelp);assert.equal(JSON.stringify(api.segments),wallsBeforeHelp);assert.equal(api.mode,modeBeforeHelp);
+el('helpClose').click();assert.equal(el('helpDialog').open,false);
+
+// Circle creation, selection, radius editing, erasure and undo preserve a real circle.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('shape-square');deselect();
+timedTap(500,400,60000);timedTap(500,400,60200);
+const circleCanvas=el('sketchBoard');
+const circleTap=(x,y)=>{circleCanvas.onpointerdown(event(x,y));circleCanvas.onpointerup(event(x,y));};
+const circleDrag=(x,y,a,b)=>{circleCanvas.onpointerdown(event(x,y));circleCanvas.onpointermove(event(a,b));circleCanvas.onpointerup(event(a,b));};
+el('sketchcircle').onclick();circleTap(500,400);circleTap(644,400);
+el('sketchselect').onclick();circleTap(644,400);circleDrag(644,400,680,400);
+el('sketcherase').onclick();circleTap(680,400);el('sketchUndo').onclick();
+el('sketchDone').onclick();
+const drawnCircle=api.objects[0].sketch.lines.find(shape=>shape.type==='circle');assert.ok(drawnCircle);assert.ok(drawnCircle.rx>20);assert.equal(drawnCircle.rx,drawnCircle.ry);
+assert.equal(JSON.stringify(context.CadObjects.validate(JSON.parse(JSON.stringify(api.objects)))),JSON.stringify(api.objects));
+api.undo();assert.equal(api.objects[0].sketch,undefined);api.redo();assert.ok(api.objects[0].sketch.lines.some(shape=>shape.type==='circle'));deselect();
+
+// Select a room, edit its label, area and pastel hue, and retain settings with the plan.
+el('clearAll').click();el('clearAll').click();api.fit();startDrawing();
+line(100,100,500,100);line(500,100,500,400);line(500,400,100,400);line(100,400,100,100);enterEdit();
+click(300,250);assert.equal(el('roomActions').hidden,false);assert.equal(el('modeTools').hidden,true);
+const editedRoomId=api.selectedRoomId;
+el('roomName').value='Dnevni boravak';el('roomShowArea').checked=true;el('roomHue').value='215';el('roomForm').input({preventDefault(){}});
+assert.equal(api.roomDetails[0].name,'Dnevni boravak');assert.equal(api.roomDetails[0].showArea,true);assert.equal(api.roomDetails[0].hue,215);
+assert.ok(labels.includes('Dnevni boravak'));assert.ok(labels.some(text=>String(text).includes('m\u00b2')));
+paintCalls.length=0;api.draw();assert.ok(paintCalls.some(p=>p.color==='hsl(215.0000, 35%, 96%)'));
+const savedRoomDetails=JSON.parse(memory.get('infoa_grid_loops_v1')).roomDetails;
+assert.equal(savedRoomDetails[0].name,'Dnevni boravak');assert.equal(savedRoomDetails[0].id,editedRoomId);
+api.undo();assert.equal(api.roomDetails[0].name,'');api.redo();assert.equal(api.roomDetails[0].name,'Dnevni boravak');
+// Moving a boundary keeps identity and settings, while the net area changes.
+const areaBeforeRoomMove=api.model().layout.net[0].area;
+click(300,400);drag(300,400,300,450);
+assert.equal(api.roomDetails[0].id,editedRoomId);assert.equal(api.roomDetails[0].name,'Dnevni boravak');assert.ok(api.model().layout.net[0].area>areaBeforeRoomMove);
+api.undo();assert.equal(api.model().layout.net[0].area,areaBeforeRoomMove);assert.equal(api.roomDetails[0].name,'Dnevni boravak');
+assert.throws(()=>api.readRoomDetails([{...savedRoomDetails[0],hue:400}]));
+assert.throws(()=>api.readRoomDetails([{...savedRoomDetails[0],showArea:'yes'}]));
+assert.throws(()=>api.readRoomDetails([savedRoomDetails[0],savedRoomDetails[0]]));
+click(990,790);
+
+// Room properties are exported alongside the drawing and survive a partition change.
+el('saveJson').click();const roomExportBlob=downloadedBlob;
+roomExportBlob.text().then(text=>{const data=JSON.parse(text);assert.equal(data.roomDetails[0].name,'Dnevni boravak');assert.equal(data.roomDetails[0].showArea,true);assert.equal(data.roomDetails[0].hue,215);}).catch(error=>{console.error(error);process.exitCode=1;});
+startDrawing();line(300,100,300,400);enterEdit();
+assert.equal(api.model().faces.length,2);assert.equal(api.roomDetails.filter(room=>room.name==='Dnevni boravak').length,1);
+assert.equal(new Set(api.roomDetails.map(room=>room.id)).size,2);
+api.undo();assert.equal(api.roomDetails.length,1);assert.equal(api.roomDetails[0].name,'Dnevni boravak');deselect();
+
+// Overall dimensions include wall thickness, ignore furniture, and have their own switch.
+el('showOverallMeasures').checked=true;el('showOverallMeasures').change();
+const totalBox=api.overallDimensions();assert.ok(totalBox);assert.ok(totalBox.width>0&&totalBox.depth>0);
+el('showMeasures').checked=false;el('showMeasures').change();labels.length=0;api.draw();
+assert.ok(labels.includes(totalBox.width.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm'));
+assert.ok(labels.includes(totalBox.depth.toLocaleString('hr-HR',{maximumFractionDigits:1})+' cm'));
+const totalBeforeFurniture=JSON.stringify(api.overallDimensions());api.addObject('desk');assert.equal(JSON.stringify(api.overallDimensions()),totalBeforeFurniture);
+el('showOverallMeasures').checked=false;el('showOverallMeasures').change();
+assert.equal(JSON.parse(memory.get('cadup_view_settings_v1')).overallMeasures,false);
+el('showMeasures').checked=true;el('showMeasures').change();
+
+// Insertion and dimension input retain an edge on the drawing grid.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('shelf');
+let insertedBox=context.CadObjects.selectionBounds(api.objects);const insertionUnit=100;
+assert.ok(Math.abs(insertedBox.left/insertionUnit-Math.round(insertedBox.left/insertionUnit))<1e-8);
+assert.ok(Math.abs(insertedBox.bottom/insertionUnit-Math.round(insertedBox.bottom/insertionUnit))<1e-8);
+el('objectWidth').value='45';el('objectDepth').value='35';el('objectForm').submit({preventDefault(){}});
+const resizedGridBox=context.CadObjects.selectionBounds(api.objects);assert.equal(resizedGridBox.left,insertedBox.left);assert.equal(resizedGridBox.bottom,insertedBox.bottom);
+// The editor grid starts at the object's lower-left edge, including odd half-sizes.
+deselect();const oddItem=api.objects[0],oddCenter={x:api.view.ox+oddItem.x*api.view.scale,y:api.view.oy+oddItem.y*api.view.scale};
+timedTap(oddCenter.x,oddCenter.y,70000);timedTap(oddCenter.x,oddCenter.y,70200);
+const oddCanvas=el('sketchBoard'),oddZoom=Math.min((oddCanvas.clientWidth-80)/45,(oddCanvas.clientHeight-80)/35),oddLeft=oddCanvas.clientWidth/2-45*oddZoom/2,oddBottom=oddCanvas.clientHeight/2+35*oddZoom/2;
+el('sketchdraw').onclick();
+for(const p of [{x:oddLeft+10*oddZoom,y:oddBottom-10*oddZoom},{x:oddLeft+25*oddZoom,y:oddBottom-20*oddZoom}]){oddCanvas.onpointerdown(event(p.x,p.y));oddCanvas.onpointerup(event(p.x,p.y));}
+el('sketchDone').onclick();const snappedStroke=api.objects[0].sketch.lines.at(-1);
+for(const n of [1,2]){
+ const x=(snappedStroke['x'+n]+50)*45/100,y=(snappedStroke['y'+n]-50)*35/100;
+ assert.ok(Math.abs(x/5-Math.round(x/5))<1e-8);assert.ok(Math.abs(y/5-Math.round(y/5))<1e-8);
+}
 deselect();

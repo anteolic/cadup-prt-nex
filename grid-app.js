@@ -74,7 +74,11 @@
  }
  function model(){
   const key=JSON.stringify(segments);
-  if(cachedKey!==key){const detected=GridGeometry.detectWithDoors(segments),layout=RoomGeometry.layout(detected.rooms,segments);const wallOutlines=layout.wallGroups.map(boxes=>RoomGeometry.union(boxes));cached={...detected,layout,junctions:GridGeometry.junctions(segments),wallOutline:{area:RoomGeometry.union([...layout.outer,...layout.inner]).area,edges:wallOutlines.flatMap(outline=>outline.edges)}};cachedKey=key;}
+  if(cachedKey!==key){
+   const detected=GridGeometry.detectWithDoors(segments),layout=RoomGeometry.layout(detected.rooms,segments),wallOutlines=layout.wallGroups.map(boxes=>RoomGeometry.union(boxes));
+   const wallOutline={area:RoomGeometry.union([...layout.outer,...layout.inner]).area,edges:wallOutlines.flatMap(outline=>outline.edges)};
+   cached={...detected,layout,junctions:GridGeometry.junctions(segments),wallOutline,measureEdges:RoomGeometry.wallDimensionEdges(layout,wallOutline.edges)};cachedKey=key;
+  }
   return cached;
  }
  const point=(x,y)=>({x:(x-ox)/scale,y:(y-oy)/scale});
@@ -385,7 +389,7 @@
    const horizontal=wall.y1===wall.y2,start=(horizontal?item.x:item.y)-item.width/2,end=start+item.width;
    for(const box of RoomGeometry.wallSelection(current.rooms,segments,wall,current.layout))openingCuts.push({axis:horizontal?'h':'v',start:Math.max(start,horizontal?box.x:box.y),end:Math.min(end,horizontal?box.x+box.width:box.y+box.height),low:horizontal?box.y:box.x,high:horizontal?box.y+box.height:box.x+box.width});
   }
-  for(const e of RoomGeometry.cutWallDimensions(current.wallOutline.edges,openingCuts.filter(cut=>cut.end>cut.start))){
+  for(const e of RoomGeometry.cutWallDimensions(current.measureEdges,openingCuts.filter(cut=>cut.end>cut.start))){
    const wall=e.axis==='h'?{x1:e.span[0],y1:e.line,x2:e.span[1],y2:e.line}:{x1:e.line,y1:e.span[0],x2:e.line,y2:e.span[1]};
    const center=visibleWallCenter(wall);if(!center)continue;
    const visibleLength=e.axis==='h'?Math.min(bounds.right,ox+wall.x2*scale)-Math.max(bounds.left,ox+wall.x1*scale):Math.min(bounds.bottom,oy+wall.y2*scale)-Math.max(bounds.top,oy+wall.y1*scale);

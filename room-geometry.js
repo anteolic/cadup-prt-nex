@@ -168,10 +168,39 @@ globalThis.RoomGeometry = (() => {
    return spans.map(span=>({...edge,span,...(cut?{cut:true}:{})}));
   });
  }
+ // Restore a continuous dimension across material overlaps without a real axis junction.
+ function wallDimensionEdges(layout,edges){
+  if(!layout.centered)return edges;const bridges=[];
+  for(const main of layout.physicalParts){
+   const wall=main.source,h=wall.y1===wall.y2,line=h?wall.y1:wall.x1,start=h?main.box.x:main.box.y,end=start+(h?main.box.width:main.box.height);
+   for(const other of layout.physicalParts){
+    const source=other.source;if((source.y1===source.y2)===h)continue;
+    const low=h?source.y1:source.x1,high=h?source.y2:source.x2;if(line>=low&&line<=high)continue;
+    const crossStart=h?other.box.x:other.box.y,crossEnd=crossStart+(h?other.box.width:other.box.height),a=Math.max(start,crossStart),b=Math.min(end,crossEnd);if(b<=a)continue;
+    const normalStart=h?other.box.y:other.box.x,normalEnd=normalStart+(h?other.box.height:other.box.width);
+    for(const side of [-1,1]){
+     const face=(h?main.box.y:main.box.x)+(side===1?(h?main.box.height:main.box.width):0);
+     if(face>normalStart&&face<normalEnd)bridges.push({axis:h?'h':'v',line:face,side,span:[a,b]});
+    }
+   }
+  }
+  if(!bridges.length)return edges;
+  const groups=new Map();for(const edge of [...edges,...bridges]){const key=edge.axis+':'+edge.line+':'+edge.side;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(edge);}
+  const result=[];for(const group of groups.values()){
+   group.sort((a,b)=>a.span[0]-b.span[0]);let current=null;
+   for(const edge of group){if(current&&edge.span[0]<=current.span[1])current.span[1]=Math.max(current.span[1],edge.span[1]);else{current={...edge,span:[...edge.span]};result.push(current);}}
+  }return result;
+ }
  function visibleWallDimension(rects,physicalWalls,wall,layout){
   const h=wall.y1===wall.y2,axis=h?'h':'v',line=h?wall.y1:wall.x1;
   const start=h?wall.x1:wall.y1,end=h?wall.x2:wall.y2,t=wall.thickness??defaultThickness(rects,wall);
-  const candidates=union([...layout.outer,...layout.inner]).edges.filter(e=>e.axis===axis&&Math.abs(e.line-line)<=t/2+.001)
+  const collinear=source=>(source.y1===source.y2)===h&&(h?source.y1:source.x1)===line&&(h?source.x2:source.y2)>=start&&(h?source.x1:source.y1)<=end;
+  const relevant=source=>{
+   if((source.y1===source.y2)===h)return collinear(source);
+   const crossing=h?source.x1:source.y1;return crossing>=start&&crossing<=end&&line>=(h?source.y1:source.x1)&&line<=(h?source.y2:source.x2);
+  };
+  const boxes=layout.centered?[...layout.physicalParts.filter(part=>relevant(part.source)).map(part=>part.box),...layout.physicalJoints.filter(joint=>joint.sources.some(collinear)&&joint.sources.every(relevant)).map(joint=>joint.box)]:[...layout.outer,...layout.inner];
+  const candidates=union(boxes).edges.filter(e=>e.axis===axis&&Math.abs(e.line-line)<=t/2+.001)
    .map(e=>({axis,line:e.line,start:Math.max(start,e.span[0]),end:Math.min(end,e.span[1]),side:e.side}))
    .filter(e=>e.end>e.start&&e.start<=(start+end)/2&&e.end>=(start+end)/2);
   candidates.sort((a,b)=>(a.end-a.start)-(b.end-b.start));
@@ -249,5 +278,5 @@ globalThis.RoomGeometry = (() => {
   let free=rects;for(const wall of inner)free=subtract(free,wall);
   return {outer,inner,net,area:union(free).area,segments};
  }
- return {connected,shell,union,subtract,defaultThickness,cutWallDimensions,visibleWallDimension,wallSelection,layout,roomKey,groups,split};
+ return {connected,shell,union,subtract,defaultThickness,cutWallDimensions,wallDimensionEdges,visibleWallDimension,wallSelection,layout,roomKey,groups,split};
 })();

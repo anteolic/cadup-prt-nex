@@ -134,3 +134,19 @@ const unjoinedLoop=RoomGeometry.layout([],almostClosed);assert.equal(unjoinedLoo
  assert.deepEqual(overlap.map(e=>e.span),[[100,255],[660,900]]);
  assert.deepEqual(RoomGeometry.cutWallDimensions([edges[0]],[{axis:'h',start:0,end:1000,low:385,high:415}]),[]);
 }
+
+// Only touching centerlines shorten the selected span; a nearby branch must not cut it.
+{
+ const top={x1:200,y1:500,x2:1000,y2:500,thickness:30},left={x1:200,y1:500,x2:200,y2:900,thickness:30},right={x1:1000,y1:500,x2:1000,y2:900,thickness:30},bottom={x1:200,y1:900,x2:1000,y2:900,thickness:30};
+ const rects=[{id:1,x:200,y:500,width:800,height:400}];
+ for(const gap of [1,10]){
+  const branch={x1:450,y1:500+gap,x2:450,y2:900,thickness:20},walls=[top,left,right,bottom,branch],layout=RoomGeometry.layout(rects,walls),d=RoomGeometry.visibleWallDimension(rects,walls,top,layout);
+  assert.equal(layout.wallGroups.length,1,'The branch also connects elsewhere, but not to the selected wall.');assert.equal(d.start,215);assert.equal(d.end,985);assert.equal(d.end-d.start,770);
+  assert.ok(!layout.physicalJoints.some(j=>j.x===450&&j.y===500));
+  const edges=layout.wallGroups.flatMap(boxes=>RoomGeometry.union(boxes).edges),measures=RoomGeometry.wallDimensionEdges(layout,edges);
+  assert.ok(measures.some(e=>e.axis==='h'&&e.line===515&&e.span[0]===215&&e.span[1]===985));
+  const swapped=walls.map(w=>({...w,x1:w.y1,y1:w.x1,x2:w.y2,y2:w.x2})),swappedRects=[{id:1,x:500,y:200,width:400,height:800}],vertical=RoomGeometry.visibleWallDimension(swappedRects,swapped,swapped[0],RoomGeometry.layout(swappedRects,swapped));assert.equal(vertical.end-vertical.start,770);
+ }
+ const joinedBranch={x1:450,y1:500,x2:450,y2:900,thickness:20},joinedWalls=[top,left,right,bottom,joinedBranch],joinedLayout=RoomGeometry.layout(rects,joinedWalls),joined=RoomGeometry.visibleWallDimension(rects,joinedWalls,{...top,x2:450},joinedLayout);
+ assert.equal(joined.start,215);assert.equal(joined.end,440);assert.equal(joined.end-joined.start,225);assert.ok(joinedLayout.physicalJoints.some(j=>j.x===450&&j.y===500));
+}

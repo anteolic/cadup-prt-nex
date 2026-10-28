@@ -226,9 +226,12 @@
  function objectHandles(){
   const item=objects.find(item=>item.id===editingObjectId);if(!item||objectIds.size!==1||!objectIds.has(item.id))return [];
   const box=objectControlBounds(),offset=14*handleScale()+8,angle=item.rotation*Math.PI/180,c=Math.round(Math.cos(angle)),s=Math.round(Math.sin(angle));
-  return [{x:box.right,y:box.y,nx:1,ny:0},{x:box.x,y:box.bottom,nx:0,ny:1}].map(handle=>{
-   const widthDirection=handle.nx*c+handle.ny*s,axis=widthDirection?'width':'depth',side=widthDirection||(-handle.nx*s+handle.ny*c),p=screen(handle);
-   return {...handle,axis,side,item,x:p.x+handle.nx*offset,y:p.y+handle.ny*offset};
+  const corners=[{x:box.left,y:box.top},{x:box.right,y:box.bottom}].map(p=>displayPoint(screen(p)));
+  const left=Math.min(...corners.map(p=>p.x)),right=Math.max(...corners.map(p=>p.x)),top=Math.min(...corners.map(p=>p.y)),bottom=Math.max(...corners.map(p=>p.y));
+  return [{x:right+offset,y:(top+bottom)/2,nx:1,ny:0},{x:(left+right)/2,y:bottom+offset,nx:0,ny:1}].map(handle=>{
+   const p=displayPoint(handle,true),origin=displayPoint({x:0,y:0},true),normal=displayPoint({x:handle.nx,y:handle.ny},true),nx=Math.round(normal.x-origin.x),ny=Math.round(normal.y-origin.y);
+   const widthDirection=nx*c+ny*s,axis=widthDirection?'width':'depth',side=widthDirection||(-nx*s+ny*c);
+   return {...handle,nx,ny,axis,side,item,x:p.x,y:p.y};
   });
  }
  const CONTROL_COLOR='#4b5563';
@@ -240,6 +243,8 @@
   g.strokeStyle=CONTROL_COLOR;g.lineWidth=1.5;g.lineCap='round';g.lineJoin='round';g.setLineDash([]);
   if(kind==='resize'){
    g.beginPath();g.moveTo(-3.5,-3.5);g.lineTo(-7,0);g.lineTo(-3.5,3.5);g.moveTo(3.5,-3.5);g.lineTo(7,0);g.lineTo(3.5,3.5);g.stroke();
+  }else if(kind==='delete'){
+   g.beginPath();g.moveTo(-4,-4);g.lineTo(4,4);g.moveTo(4,-4);g.lineTo(-4,4);g.stroke();
   }else if(kind==='duplicate'){
    g.strokeRect(-3,-3,9,9);g.beginPath();g.moveTo(-6,3);g.lineTo(-6,-6);g.lineTo(3,-6);g.stroke();
   }else if(kind==='mirror'){
@@ -252,17 +257,25 @@
  function drawObjectHandles(){
   for(const handle of objectHandles()){
    if(gesture?.type==='object-resize'&&gesture.axis===handle.axis)continue;
-   g.save();g.translate(handle.x,handle.y);g.rotate(handle.ny?Math.PI/2:0);g.scale(handleScale(),handleScale());drawControlCircle(true);drawControlGlyph('resize');g.restore();
+   g.save();g.translate(handle.x,handle.y);g.rotate(Math.atan2(handle.ny,handle.nx));g.scale(handleScale(),handleScale());drawControlCircle(true);drawControlGlyph('resize');g.restore();
   }
  }
  function objectViewportActions(){
   const box=objectControlBounds();if(!box||mode!=='edit')return [];
   const corners=[{x:box.left,y:box.top},{x:box.right,y:box.top},{x:box.left,y:box.bottom},{x:box.right,y:box.bottom}].map(p=>displayPoint(screen(p)));
   const left=Math.min(...corners.map(p=>p.x)),right=Math.max(...corners.map(p=>p.x)),top=Math.min(...corners.map(p=>p.y)),bottom=Math.max(...corners.map(p=>p.y)),offset=10*handleScale()+2;
-  return [{action:'duplicate',screenX:left-offset,screenY:top-offset},{action:'mirror',screenX:right+offset,screenY:top-offset},{action:'rotate',screenX:left-offset,screenY:bottom+offset}].map(action=>({...action,...displayPoint({x:action.screenX,y:action.screenY},true)}));
+  const spacing=30*handleScale(),center=(left+right)/2;
+  return ['delete','rotate','mirror','duplicate'].map((action,index)=>({action,screenX:center+(index-1.5)*spacing,screenY:top-20*handleScale()-8})).map(action=>({...action,...displayPoint({x:action.screenX,y:action.screenY},true)}));
  }
  function drawObjectViewportActions(){
-  for(const action of objectViewportActions()){
+  const actions=objectViewportActions(),grouped=actions;
+  if(grouped.length){
+   const padding=17*handleScale(),left=grouped[0].screenX-padding,top=grouped[0].screenY-padding,width=grouped[grouped.length-1].screenX-grouped[0].screenX+2*padding;
+   g.save();g.globalAlpha=1;g.setTransform(dpr,0,0,dpr,0,0);
+   g.fillStyle='#ffffff';g.strokeStyle='#cbd5e1';g.lineWidth=1;
+   g.beginPath();g.roundRect(left,top,width,2*padding,9*handleScale());g.fill();g.stroke();g.restore();
+  }
+  for(const action of actions){
    g.save();g.globalAlpha=1;g.setTransform(dpr,0,0,dpr,0,0);g.translate(action.screenX,action.screenY);g.scale(handleScale(),handleScale());
    drawControlCircle(true,gesture?.type==='object-action'&&gesture.action===action.action);drawControlGlyph(action.action);g.restore();
   }
@@ -570,7 +583,7 @@
    if(box&&(raw.x<box.left||raw.x>box.right||raw.y<box.top||raw.y>box.bottom)){closeGroupEditor();return;}
   }
   if(handleGroupDoubleTap(e,p,last,cancelled))return;
-  if(last?.type==='object-action'){if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9){if(last.action==='mirror')mirrorSelectedObjects();else if(last.action==='duplicate')duplicateSelectedObjects();else rotateSelectedObjects();}else{status();draw();}return;}
+  if(last?.type==='object-action'){if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9){if(last.action==='mirror')mirrorSelectedObjects();else if(last.action==='duplicate')duplicateSelectedObjects();else if(last.action==='delete')deleteSelectedObjects();else rotateSelectedObjects();}else{status();draw();}return;}
   if(last?.type==='erase-span'){if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9)deleteEraseTarget(last.target);else{eraseHover=null;eraseObjectIds=[];draw();}return;}
   if(last?.type==='pick-pan'){
    if(!cancelled&&!last.moved&&Math.hypot(p.x-last.start.x,p.y-last.start.y)<=9){
@@ -773,12 +786,11 @@
   const items=objects.filter(item=>objectIds.has(item.id)),count=items.length;
   editingObjectId=count===1&&(!items[0].group||items[0].group===editingGroup)?items[0].id:null;
   $('objectMulti').setAttribute('aria-pressed',String(objectMulti));$('objectMulti').classList.toggle('active',objectMulti);
-  $('objectGroup').disabled=!!editingGroup||count<2;$('objectUngroup').disabled=!!editingGroup||!items.some(item=>item.group);$('objectCopy').disabled=!count;$('objectDelete').disabled=!count;
+  $('objectGroup').disabled=!!editingGroup||count<2;$('objectUngroup').disabled=!!editingGroup||!items.some(item=>item.group);$('objectCopy').disabled=!count;
   const group=items[0]?.group,canEditGroup=!!group&&items.every(item=>item.group===group);
   const selectedGroup=canEditGroup&&!editingGroup,hasGroups=items.some(item=>item.group)&&!editingGroup;
   const showDimensions=count===1&&!objectMulti&&!selectedGroup;
   $('objectForm').hidden=!showDimensions;
-  $('objectDelete').hidden=objectMulti;
   $('objectGroupMenu').hidden=!objectMulti&&!selectedGroup&&!editingGroup;
   $('objectGroup').hidden=!objectMulti||hasGroups;
   $('objectUngroup').hidden=!hasGroups;
@@ -872,10 +884,10 @@
  $('objectCopy').addEventListener('click',duplicateSelectedObjects);
  $('objectGroup').addEventListener('click',()=>{if(editingGroup||objectIds.size<2)return;const before=snapshot();objects=CadObjects.group(objects,[...objectIds]);objectMulti=false;commitObjects(before,[...objectIds]);});
  $('objectUngroup').addEventListener('click',()=>{if(editingGroup)return;const before=snapshot();objects=CadObjects.ungroup(objects,[...objectIds]);commitObjects(before,[...objectIds]);});
- $('objectDelete').addEventListener('click',()=>{
+ function deleteSelectedObjects(){
   if(!objectIds.size)return;
   const before=snapshot();objects=objects.filter(item=>!objectIds.has(item.id));objectMulti=false;commitObjects(before);
- });
+ }
  function applyObjectInputs(e){
   e.preventDefault();if(objectIds.size!==1||objectMulti||$('objectForm').hidden)return;const parse=id=>Number($(id).value.trim().replace(',','.'));
   try{const before=snapshot();objects=CadObjects.resize(objects,[...objectIds],parse('objectWidth'),parse('objectDepth'),objects.find(item=>objectIds.has(item.id))?.rotation??0);commitObjects(before,[...objectIds]);}

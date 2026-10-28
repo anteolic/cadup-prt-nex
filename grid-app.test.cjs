@@ -343,7 +343,7 @@ assert.equal(api.objectIds.length,2);el('objectGroup').click();assert.ok(api.obj
 const groupedFurniture=JSON.stringify(api.objects);el('objectCopy').click();assert.equal(api.objects.length,4);assert.notEqual(api.objects[2].group,api.objects[0].group);
 api.undo();assert.equal(JSON.stringify(api.objects),groupedFurniture);api.redo();assert.equal(api.objects.length,4);
 let groupPoint=api.objects[2];click(objectView.ox+groupPoint.x*objectView.scale,objectView.oy+groupPoint.y*objectView.scale);assert.equal(api.objectIds.length,2);
-el('objectDelete').click();assert.equal(api.objects.length,2);api.undo();assert.equal(api.objects.length,4);
+clickObjectAction('delete');assert.equal(api.objects.length,2);api.undo();assert.equal(api.objects.length,4);
 api.addObject('stairs');assert.equal(api.objects.length,5);assert.equal(api.objects.at(-1).kind,'stairs');
 const beforeInvalidObject=JSON.stringify(api.objects);el('objectWidth').value='0';el('objectForm').submit({preventDefault(){}});assert.equal(JSON.stringify(api.objects),beforeInvalidObject);assert.ok(el('objectError').textContent);
 const beforeObjectClear=JSON.stringify(api.objects);el('clearAll').click();el('clearAll').click();assert.equal(api.objects.length,0);api.undo();assert.equal(JSON.stringify(api.objects),beforeObjectClear,'Briši sve i undo čuvaju cijelu scenu');
@@ -471,7 +471,7 @@ el('eraseMode').click();click(groupPoints[1].x,groupPoints[1].y);assert.equal(ap
 el('clearAll').click();el('clearAll').click();startDrawing();click(100,100);blueDraftStrokes=0;board.pointermove(event(200,100));assert.ok(blueDraftStrokes>0);finishDrawing();
 
 // Zasebna tipka briše predmet odmah; Undo ga vraća.
-api.addObject('chair');const deleteButtonBefore=JSON.stringify(api.objects);el('objectDelete').click();assert.equal(api.objects.length,0);api.undo();assert.equal(JSON.stringify(api.objects),deleteButtonBefore);
+api.addObject('chair');const deleteButtonBefore=JSON.stringify(api.objects);clickObjectAction('delete');assert.equal(api.objects.length,0);api.undo();assert.equal(JSON.stringify(api.objects),deleteButtonBefore);
 
 // Selected wall editor deletes immediately and supports Undo.
 el('clearAll').click();el('clearAll').click();line(100,100,300,100);enterEdit();click(200,100);
@@ -574,13 +574,13 @@ el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);en
 board.pointerdown(event(700,600,1));board.pointerdown(event(800,600,2));board.pointermove(event(850,600,2));board.pointerup(event(850,600,2));board.pointerup(event(700,600,1));assert.equal(JSON.stringify(api.selection),keptWall);assert.equal(el('wallActions').hidden,false);assert.equal(memory.get('infoa_grid_loops_v1'),keptWallScene);deselect();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
 
 // Canvas actions stay at screen corners and share Mirror/Rotate undo semantics.
-el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');const actionObject=JSON.parse(JSON.stringify(api.objects[0])),actionCamera={...api.view};assert.equal(api.objectViewportActions().length,3);
-let mirrorCorner=api.objectViewportActions().find(a=>a.action==='mirror'),rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');assert.ok(mirrorCorner.screenX>rotateCorner.screenX);assert.ok(mirrorCorner.screenY<rotateCorner.screenY);click(mirrorCorner.x,mirrorCorner.y);assert.equal(api.objects[0].mirrored,true);assert.equal(api.objects[0].rotation,actionObject.rotation);assert.deepEqual({...api.view},actionCamera);
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');const actionObject=JSON.parse(JSON.stringify(api.objects[0])),actionCamera={...api.view};assert.equal(api.objectViewportActions().length,4);
+let mirrorCorner=api.objectViewportActions().find(a=>a.action==='mirror'),rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');assert.ok(mirrorCorner.screenX>rotateCorner.screenX);assert.equal(mirrorCorner.screenY,rotateCorner.screenY);click(mirrorCorner.x,mirrorCorner.y);assert.equal(api.objects[0].mirrored,true);assert.equal(api.objects[0].rotation,actionObject.rotation);assert.deepEqual({...api.view},actionCamera);
 rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');click(rotateCorner.x,rotateCorner.y);assert.equal(api.objects[0].rotation,90);api.undo();assert.equal(api.objects[0].rotation,0);api.undo();assert.equal(api.objects[0].mirrored,undefined);
-el('viewportRotate').click();mirrorCorner=api.objectViewportActions().find(a=>a.action==='mirror');rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');assert.ok(mirrorCorner.screenX>rotateCorner.screenX);assert.ok(mirrorCorner.screenY<rotateCorner.screenY);const displayedMirror=api.displayPoint(mirrorCorner);click(displayedMirror.x,displayedMirror.y);assert.equal(api.objects[0].mirrored,true);assert.equal(api.objects[0].rotation,0);
+el('viewportRotate').click();mirrorCorner=api.objectViewportActions().find(a=>a.action==='mirror');rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');assert.ok(mirrorCorner.screenX>rotateCorner.screenX);assert.equal(mirrorCorner.screenY,rotateCorner.screenY);const displayedMirror=api.displayPoint(mirrorCorner);click(displayedMirror.x,displayedMirror.y);assert.equal(api.objects[0].mirrored,true);assert.equal(api.objects[0].rotation,0);
 
 // Active canvas actions do not inherit the dimmed group's background opacity.
-paintCalls.length=0;canvas.globalAlpha=.2;api.drawObjectViewportActions();const activeActionFills=paintCalls.filter(p=>p.color==='rgba(255,255,255,0.96)');assert.equal(activeActionFills.length,3);assert.ok(activeActionFills.every(p=>p.alpha===1));
+paintCalls.length=0;canvas.globalAlpha=.2;api.drawObjectViewportActions();const activeActionFills=paintCalls.filter(p=>p.color==='rgba(255,255,255,0.96)');assert.equal(activeActionFills.length,4);assert.ok(activeActionFills.every(p=>p.alpha===1));
 
 for(const [id,mode] of [['selectMode','edit'],['drawMode','draw'],['eraseMode','erase'],['selectMode','edit']]){el(id).click();el(id).click();assert.equal(api.mode,mode);assert.equal(['selectMode','drawMode','eraseMode'].filter(key=>el(key).attributes['aria-pressed']==='true').length,1);}
 
@@ -621,14 +621,28 @@ deselect();assert.equal(el('modeTools').hidden,false);
 
 // Multi selection only offers grouping; a selected group offers delete and ungroup.
 api.addObject('desk');el('objectMulti').click();
-assert.equal(el('objectForm').hidden,true);assert.equal(el('objectDelete').hidden,true);
+assert.equal(el('objectForm').hidden,true);
 assert.equal(el('objectGroup').hidden,false);assert.equal(el('objectUngroup').hidden,true);
 el('objectMulti').click();
 // Use an isolated scene to create a group without overlapping hit targets.
 el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');drag(500,400,650,400);api.addObject('chair');
 el('objectMulti').click();click(650,400);el('objectGroup').click();
 assert.equal(api.objectIds.length,2);assert.equal(el('objectForm').hidden,true);
-assert.equal(el('objectDelete').hidden,false);assert.equal(el('objectGroup').hidden,true);
+assert.equal(el('objectGroup').hidden,true);
 assert.equal(el('objectUngroup').hidden,false);assert.equal(el('objectGroupMenu').hidden,false);
 el('objectUngroup').click();assert.ok(api.objects.every(item=>!item.group));
+deselect();
+
+// Size grips stay right/bottom on screen; action icons share a row above the object.
+el('clearAll').click();el('clearAll').click();api.addObject('desk');
+for(let turn=0;turn<4;turn++){
+ const actions=api.objectViewportActions();assert.deepEqual(Array.from(actions,a=>a.action),['delete','rotate','mirror','duplicate']);
+ assert.ok(actions.every(a=>a.screenY===actions[0].screenY));
+ const item=api.objects[0],center=api.displayPoint({x:api.view.ox+item.x*api.view.scale,y:api.view.oy+item.y*api.view.scale});
+ const grips=api.objectHandles().map(h=>api.displayPoint(h));
+ assert.ok(grips[0].x>center.x);assert.ok(Math.abs(grips[0].y-center.y)<1e-7);
+ assert.ok(grips[1].y>center.y);assert.ok(Math.abs(grips[1].x-center.x)<1e-7);
+ el('viewportRotate').click();
+}
+clickObjectAction('delete');assert.equal(api.objects.length,0);api.undo();assert.equal(api.objects.length,1);
 deselect();

@@ -73,7 +73,7 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
 .object-buttons,.custom-save-form,#dimensionError,#objectError,#customMessage{grid-column:1 / -1}
 .object-buttons{margin-top:0}.object-buttons #saveCustom{flex-basis:auto}
 
-#objectActions:not([hidden]){grid-template-columns:auto minmax(0,1fr) auto}
+#objectActions:not([hidden]){grid-template-columns:minmax(0,1fr) auto}
 #objectTitle{display:none}
 #objectMulti{min-height:36px;max-width:90px;margin:0;padding:6px;font-size:11px}
 #objectGroupMenu[hidden]{display:none}
@@ -84,9 +84,9 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
 #objectError:empty,#dimensionError:empty,#customMessage:empty{display:none}
 
 #objectForm[hidden]{display:none}
-#objectActions.group-controls{grid-template-columns:auto minmax(0,1fr) auto}
-#objectActions.group-controls #objectGroupMenu{grid-column:2;grid-row:1;justify-content:flex-start}
-#objectActions.group-controls #objectMulti{grid-column:3;grid-row:1}
+#objectActions.group-controls{grid-template-columns:minmax(0,1fr) auto}
+#objectActions.group-controls #objectGroupMenu{grid-column:1;grid-row:1;justify-content:flex-start}
+#objectActions.group-controls #objectMulti{grid-column:2;grid-row:1}
 </style>
 </head>
 <body>
@@ -111,7 +111,7 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
   <p id="customMessage" role="status"></p>
    <details class="view-settings"><summary>Postavke</summary><label><span>Neprekinuto crtanje</span><input id="continuousDrawing" type="checkbox" checked></label><label><span>Automatski puni zaslon</span><input id="autoFullscreen" type="checkbox" checked></label><label><span>Grid</span><input id="showGrid" type="checkbox" checked></label><label><span>Prikaži mjere</span><input id="showMeasures" type="checkbox" checked></label></details>
    <button id="reloadApp" class="file-action" type="button">↻ Učitaj novu verziju</button>
-   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v111</small></div>
+   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v115</small></div>
   </div>
  </details>
  <input id="jsonFile" type="file" accept=".json,application/json" hidden>
@@ -131,7 +131,6 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
  </div>
  <div id="objectActions" class="object-actions" hidden>
   <div id="objectTitle" class="object-title"></div>
-  <button id="objectDelete" type="button" class="selection-delete">Obriši</button>
   <form id="objectForm" class="object-fields">
    <label>Širina (cm)<input id="objectWidth" type="text" inputmode="decimal" required></label>
    <label>Dubina (cm)<input id="objectDepth" type="text" inputmode="decimal" required></label>
@@ -142,9 +141,9 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
   <p id="objectError" role="alert"></p>
  </div>
 </footer>
-<script src="room-geometry.js?v=20261028-111"></script>
-<script src="grid-geometry.js?v=20261028-111"></script>
-<script src="cad-objects.js?v=20261028-111"></script>
-<script src="grid-app.js?v=20261028-111"></script>
+<script src="room-geometry.js?v=20261028-115"></script>
+<script src="grid-geometry.js?v=20261028-115"></script>
+<script src="cad-objects.js?v=20261028-115"></script>
+<script src="grid-app.js?v=20261028-115"></script>
 </body>
 </html>

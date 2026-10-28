@@ -57,11 +57,11 @@ globalThis.CadObjects=(()=>{
   // Anchor the actual lower-left corner, not the original object centre.
   return move(items,ids,Math.round((box.left+dx)/unit)*unit-box.left,Math.round((box.bottom+dy)/unit)*unit-box.bottom);
  }
- function resizeFromHandle(items,id,axis,delta,unit=5){
+ function resizeFromHandle(items,id,axis,delta,unit=5,side=null){
   const item=items.find(item=>item.id===id);if(!item||!['width','depth'].includes(axis)||!Number.isFinite(delta))return clone(items);
-  const opening=['door','double-door'].includes(item.kind),direction=axis==='depth'&&opening?-1:1;
+  const opening=['door','double-door'].includes(item.kind),direction=side===null&&axis==='depth'&&opening?-1:1;
   const size=Math.max(5,Math.min(2000,Math.round((item[axis]+delta*direction)/unit)*unit)),change=size-item[axis];
-  const dx=axis==='width'?change/2*(item.mirrored?-1:1):0,dy=axis==='depth'&&!opening?change/2:0,angle=item.rotation*Math.PI/180;
+  const dx=axis==='width'?change/2*(side??(item.mirrored?-1:1)):0,dy=axis==='depth'?(opening?(side===1?change:0):change/2*(side??1)):0,angle=item.rotation*Math.PI/180;
   const next={...item,[axis]:size,x:item.x+dx*Math.cos(angle)-dy*Math.sin(angle),y:item.y+dx*Math.sin(angle)+dy*Math.cos(angle)},box=bounds(next);
   if(box.left<0||box.top<0||box.right>2000||box.bottom>2000)return clone(items);
   return items.map(other=>other.id===id?next:{...other});

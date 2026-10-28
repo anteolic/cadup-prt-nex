@@ -60,6 +60,33 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
 @media(max-width:360px){header{gap:4px;padding-inline:8px}header .top-action{width:32px}header #mainTools #drawMode,header #mainTools #eraseMode{flex-basis:34px;width:34px;min-width:34px}.object-menu>summary{width:34px}header>.top-menu>summary{min-width:32px}}
 #modeTools{position:fixed;bottom:0;left:0;right:0;z-index:21;display:flex;justify-content:center;gap:10px;padding:8px 12px max(8px,env(safe-area-inset-bottom));background:#fffffff2;border-top:1px solid #dde4ec;box-shadow:0 -2px 12px #16233512}#modeTools .tool{width:46px;height:42px;flex:none;padding:8px;border-radius:10px}#modeTools svg{display:block;width:24px;height:24px;margin:auto}#editorFooter{bottom:calc(59px + max(0px,env(safe-area-inset-bottom) - 8px));padding-bottom:5px;max-height:calc(45dvh - 59px)}
 #selectMode.active{color:#7e22ce;background:#f3e8ff;border-color:#9333ea;box-shadow:inset 0 0 0 1px #9333ea}
+
+#modeTools[hidden]{display:none}
+#editorFooter{bottom:0;max-height:45dvh;padding:8px 8px max(8px,env(safe-area-inset-bottom))}
+#wallActions,#objectActions{border:0;background:transparent;padding:0;margin:0}
+#wallActions:not([hidden]),#objectActions:not([hidden]){display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;align-items:end}
+#objectTitle{grid-column:1 / -1;margin:0}
+#dimensionForm,#objectForm{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+#dimensionForm label,#objectForm label{font-size:10px;color:#1e40af;font-weight:650}
+#dimensionForm input,#objectForm input{margin-top:3px;padding:7px 5px;border:1px solid #93c5fd;border-radius:7px;font-size:16px}
+#editorFooter .selection-delete{min-height:36px;color:#b91c1c;background:#fff1f2;border:1px solid #fecaca;border-radius:7px;padding:6px 9px}
+.object-buttons,.custom-save-form,#dimensionError,#objectError,#customMessage{grid-column:1 / -1}
+.object-buttons{margin-top:0}.object-buttons #saveCustom{flex-basis:auto}
+
+#objectActions:not([hidden]){grid-template-columns:auto minmax(0,1fr) auto}
+#objectTitle{display:none}
+#objectMulti{min-height:36px;max-width:90px;margin:0;padding:6px;font-size:11px}
+#objectGroupMenu[hidden]{display:none}
+#objectGroupMenu{grid-column:1 / -1;justify-content:flex-end}
+#objectGroupMenu button{flex:0 1 auto}
+#customSaveForm,#customMessage{grid-column:1 / -1}
+#customSaveForm button{border:1px solid #cbd5e1;border-radius:7px;background:#f2f6fb;color:#1a456d}
+#objectError:empty,#dimensionError:empty,#customMessage:empty{display:none}
+
+#objectForm[hidden]{display:none}
+#objectActions.group-controls{grid-template-columns:auto minmax(0,1fr) auto}
+#objectActions.group-controls #objectGroupMenu{grid-column:2;grid-row:1;justify-content:flex-start}
+#objectActions.group-controls #objectMulti{grid-column:3;grid-row:1}
 </style>
 </head>
 <body>
@@ -76,10 +103,15 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
    <button id="fit" class="file-action">Cijelo</button>
    <button id="clearAll" class="file-action">Briši sve</button>
    <button id="saveJson" class="file-action">Spremi JSON</button>
+   <button id="saveCustom" type="button" class="file-action">Spremi u biblioteku</button>
    <button id="importJson" class="file-action">Uvezi JSON</button>
+  <form id="customSaveForm" class="custom-save-form" hidden>
+   <label for="customName">Naziv custom objekta</label><input id="customName" type="text" maxlength="60" autocomplete="off" required><button type="submit">Spremi</button>
+  </form>
+  <p id="customMessage" role="status"></p>
    <details class="view-settings"><summary>Postavke</summary><label><span>Neprekinuto crtanje</span><input id="continuousDrawing" type="checkbox" checked></label><label><span>Automatski puni zaslon</span><input id="autoFullscreen" type="checkbox" checked></label><label><span>Grid</span><input id="showGrid" type="checkbox" checked></label><label><span>Prikaži mjere</span><input id="showMeasures" type="checkbox" checked></label></details>
    <button id="reloadApp" class="file-action" type="button">↻ Učitaj novu verziju</button>
-   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v105</small></div>
+   <div class="menu-credit">Ante Olić · <a href="https://infoa.hr" target="_blank" rel="noopener noreferrer">INFOA</a> · Poreč<br><small class="app-version">v111</small></div>
   </div>
  </details>
  <input id="jsonFile" type="file" accept=".json,application/json" hidden>
@@ -90,30 +122,29 @@ header .top-action{width:36px;height:34px;font-size:22px}header #mainTools #draw
 <nav id="modeTools" aria-label="Alati"><button id="selectMode" class="tool active" aria-pressed="true" aria-label="Odabir" title="Odabir"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 3 14 10-7 1-3 7L5 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button><button id="drawMode" class="tool" aria-pressed="false" aria-label="Crtaj" title="Crtaj"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 15-1 6 6-1L21 8a2 2 0 0 0 0-3l-2-2a2 2 0 0 0-3 0L4 15Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m13 6 5 5M4 15l5 5" stroke="currentColor" stroke-width="1.8"/></svg></button><button id="eraseMode" class="tool" aria-pressed="false" aria-label="Gumica: dodirni za brisanje" title="Gumica"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 14 9-10a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 9H9l-5-5a2 2 0 0 1 0-2Z" stroke="currentColor" stroke-width="1.8"/><path d="m8 10 9 8M12 21h10" stroke="currentColor" stroke-width="1.8"/></svg></button></nav>
 <footer id="editorFooter" hidden>
  <div id="wallActions" class="wall-actions" hidden aria-label="Uređivanje odabranog zida">
+  <button id="wallDelete" type="button" class="selection-delete">Briši</button>
   <form id="dimensionForm" class="dimension-fields">
    <label for="dimensionValue">Vidljivi segment zida (cm)<input id="dimensionValue" type="text" inputmode="decimal" autocomplete="off" required aria-describedby="dimensionError"></label>
    <label for="dimensionThickness">Debljina (cm)<input id="dimensionThickness" type="text" inputmode="decimal" autocomplete="off" required aria-describedby="dimensionError"></label>
   </form>
-  <button id="wallDelete" type="button" style="color:#b91c1c;border-color:#fecaca;margin-top:5px">Briši</button>
   <p id="dimensionError" role="alert"></p>
  </div>
  <div id="objectActions" class="object-actions" hidden>
   <div id="objectTitle" class="object-title"></div>
+  <button id="objectDelete" type="button" class="selection-delete">Obriši</button>
   <form id="objectForm" class="object-fields">
    <label>Širina (cm)<input id="objectWidth" type="text" inputmode="decimal" required></label>
    <label>Dubina (cm)<input id="objectDepth" type="text" inputmode="decimal" required></label>
   </form>
-  <div class="object-buttons"><button id="objectEditGroup" type="button" aria-pressed="false" hidden>Uredi grupu</button><button id="objectCopy" type="button">Dupliciraj</button><button id="objectMulti" type="button" aria-pressed="false">Više odabira</button><button id="objectGroup" type="button">Grupiraj</button><button id="objectUngroup" type="button">Razgrupiraj</button><button id="objectDelete" type="button">Obriši</button><button id="saveCustom" type="button">Spremi u biblioteku</button></div>
-  <form id="customSaveForm" class="custom-save-form" hidden>
-   <label for="customName">Naziv custom objekta</label><input id="customName" type="text" maxlength="60" autocomplete="off" required><button type="submit">Spremi</button>
-  </form>
-  <p id="customMessage" role="status"></p>
+  <button id="objectMulti" type="button" aria-pressed="false">Više odabira</button>
+  <div id="objectGroupMenu" class="object-buttons" hidden><button id="objectEditGroup" type="button" aria-pressed="false" hidden>Uredi grupu</button><button id="objectGroup" type="button">Grupiraj</button><button id="objectUngroup" type="button">Razgrupiraj</button></div>
+  <button id="objectCopy" type="button" hidden>Dupliciraj</button>
   <p id="objectError" role="alert"></p>
  </div>
 </footer>
-<script src="room-geometry.js?v=20261028-105"></script>
-<script src="grid-geometry.js?v=20261028-105"></script>
-<script src="cad-objects.js?v=20261028-105"></script>
-<script src="grid-app.js?v=20261028-105"></script>
+<script src="room-geometry.js?v=20261028-111"></script>
+<script src="grid-geometry.js?v=20261028-111"></script>
+<script src="cad-objects.js?v=20261028-111"></script>
+<script src="grid-app.js?v=20261028-111"></script>
 </body>
 </html>

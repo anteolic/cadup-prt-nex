@@ -157,7 +157,7 @@ el('topMenu').open=true;click(100,100);assert.equal(el('topMenu').open,false);
 el('topMenu').open=true;enterEdit();assert.equal(el('topMenu').open,false);
 el('topMenu').open=true;context.document.pointerdown({target:{closest:()=>null}});assert.equal(el('topMenu').open,false);
 el('topMenu').open=true;context.document.pointerdown({target:{closest:()=>el('topMenu')}});assert.equal(el('topMenu').open,true);
-el('topMenu').open=false;
+el('topMenu').open=false;api.fit();
 
 // Dimenzije su samo oznake; uređivanje počinje odabirom samog zida.
 el('clearAll').click();el('clearAll').click();startDrawing();
@@ -487,7 +487,7 @@ el('eraseMode').click();drag(500,500,470,460);assert.equal(api.mode,'erase');ass
 // Open a group, edit one member, duplicate inside it, and close without ungrouping.
 el('clearAll').click();el('clearAll').click();api.fit();api.addCustomObject(api.customLibrary[0].id);
 const groupMembers=JSON.parse(JSON.stringify(api.objects)),member=groupMembers[0],otherMember=groupMembers[1],groupView=api.view,groupCamera={...api.view};
-assert.equal(api.objectIds.length,2);assert.equal(el('objectEditGroup').hidden,false);el('objectEditGroup').click();assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');assert.equal(api.objectIds.length,0);assert.equal(el('objectActions').hidden,false);
+assert.equal(api.objectIds.length,2);assert.equal(el('objectEditGroup').hidden,true);el('objectEditGroup').click();assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');assert.equal(api.objectIds.length,0);assert.equal(el('objectActions').hidden,false);
 click(groupView.ox+member.x*groupView.scale,groupView.oy+member.y*groupView.scale);assert.equal(api.objectIds.length,1);assert.equal(api.objectIds[0],member.id);
 el('objectWidth').value=String(member.width+20);el('objectForm').submit({preventDefault(){}});assert.equal(api.objects.find(o=>o.id===member.id).width,member.width+20);assert.equal(JSON.stringify(api.objects.find(o=>o.id===otherMember.id)),JSON.stringify(otherMember));
 el('objectCopy').click();assert.equal(api.objects.length,3);assert.ok(api.objects.every(o=>o.group===member.group));api.undo();assert.equal(api.objects.length,2);assert.equal(el('objectEditGroup').textContent,'Zatvori grupu');
@@ -574,12 +574,61 @@ el('clearAll').click();el('clearAll').click();api.fit();line(100,100,300,100);en
 board.pointerdown(event(700,600,1));board.pointerdown(event(800,600,2));board.pointermove(event(850,600,2));board.pointerup(event(850,600,2));board.pointerup(event(700,600,1));assert.equal(JSON.stringify(api.selection),keptWall);assert.equal(el('wallActions').hidden,false);assert.equal(memory.get('infoa_grid_loops_v1'),keptWallScene);deselect();assert.equal(api.selection,null);assert.equal(el('wallActions').hidden,true);
 
 // Canvas actions stay at screen corners and share Mirror/Rotate undo semantics.
-el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');const actionObject=JSON.parse(JSON.stringify(api.objects[0])),actionCamera={...api.view};assert.equal(api.objectViewportActions().length,2);
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');const actionObject=JSON.parse(JSON.stringify(api.objects[0])),actionCamera={...api.view};assert.equal(api.objectViewportActions().length,3);
 let mirrorCorner=api.objectViewportActions().find(a=>a.action==='mirror'),rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');assert.ok(mirrorCorner.screenX>rotateCorner.screenX);assert.ok(mirrorCorner.screenY<rotateCorner.screenY);click(mirrorCorner.x,mirrorCorner.y);assert.equal(api.objects[0].mirrored,true);assert.equal(api.objects[0].rotation,actionObject.rotation);assert.deepEqual({...api.view},actionCamera);
 rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');click(rotateCorner.x,rotateCorner.y);assert.equal(api.objects[0].rotation,90);api.undo();assert.equal(api.objects[0].rotation,0);api.undo();assert.equal(api.objects[0].mirrored,undefined);
 el('viewportRotate').click();mirrorCorner=api.objectViewportActions().find(a=>a.action==='mirror');rotateCorner=api.objectViewportActions().find(a=>a.action==='rotate');assert.ok(mirrorCorner.screenX>rotateCorner.screenX);assert.ok(mirrorCorner.screenY<rotateCorner.screenY);const displayedMirror=api.displayPoint(mirrorCorner);click(displayedMirror.x,displayedMirror.y);assert.equal(api.objects[0].mirrored,true);assert.equal(api.objects[0].rotation,0);
 
 // Active canvas actions do not inherit the dimmed group's background opacity.
-paintCalls.length=0;canvas.globalAlpha=.2;api.drawObjectViewportActions();const activeActionFills=paintCalls.filter(p=>p.color==='rgba(255,255,255,0.96)');assert.equal(activeActionFills.length,2);assert.ok(activeActionFills.every(p=>p.alpha===1));
+paintCalls.length=0;canvas.globalAlpha=.2;api.drawObjectViewportActions();const activeActionFills=paintCalls.filter(p=>p.color==='rgba(255,255,255,0.96)');assert.equal(activeActionFills.length,3);assert.ok(activeActionFills.every(p=>p.alpha===1));
 
 for(const [id,mode] of [['selectMode','edit'],['drawMode','draw'],['eraseMode','erase'],['selectMode','edit']]){el(id).click();el(id).click();assert.equal(api.mode,mode);assert.equal(['selectMode','drawMode','eraseMode'].filter(key=>el(key).attributes['aria-pressed']==='true').length,1);}
+
+// Transform controls retain their positions through mirror and quarter turns.
+while(api.viewportTurns)el('viewportRotate').click();
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');
+const controlPositions=()=>JSON.stringify({handles:api.objectHandles().map(h=>({x:h.x,y:h.y})),actions:api.objectViewportActions().map(a=>({x:a.x,y:a.y}))});
+const fixedControls=controlPositions();
+clickObjectAction('mirror');assert.equal(controlPositions(),fixedControls);
+for(let turn=0;turn<4;turn++){clickObjectAction('rotate');assert.equal(controlPositions(),fixedControls);}
+clickObjectAction('rotate');
+const stableRight=api.objectHandles().find(h=>h.nx===1),beforeDepth=api.objects[0].depth;
+drag(stableRight.x,stableRight.y,stableRight.x+20,stableRight.y);assert.ok(api.objects[0].depth>beforeDepth);
+
+// Zoom out fits the full model on wide desktops and rotated viewports.
+for(const [width,height] of [[1400,700],[400,800]]){
+ board.clientWidth=width;board.clientHeight=height;api.resize();
+ for(let turn=0;turn<4;turn++){
+  api.zoomAt(.001);const view=api.view,bounds=api.viewBounds();
+  assert.ok(view.scale*2000<=bounds.width+1e-8);assert.ok(view.scale*2000<=bounds.height+1e-8);
+  assert.ok(view.ox>=bounds.left-1e-8&&view.ox+2000*view.scale<=bounds.right+1e-8);
+  assert.ok(view.oy>=bounds.top-1e-8&&view.oy+2000*view.scale<=bounds.bottom+1e-8);
+  el('viewportRotate').click();
+ }
+}
+board.clientWidth=1000;board.clientHeight=800;api.resize();api.fit();
+
+// Selection panels replace the mode bar; duplication is available on the canvas.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');
+assert.equal(el('modeTools').hidden,true);assert.equal(el('editorFooter').hidden,false);
+clickObjectAction('duplicate');assert.equal(api.objects.length,2);
+deselect();assert.equal(el('modeTools').hidden,false);assert.equal(el('editorFooter').hidden,true);
+
+api.addObject('desk');assert.equal(el('objectGroupMenu').hidden,true);
+el('objectMulti').click();assert.equal(el('objectGroupMenu').hidden,false);
+el('objectMulti').click();assert.equal(el('objectGroupMenu').hidden,true);
+deselect();assert.equal(el('modeTools').hidden,false);
+
+// Multi selection only offers grouping; a selected group offers delete and ungroup.
+api.addObject('desk');el('objectMulti').click();
+assert.equal(el('objectForm').hidden,true);assert.equal(el('objectDelete').hidden,true);
+assert.equal(el('objectGroup').hidden,false);assert.equal(el('objectUngroup').hidden,true);
+el('objectMulti').click();
+// Use an isolated scene to create a group without overlapping hit targets.
+el('clearAll').click();el('clearAll').click();api.fit();api.addObject('desk');drag(500,400,650,400);api.addObject('chair');
+el('objectMulti').click();click(650,400);el('objectGroup').click();
+assert.equal(api.objectIds.length,2);assert.equal(el('objectForm').hidden,true);
+assert.equal(el('objectDelete').hidden,false);assert.equal(el('objectGroup').hidden,true);
+assert.equal(el('objectUngroup').hidden,false);assert.equal(el('objectGroupMenu').hidden,false);
+el('objectUngroup').click();assert.ok(api.objects.every(item=>!item.group));
+deselect();

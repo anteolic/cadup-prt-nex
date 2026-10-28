@@ -250,7 +250,7 @@
  }
  function drawObjectViewportActions(){
   for(const action of objectViewportActions()){
-   g.save();g.setTransform(dpr,0,0,dpr,0,0);g.translate(action.screenX,action.screenY);g.scale(handleScale(),handleScale());
+   g.save();g.globalAlpha=1;g.setTransform(dpr,0,0,dpr,0,0);g.translate(action.screenX,action.screenY);g.scale(handleScale(),handleScale());
    drawControlCircle(true,gesture?.type==='object-action'&&gesture.action===action.action);drawControlGlyph(action.action);g.restore();
   }
  }
